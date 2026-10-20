@@ -167,9 +167,18 @@
 
   /* ---------- Nhập / sao lưu dữ liệu ---------- */
   window.hubImport = function (file) {
+    var KNOWN = ['staff', 'tasks', 'logs', 'effort', 'okrs', 'config', 'catalog', 'assign', 'sys'];
+    if (/\.zip$/i.test(file.name)) return Promise.reject(new Error('Bạn đang chọn file .zip (mã nguồn). Hãy chọn file dữ liệu HCNS-HUB_DU-LIEU-BAN-DAU_2026-10-20.json'));
     return file.text().then(function (txt) {
-      var j = JSON.parse(txt);
-      if (!j || j.format !== 'hcns-hub-export' || !j.collections) throw new Error('File không đúng định dạng sao lưu của Bàn điều hành');
+      txt = txt.replace(/^\uFEFF/, '').trim();
+      var j;
+      try { j = JSON.parse(txt); } catch (e) { throw new Error('File "' + file.name + '" không phải JSON hợp lệ (có thể tải về chưa xong hoặc đã bị mở bằng ứng dụng khác)'); }
+      if (j && j.data && j.data.collections) j = j.data;
+      var cols = j && j.collections ? j.collections : j;
+      if (!cols || typeof cols !== 'object' || !Object.keys(cols).some(function (k) { return KNOWN.indexOf(k) >= 0; }))
+        throw new Error('File "' + file.name + '" không chứa dữ liệu Bàn điều hành (cần có staff, logs, tasks…)');
+      j = { collections: {} };
+      Object.keys(cols).forEach(function (k) { if (KNOWN.indexOf(k) >= 0 && cols[k] && typeof cols[k] === 'object') j.collections[k] = cols[k]; });
       var ops = [];
       Object.keys(j.collections).forEach(function (col) {
         var docs = j.collections[col];
