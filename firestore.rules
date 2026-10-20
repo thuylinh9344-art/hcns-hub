@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== Rule hiện có của dự án linh-hr =====
+    // Nếu vẫn cần giữ dữ liệu web quản trị cũ, GIỮ NGUYÊN các khối match đang có ở đây
+    // và chỉ dán thêm khối "Bàn điều hành HCNS" bên dưới.
+
+    // ===== Bàn điều hành HCNS =====
+    // Danh sách email Google được phép dùng. Thêm email của từng thành viên phòng, cách nhau bằng dấu phẩy.
+    function hubMember() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in [
+          'thuylinh9344@gmail.com'
+          // , 'email.thanh.vien@gmail.com'
+        ];
+    }
+
+    match /hcns_hub/main/{document=**} {
+      allow read, write: if hubMember();
+    }
+
+    // Phương án chặt hơn (tùy chọn): chỉ quản trị sửa cấu hình, danh mục KPI và danh sách nhân sự.
+    // Dùng thì xóa khối "match /hcns_hub/main/{document=**}" ở trên và bỏ dấu // ở các dòng dưới.
+    // function hubAdmin() { return request.auth != null && request.auth.token.email in ['thuylinh9344@gmail.com']; }
+    // match /hcns_hub/main/{col}/{docId} {
+    //   allow read: if hubMember();
+    //   allow write: if hubAdmin() || (hubMember() && !(col in ['config', 'catalog', 'staff']));
+    // }
+  }
+}

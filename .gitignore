@@ -1,0 +1,7 @@
+# Không đưa dữ liệu nhân sự hay khóa tài khoản dịch vụ lên GitHub
+*.json
+!firebase.json
+!package.json
+.firebase/
+*-service-account*.json
+.DS_Store

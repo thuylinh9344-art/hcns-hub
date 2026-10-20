@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "default": "linh-hr"
+  },
+  "targets": {
+    "linh-hr": {
+      "hosting": {
+        "hru": ["hru"]
+      }
+    }
+  }
+}
