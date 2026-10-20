@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
+<link rel="icon" type="image/png" href="logo-mark.png">
 <title>Bàn điều hành HCNS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
@@ -11,21 +12,21 @@
 <style>
 /* Layout: thanh điều hướng trái (cuộn ngang trên điện thoại) + vùng làm việc; thẻ chỉ dùng cho khối cần tách biệt */
 :root{
-  --bg:#F3F6F5; --surface:#FFFFFF; --sunken:#E9EFEC; --fg:#14211D; --muted:#5A6B65; --line:#D8E1DD;
-  --accent:#0D6A56; --accent-fg:#FFFFFF; --accent-soft:#DCEFE8;
+  --bg:#F5F8F2; --surface:#FFFFFF; --sunken:#ECF3E8; --fg:#15241A; --muted:#5A6B5E; --line:#D7E4D3;
+  --accent:#13924A; --accent-fg:#FFFFFF; --accent-soft:#E2F2E3; --brand-2:#F38A2A; --brand-2-soft:#FEF0E1;
   --ok:#2D7A4C; --ok-soft:#DFF1E6; --warn:#A86A12; --warn-soft:#FBEFD9; --bad:#BC3B27; --bad-soft:#FBE3DE; --info:#2E5D9C; --info-soft:#E1EAF7;
   --f-body:"Be Vietnam Pro",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --f-num:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
   --r:8px;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0E1412; --surface:#151D1A; --sunken:#1B2521; --fg:#E3ECE8; --muted:#93A59F; --line:#29352F;
-  --accent:#4BC29F; --accent-fg:#06221A; --accent-soft:#163A30;
+  --bg:#0D140F; --surface:#142019; --sunken:#1A2820; --fg:#E4EEE6; --muted:#94A69A; --line:#28382D;
+  --accent:#5DC07A; --accent-fg:#06200F; --accent-soft:#17351F; --brand-2:#F8A14E; --brand-2-soft:#3A2814;
   --ok:#5CC98B; --ok-soft:#163A26; --warn:#E2AE58; --warn-soft:#3A2D14; --bad:#EE7B66; --bad-soft:#3E1F19; --info:#86AEE6; --info-soft:#1A2A40;
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0E1412; --surface:#151D1A; --sunken:#1B2521; --fg:#E3ECE8; --muted:#93A59F; --line:#29352F;
-  --accent:#4BC29F; --accent-fg:#06221A; --accent-soft:#163A30;
+  --bg:#0D140F; --surface:#142019; --sunken:#1A2820; --fg:#E4EEE6; --muted:#94A69A; --line:#28382D;
+  --accent:#5DC07A; --accent-fg:#06200F; --accent-soft:#17351F; --brand-2:#F8A14E; --brand-2-soft:#3A2814;
   --ok:#5CC98B; --ok-soft:#163A26; --warn:#E2AE58; --warn-soft:#3A2D14; --bad:#EE7B66; --bad-soft:#3E1F19; --info:#86AEE6; --info-soft:#1A2A40;
   color-scheme:dark}
 *{box-sizing:border-box}
@@ -35,13 +36,16 @@ button,input,select,textarea{font:inherit;color:inherit}
 .num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
 .app{display:grid;grid-template-columns:228px minmax(0,1fr);min-height:100vh}
 nav.side{background:var(--surface);border-right:1px solid var(--line);padding-block:20px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:16px;position:sticky;top:env(safe-area-inset-top,0px);height:100vh;display:flex;flex-direction:column;gap:18px}
-.brand{display:flex;flex-direction:column;gap:2px;padding:0 8px}
-.brand b{font-size:17px;letter-spacing:-.01em;white-space:nowrap}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px 14px;border-bottom:3px solid transparent;border-image:linear-gradient(90deg,#119549,#67B73F 62%,#F37923 62%,#FB9B35) 1}
+.brand img{width:40px;height:40px;flex:none}
+.brand .bt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.brand b{font-size:16px;letter-spacing:-.01em;white-space:nowrap;color:var(--accent)}
+.brand b em{font-style:normal;color:var(--brand-2)}
 .brand span{font-size:12px;color:var(--muted)}
 .navlist{display:flex;flex-direction:column;gap:2px}
 .navlist a{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:6px;color:var(--fg);text-decoration:none;font-weight:500}
 .navlist a:hover{background:var(--sunken)}
-.navlist a[aria-current="page"]{background:var(--accent-soft);color:var(--accent)}
+.navlist a[aria-current="page"]{background:var(--accent-soft);color:var(--accent);box-shadow:inset 3px 0 0 var(--brand-2)}
 .navlist .cnt{font-family:var(--f-num);font-size:11px;padding:1px 6px;border-radius:10px;background:var(--bad-soft);color:var(--bad)}
 .side-foot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 8px}
 main{padding-block:24px 48px;padding-left:28px;padding-right:max(28px,env(safe-area-inset-right,0px));min-width:0}
@@ -151,6 +155,7 @@ dialog::backdrop{background:rgba(10,20,16,.45)}
   body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
   nav.side{position:sticky;z-index:5;height:auto;flex-direction:row;align-items:center;padding-block:10px;padding-right:max(16px,env(safe-area-inset-right,0px));border-right:0;border-bottom:1px solid var(--line);overflow-x:auto;gap:12px}
   .brand span,.side-foot{display:none}
+  .brand{border:0;padding:0 4px}.brand img{width:30px;height:30px}
   .navlist{flex-direction:row}
   .navlist a{white-space:nowrap}
   main{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -189,7 +194,7 @@ details.ref ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--mut
 <body>
 <div class="app">
   <nav class="side" aria-label="Điều hướng">
-    <div class="brand"><b>HCNS · Upharma</b><span>Bàn điều hành phòng</span></div>
+    <div class="brand"><img src="logo-mark.png" alt="UPharma"><div class="bt"><b>U<em>P</em>harma · HCNS</b><span>Bàn điều hành phòng</span></div></div>
     <div class="navlist" id="nav"></div>
     <div class="side-foot" id="sideFoot">Đang kết nối dữ liệu…</div>
   </nav>

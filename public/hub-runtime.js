@@ -31,7 +31,7 @@
   var css = document.createElement('style');
   css.textContent =
     '#hubLogin{position:fixed;inset:0;z-index:100;display:grid;place-items:center;background:var(--bg);padding:16px}' +
-    '#hubLogin .box{max-width:380px;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:28px;display:grid;gap:14px;text-align:center}' +
+    '#hubLogin .box{max-width:380px;width:100%;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--accent);border-radius:10px;padding:28px;display:grid;gap:12px;text-align:center}' +
     '#hubLogin h1{margin:0;font-size:20px}#hubLogin p{margin:0;color:var(--muted)}' +
     '#hubUser{font-size:12px;color:var(--muted);padding:0 8px;display:grid;gap:6px}' +
     '#hubUser button{justify-self:start}';
@@ -39,7 +39,7 @@
 
   var overlay = document.createElement('div');
   overlay.id = 'hubLogin';
-  overlay.innerHTML = '<div class="box"><h1>HCNS · Upharma</h1><p>Bàn điều hành phòng Tổ chức Hành chính</p>' +
+  overlay.innerHTML = '<div class="box"><img src="logo.png" alt="UPharma" style="width:150px;height:auto;margin:0 auto 4px"><h1>Bàn điều hành HCNS</h1><p>Phòng Tổ chức Hành chính</p>' +
     '<button class="btn pri" id="hubSignIn" type="button">Đăng nhập bằng Google</button>' +
     '<p id="hubLoginMsg" style="font-size:12.5px"></p></div>';
   document.body.appendChild(overlay);
