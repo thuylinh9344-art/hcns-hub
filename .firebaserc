@@ -5,7 +5,7 @@
   "targets": {
     "linh-hr": {
       "hosting": {
-        "hru": ["hru"]
+        "hru": ["hcnsupharma"]
       }
     }
   }

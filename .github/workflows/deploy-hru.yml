@@ -1,4 +1,4 @@
-name: Đăng web lên hru.web.app
+name: Đăng web lên hcnsupharma.web.app
 
 on:
   push:

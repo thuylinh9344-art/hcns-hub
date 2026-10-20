@@ -1,5 +1,5 @@
 /* Cấu hình web của dự án Firebase LINH HR (project id: linh-hr).
-   Web được đăng tại hru.web.app (Firebase Hosting, site "hru" trong dự án linh-hr), mã nguồn quản lý trên GitHub.
+   Web được đăng tại hcnsupharma.web.app (Firebase Hosting, site "hcnsupharma" trong dự án linh-hr), mã nguồn quản lý trên GitHub.
    Đây là cấu hình công khai của ứng dụng web, không phải mật khẩu; quyền truy cập dữ liệu do Firestore Rules quyết định.
    Đối chiếu tại: Firebase Console → Project settings → General → Your apps → Web app → Config. */
 window.HUB_FIREBASE_CONFIG = {
