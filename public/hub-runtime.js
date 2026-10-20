@@ -179,6 +179,12 @@
         throw new Error('File "' + file.name + '" không chứa dữ liệu Bàn điều hành (cần có staff, logs, tasks…)');
       j = { collections: {} };
       Object.keys(cols).forEach(function (k) { if (KNOWN.indexOf(k) >= 0 && cols[k] && typeof cols[k] === 'object') j.collections[k] = cols[k]; });
+      /* Firestore không lưu được mảng lồng mảng: chuyển danh sách DSNS U sang chuỗi JSON. */
+      var sys = j.collections.sys;
+      if (sys) Object.keys(sys).forEach(function (id) {
+        var d = sys[id];
+        if (d && Array.isArray(d.rows)) { var c = {}; Object.keys(d).forEach(function (k) { if (k !== 'rows') c[k] = d[k]; }); c.rowsJson = JSON.stringify(d.rows); sys[id] = c; }
+      });
       var ops = [];
       Object.keys(j.collections).forEach(function (col) {
         var docs = j.collections[col];

@@ -520,7 +520,7 @@ const SHEET_ID='1AdSIpmxiyRQlbIGvavvLS4vytUVwCpK2Qe8ypRIDPGM';
 const SYS_COLS=['code','name','pos','dept','area','block','start','probEnd','status','quit','hdType','hdEnd','tsTo','shop'];
 const SHOP_ALIAS={SHOP0012:'SHOP012A',SHOP0004:'SHOP004A'};
 let _sysCache=null;
-function sysRows(){if(_sysCache)return _sysCache;const c=S.sys.cols||SYS_COLS;_sysCache=(S.sys.rows||[]).map(a=>Object.fromEntries(c.map((k,i)=>[k,a[i]||''])));return _sysCache}
+function sysRows(){if(_sysCache)return _sysCache;const c=S.sys.cols||SYS_COLS;let raw=S.sys.rows||[];if(!raw.length&&S.sys.rowsJson){try{raw=JSON.parse(S.sys.rowsJson)}catch(_){raw=[]}}_sysCache=raw.map(a=>Object.fromEntries(c.map((k,i)=>[k,a[i]||''])));return _sysCache}
 const sysActive=r=>r.status!=='Nghỉ việc';
 const sysOn=r=>sysActive(r)&&r.status!=='Nghỉ thai sản'&&r.status!=='Nghỉ không lương';
 const isCHT=p=>/cửa hàng trưởng|phụ trách cửa hàng/i.test(p||'');
@@ -605,8 +605,9 @@ async function refreshSys(){if(!S.mcp||S.sysBusy)return;S.sysBusy=true;render();
       const st=g(17),q=parseDsnsDate(g(18));if(st==='Nghỉ việc'&&q&&q<cut)return;const sh=sysShop(d[0],g(6));
       rows.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(15))||parseDsnsDate(g(11)),parseDsnsDate(g(16)),st,q,String(b[1]??'').trim(),parseDsnsDate(b[2]),parseDsnsDate(c[1]),sh])});
     if(!rows.length){toast('Sheet DSNS U không trả về dữ liệu, chưa cập nhật');return}
-    let body={source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rows};
-    while(JSON.stringify(body).length>240000){const i=body.rows.findIndex(r=>r[8]==='Nghỉ việc');if(i<0)break;body.rows.splice(i,1)}
+    const lim=window.HUB_STANDALONE?900000:240000;
+    while(JSON.stringify(rows).length>lim){const i=rows.findIndex(r=>r[8]==='Nghỉ việc');if(i<0)break;rows.splice(i,1)}
+    const body=window.HUB_STANDALONE?{source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rowsJson:JSON.stringify(rows)}:{source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rows};
     await write('sys/dsns',body);toast('Đã cập nhật '+rows.length+' nhân sự từ DSNS U');
   }catch(e){const c=e&&e.code;
     toast(c==='server_not_connected'?'Chưa kết nối Google Sheets: thêm trong claude.ai Settings → Connectors':c==='needs_reauth'?'Cần kết nối lại Google Sheets trong claude.ai Settings → Connectors':c==='not_in_manifest'||c==='approval_required'?'Bạn chưa cho phép trang đọc Google Sheets':c==='selection_required'?'Hãy chọn tài khoản Google Sheets trong hộp thoại của claude.ai':c==='tool_error'?'Google Sheets báo lỗi: có thể bạn chưa có quyền xem file Data HCNS':c==='server_unavailable'?'Google Sheets đang không phản hồi, thử lại sau ít phút':'Chưa cập nhật được dữ liệu, thử lại sau')}
