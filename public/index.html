@@ -522,7 +522,8 @@ function vAssign(){
 
 /* ===================== Nhân sự hệ thống (DSNS U) ===================== */
 const SHEET_ID='1AdSIpmxiyRQlbIGvavvLS4vytUVwCpK2Qe8ypRIDPGM';
-const SYS_COLS=['code','name','pos','dept','area','block','start','probEnd','status','quit','hdType','hdEnd','tsTo','shop'];
+const SYS_COLS=['code','name','pos','dept','area','block','start','probEnd','status','quit','hdType','hdEnd','tsTo','shop','yr'];
+const yrOf=r=>String(r.yr||'').trim()||(r.start||'').slice(0,4);
 const SHOP_ALIAS={SHOP0012:'SHOP012A',SHOP0004:'SHOP004A'};
 let _sysCache=null;
 function sysRows(){if(_sysCache)return _sysCache;const c=S.sys.cols||SYS_COLS;let raw=S.sys.rows||[];if(!raw.length&&S.sys.rowsJson){try{raw=JSON.parse(S.sys.rowsJson)}catch(_){raw=[]}}_sysCache=raw.map(a=>Object.fromEntries(c.map((k,i)=>[k,a[i]||''])));return _sysCache}
@@ -532,8 +533,8 @@ const isCHT=p=>/cửa hàng trưởng|phụ trách cửa hàng/i.test(p||'');
 const shopObj=code=>S.shops.find(x=>x.code===code);
 const shopOwner=(code,m)=>{const x=shopObj(code);return x?.m?.[m]||x?.m?.[prevM(m)]||''};
 const sysPlace=r=>r.shop?r.shop.replace(/^SHOP0*/,'NT '):(r.dept||r.block||'');
-function sysMonth(m){const [a,b]=monthRange(m);const R=sysRows();
-  const hires=R.filter(r=>inR(r.start,[a,b])),quits=R.filter(r=>r.status==='Nghỉ việc'&&inR(r.quit,[a,b]));
+function sysMonth(m){const [a,b]=monthRange(m);const R=sysRows();const y=m.slice(0,4);
+  const hires=R.filter(r=>inR(r.start,[a,b])&&yrOf(r)===y),quits=R.filter(r=>r.status==='Nghỉ việc'&&inR(r.quit,[a,b])&&yrOf(r)===y);
   const on=R.filter(r=>sysOn(r)&&r.start<=b).length+quits.length;const early=quits.filter(r=>r.start&&diffDays(r.start,r.quit)<=90);
   return {hires,quits,early,rate:on?r1(quits.length/on*100):0}}
 function shopStaff(code){const R=sysRows().filter(r=>r.shop===code&&sysOn(r));const cht=R.filter(r=>isCHT(r.pos)).length,oth=R.length-cht;const kind=shopObj(code)?.kind||'CHV';
@@ -608,7 +609,7 @@ async function refreshSys(){if(!S.mcp||S.sysBusy)return;S.sysBusy=true;render();
     const cut=addDays(TODAY,-395);const rows=[];
     parts[0].forEach((a,i)=>{const b=parts[1][i]||[],c=parts[2][i]||[],d=parts[3][i]||[];const g=j=>String(a[j]??'').trim();if(!g(1))return;
       const st=g(17),q=parseDsnsDate(g(18));if(st==='Nghỉ việc'&&q&&q<cut)return;const sh=sysShop(d[0],g(6));
-      rows.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(15))||parseDsnsDate(g(11)),parseDsnsDate(g(16)),st,q,String(b[1]??'').trim(),parseDsnsDate(b[2]),parseDsnsDate(c[1]),sh])});
+      rows.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(15))||parseDsnsDate(g(11)),parseDsnsDate(g(16)),st,q,String(b[1]??'').trim(),parseDsnsDate(b[2]),parseDsnsDate(c[1]),sh,g(14)])});
     if(!rows.length){toast('Sheet DSNS U không trả về dữ liệu, chưa cập nhật');return}
     const lim=window.HUB_STANDALONE?900000:240000;
     while(JSON.stringify(rows).length>lim){const i=rows.findIndex(r=>r[8]==='Nghỉ việc');if(i<0)break;rows.splice(i,1)}
@@ -629,11 +630,11 @@ function hrData(y){
   const isQ=r=>r.status==='Nghỉ việc';const actOn=(r,d)=>!!r.start&&r.start<=d&&!(isQ(r)&&r.quit<=d);const cnt=d=>R.reduce((a,r)=>a+(actOn(r,d)?1:0),0);
   const startHC=cnt(base);let prev=startHC;const monthly=[];
   for(let k=1;k<=12;k++){const m=y+'-'+pad(k);if(m+'-01'>end)break;const e=monthRange(m)[1]<end?monthRange(m)[1]:end;
-    const h=R.filter(r=>r.start&&r.start.slice(0,7)===m&&r.start<=e),q=R.filter(r=>isQ(r)&&r.quit.slice(0,7)===m&&r.quit<=e);const hc=cnt(e);
+    const h=R.filter(r=>yrOf(r)===String(y)&&r.start&&r.start.slice(0,7)===m&&r.start<=e),q=R.filter(r=>yrOf(r)===String(y)&&isQ(r)&&r.quit.slice(0,7)===m&&r.quit<=e);const hc=cnt(e);
     monthly.push({m,lbl:'T'+k+(e<monthRange(m)[1]?'*':''),vao:h.length,nghi:q.length,qs:hc,tl:r1(q.length/(((prev+hc)/2)||1)*100)});prev=hc}
-  const hires=R.filter(r=>inR(r.start,[y0,end])),quits=R.filter(r=>isQ(r)&&inR(r.quit,[y0,end]));const act=R.filter(r=>actOn(r,end));
+  const ALL=sysRows();const cohort=ALL.filter(r=>yrOf(r)===String(y));const hires=cohort,quits=cohort.filter(r=>isQ(r));const act=R.filter(r=>actOn(r,end));
   const avg=monthly.length?monthly.reduce((a,x)=>a+x.qs,0)/monthly.length:0;
-  const tenOf=r=>{if(!r.start)return null;return diffDays(r.start,r.quit)};
+  const tenOf=r=>{if(!r.start||!r.quit)return null;return diffDays(r.start,r.quit)};
   const TB=[['≤30 ngày',0,30],['31–90 ngày',31,90],['91–180 ngày',91,180],['181–365 ngày',181,365],['Trên 1 năm',366,1e9]];
   const tenure=TB.map(([l,a,b])=>({l,n:quits.filter(r=>{const t=tenOf(r);return t!=null&&t>=a&&t<=b}).length}));
   const early=quits.filter(r=>{const t=tenOf(r);return t!=null&&t<=90}).length;
@@ -647,18 +648,19 @@ function hrData(y){
   const endM=ymOf(end);const HC={};const hc=id=>HC[id]??={id,shops:0,now:0,h:0,q:0,e:0};
   S.shops.filter(x=>x.type==='nt').forEach(x=>{const o=ownerAt(x.code,endM);if(o)hc(o).shops++});
   act.forEach(r=>{if(r.shop){const o=ownerAt(r.shop,endM);if(o)hc(o).now++}});
-  hires.forEach(r=>{if(r.shop){const o=ownerAt(r.shop,r.start.slice(0,7));if(o)hc(o).h++}});
-  quits.forEach(r=>{if(r.shop){const o=ownerAt(r.shop,r.quit.slice(0,7));if(o){hc(o).q++;const t=tenOf(r);if(t!=null&&t<=90)hc(o).e++}}});
+  hires.forEach(r=>{if(r.shop){const o=ownerAt(r.shop,(r.start||end).slice(0,7));if(o)hc(o).h++}});
+  quits.forEach(r=>{if(r.shop){const o=ownerAt(r.shop,(r.quit||end).slice(0,7));if(o){hc(o).q++;const t=tenOf(r);if(t!=null&&t<=90)hc(o).e++}}});
   const byHcns=Object.values(HC).filter(x=>S.staff.some(s=>s.id===x.id)&&(x.now||x.h||x.q)).sort((a,b)=>b.now-a.now);
   const on=act.filter(sysOn);const shopsWith=new Set(on.filter(r=>r.shop).map(r=>r.shop));const noCHT=[...shopsWith].filter(c=>!on.some(r=>r.shop===c&&isCHT(r.pos))).length;
   const tvOver=act.filter(r=>r.status==='Thử việc'&&r.probEnd&&r.probEnd<addDays(TODAY,-3)).length;
-  const d={y,end,startHC,nowHC:act.length,onHC:on.length,leave:act.length-on.length,hires,quits,avg,rate:avg?r1(quits.length/avg*100):0,monthly,tenure,early,coh,byGrp,byBlk,byArea,byHcns,noCHT,shopsWith:shopsWith.size,tvOver};
+  const quitsStillIn=quits.length,hiredStay=hires.length-quits.length;const d={y,end,startHC,nowHC:act.length,onHC:on.length,leave:act.length-on.length,hires,quits,avg,rate:hires.length?r1(quits.length/hires.length*100):0,stay:hiredStay,allQuits:ALL.filter(r=>isQ(r)&&inR(r.quit,[y0,end])).length,monthly,tenure,early,coh,byGrp,byBlk,byArea,byHcns,noCHT,shopsWith:shopsWith.size,tvOver};
   _hrCache={y,src:S.sys,sh:S.shops,d};return d;
 }
 function hrInsights(d){const out=[];const pk=d.monthly.reduce((a,x)=>x.tl>(a?.tl??-1)?x:a,null);
-  const net=d.nowHC-d.startHC;out.push(`Quân số ${net>=0?'tăng':'giảm'} từ ${nf(d.startHC)} lên ${nf(d.nowHC)} người (${net>=0?'+':''}${net}, ${d.startHC?(net>=0?'+':'')+Math.round(net/d.startHC*100)+'%':'—'}); để có kết quả này đã tuyển ${nf(d.hires.length)} và mất ${nf(d.quits.length)} người.`);
+  const net=d.nowHC-d.startHC;out.push(`Quân số ${net>=0?'tăng':'giảm'} từ ${nf(d.startHC)} lên ${nf(d.nowHC)} người (${net>=0?'+':''}${net}, ${d.startHC?(net>=0?'+':'')+Math.round(net/d.startHC*100)+'%':'—'}). Năm ${d.y} tuyển ${nf(d.hires.length)} người, trong đó ${nf(d.quits.length)} người đã nghỉ (${String(d.rate).replace('.',',')}%).`);
+  if(d.allQuits>d.quits.length)out.push(`Ngoài ra có ${nf(d.allQuits-d.quits.length)} người vào làm từ trước năm ${d.y} đã nghỉ trong năm (tổng số người nghỉ theo ngày nghỉ: ${nf(d.allQuits)}).`);
   if(pk)out.push(`Tháng nghỉ việc cao nhất: ${pk.lbl.replace('*','')} với ${pk.nghi} người (${String(pk.tl).replace('.',',')}%).`);
-  if(d.quits.length)out.push(`${d.early}/${d.quits.length} người nghỉ (${Math.round(d.early/d.quits.length*100)}%) rời đi trong 90 ngày đầu.`);
+  if(d.quits.length)out.push(`${d.early}/${d.quits.length} người tuyển năm ${d.y} đã nghỉ (${Math.round(d.early/d.quits.length*100)}%) rời đi trong 90 ngày đầu.`);
   if(d.coh.length>=4){const f=d.coh.slice(0,3),l=d.coh.slice(-3);const pf=f.reduce((a,x)=>a+x.n90,0)/f.reduce((a,x)=>a+x.vao,0)*100,pl=l.reduce((a,x)=>a+x.n90,0)/l.reduce((a,x)=>a+x.vao,0)*100;out.push(`Tỷ lệ nghỉ trong 90 ngày của người mới: ${Math.round(pf)}% ở 3 lứa đầu năm, ${Math.round(pl)}% ở 3 lứa gần nhất${pl>pf+3?', đang xấu đi':pl<pf-3?', đang cải thiện':''}.`)}
   const cht=d.byGrp.find(x=>x.g.startsWith('CHT'));if(cht)out.push(`CHT: tuyển ${cht.h}, nghỉ ${cht.q}; ${d.noCHT}/${d.shopsWith} nhà thuốc đang có nhân sự nhưng không có CHT.`);
   const hot=d.byBlk.filter(x=>x.now>=10).map(x=>({...x,r:x.q/x.now})).sort((a,b)=>b.r-a.r)[0];if(hot)out.push(`Khối biến động mạnh nhất so với quy mô: ${hot.b} (nghỉ ${hot.q}, quân số hiện tại ${hot.now}).`);
@@ -693,27 +695,27 @@ function vHr(){
   const y=+(S.hrYear||TODAY.slice(0,4));const d=hrData(y);const pct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
   const years=[+TODAY.slice(0,4),+TODAY.slice(0,4)-1];const net=d.nowHC-d.startHC;const upd=S.sys.updatedAt?new Date(S.sys.updatedAt).toLocaleDateString('vi-VN'):'—';
   const tbl=(cols,rows)=>`<div class="tbl-wrap hrt"><table><thead><tr>${cols.map((c,i)=>`<th class="${i?'r':''}">${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`;
-  return head(`Báo cáo nhân sự ${y}`,`Từ 01/01/${y} đến ${fmtDY(d.end)} · nguồn DSNS U, dữ liệu ngày ${upd}`,`<select id="hrYear">${years.map(v=>`<option ${v===y?'selected':''}>${v}</option>`).join('')}</select>${S.mcp?sysBtn():''}${S.dl?`<button class="btn" data-act="hr-dl">Tải file .html</button>`:''}`)+
+  return head(`Báo cáo nhân sự ${y}`,`Từ 01/01/${y} đến ${fmtDY(d.end)} · tuyển mới và nghỉ việc lọc theo cột O "Năm" = ${y} · nguồn DSNS U, dữ liệu ngày ${upd}`,`<select id="hrYear">${years.map(v=>`<option ${v===y?'selected':''}>${v}</option>`).join('')}</select>${S.mcp?sysBtn():''}${S.dl?`<button class="btn" data-act="hr-dl">Tải file .html</button>`:''}`)+
   `<div id="hrBody"><div class="stats">
     <div class="stat"><div class="k">Quân số đầu năm</div><div class="v">${nf(d.startHC)}</div><div class="s">ngày 31/12/${y-1}</div></div>
     <div class="stat ${net>=0?'ok':'bad'}"><div class="k">Quân số hiện tại</div><div class="v">${nf(d.nowHC)}</div><div class="s">${net>=0?'+':''}${net} (${d.startHC?(net>=0?'+':'')+Math.round(net/d.startHC*100):'—'}%) · ${d.leave} thai sản / KL</div></div>
-    <div class="stat"><div class="k">Tuyển mới</div><div class="v">${nf(d.hires.length)}</div><div class="s">${d.hires.filter(r=>hrGrp(r.pos)==='NVBH').length} NVBH</div></div>
-    <div class="stat bad"><div class="k">Nghỉ việc</div><div class="v">${nf(d.quits.length)}</div><div class="s">${d.quits.filter(r=>hrGrp(r.pos)==='NVBH').length} NVBH</div></div>
-    <div class="stat warn"><div class="k">Tỷ lệ nghỉ lũy kế</div><div class="v">${String(d.rate).replace('.',',')}%</div><div class="s">trên QS bình quân ${nf(Math.round(d.avg))}; ${String(r1(d.rate/(d.monthly.length||1))).replace('.',',')}%/tháng</div></div>
-    <div class="stat warn"><div class="k">Nghỉ trong 90 ngày đầu</div><div class="v">${pct(d.early,d.quits.length)}</div><div class="s">${d.early}/${d.quits.length} người nghỉ</div></div>
+    <div class="stat"><div class="k">Tuyển mới năm ${y}</div><div class="v">${nf(d.hires.length)}</div><div class="s">${d.hires.filter(r=>hrGrp(r.pos)==='NVBH').length} NVBH · còn làm ${nf(d.stay)}</div></div>
+    <div class="stat bad"><div class="k">Đã nghỉ (tuyển năm ${y})</div><div class="v">${nf(d.quits.length)}</div><div class="s">${d.quits.filter(r=>hrGrp(r.pos)==='NVBH').length} NVBH</div></div>
+    <div class="stat warn"><div class="k">Tỷ lệ nghỉ / tuyển mới</div><div class="v">${String(d.rate).replace('.',',')}%</div><div class="s">${nf(d.quits.length)}/${nf(d.hires.length)} người vào năm ${y}</div></div>
+    <div class="stat warn"><div class="k">Nghỉ trong 90 ngày đầu</div><div class="v">${pct(d.early,d.quits.length)}</div><div class="s">${d.early}/${d.quits.length} người đã nghỉ</div></div>
   </div>
   <div class="panel" style="margin-bottom:16px"><h2>Điểm cần lưu ý</h2><ul style="margin:0;padding-left:20px;display:grid;gap:4px">${hrInsights(d).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>
-  <div class="panel" style="margin-bottom:16px"><h2>Quân số và biến động theo tháng</h2>${hrMonthChart(d)}</div>
-  <div class="panel" style="margin-bottom:16px"><h2>Nghỉ việc theo thâm niên và chất lượng tuyển</h2>${hrEarlyChart(d)}</div>
+  <div class="panel" style="margin-bottom:16px"><h2>Quân số và biến động theo tháng <small>cột vào mới / nghỉ việc: người có Năm = ${y}</small></h2>${hrMonthChart(d)}</div>
+  <div class="panel" style="margin-bottom:16px"><h2>Nghỉ việc theo thâm niên và chất lượng tuyển <small>người vào làm năm ${y}</small></h2>${hrEarlyChart(d)}</div>
   <div class="grid2" style="margin-bottom:16px">
-    <div class="panel"><h2>Theo khối</h2>${tbl(['Khối','QS hiện tại','Tỷ trọng','Tuyển mới','Nghỉ việc','Nghỉ / QS'],d.byBlk.map(x=>`<tr><td>${x.b}</td><td class="r num">${x.now}</td><td class="r num">${pct(x.now,d.nowHC)}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.now?`<span class="pill ${x.q/x.now>0.8?'bad':x.q/x.now>0.4?'warn':''}">${pct(x.q,x.now)}</span>`:'—'}</td></tr>`).join('')+`<tr><td><b>Tổng</b></td><td class="r num"><b>${d.nowHC}</b></td><td class="r num">100%</td><td class="r num"><b>${d.hires.length}</b></td><td class="r num"><b>${d.quits.length}</b></td><td class="r num">${pct(d.quits.length,d.nowHC)}</td></tr>`)}</div>
-    <div class="panel"><h2>Theo vị trí</h2>${tbl(['Vị trí','QS hiện tại','Tuyển mới','Nghỉ việc','Tăng ròng'],d.byGrp.map(x=>`<tr><td>${x.g}</td><td class="r num">${x.now}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num"><span class="${x.h-x.q<0?'down':x.h-x.q>0?'up':''}">${x.h-x.q>0?'+':''}${x.h-x.q}</span></td></tr>`).join(''))}</div>
+    <div class="panel"><h2>Theo khối</h2>${tbl(['Khối','QS hiện tại','Tỷ trọng','Tuyển mới','Đã nghỉ','Nghỉ / tuyển'],d.byBlk.map(x=>`<tr><td>${x.b}</td><td class="r num">${x.now}</td><td class="r num">${pct(x.now,d.nowHC)}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.h?`<span class="pill ${x.q/x.h>0.5?'bad':x.q/x.h>0.3?'warn':''}">${pct(x.q,x.h)}</span>`:'—'}</td></tr>`).join('')+`<tr><td><b>Tổng</b></td><td class="r num"><b>${d.nowHC}</b></td><td class="r num">100%</td><td class="r num"><b>${d.hires.length}</b></td><td class="r num"><b>${d.quits.length}</b></td><td class="r num">${pct(d.quits.length,d.hires.length)}</td></tr>`)}</div>
+    <div class="panel"><h2>Theo vị trí</h2>${tbl(['Vị trí','QS hiện tại','Tuyển mới','Đã nghỉ','Còn làm'],d.byGrp.map(x=>`<tr><td>${x.g}</td><td class="r num">${x.now}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.h-x.q}</td></tr>`).join(''))}</div>
   </div>
-  <div class="panel" style="margin-bottom:16px"><h2>Theo HCNS phụ trách <small>gán theo phân công nhà thuốc của tháng phát sinh</small></h2>${tbl(['HCNS','Nhà thuốc','NS đang làm','Tuyển mới','Nghỉ việc','Nghỉ ≤90 ngày'],d.byHcns.map(x=>`<tr><td>${esc(staffName(x.id))}</td><td class="r num">${x.shops}</td><td class="r num">${x.now}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.e?`<span class="pill bad">${x.e}</span>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="note">Chưa có phân công nhà thuốc.</td></tr>')}</div>
+  <div class="panel" style="margin-bottom:16px"><h2>Theo HCNS phụ trách <small>gán theo phân công nhà thuốc của tháng phát sinh</small></h2>${tbl(['HCNS','Nhà thuốc','NS đang làm','Tuyển mới','Đã nghỉ','Nghỉ ≤90 ngày'],d.byHcns.map(x=>`<tr><td>${esc(staffName(x.id))}</td><td class="r num">${x.shops}</td><td class="r num">${x.now}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.e?`<span class="pill bad">${x.e}</span>`:''}</td></tr>`).join('')||'<tr><td colspan="6" class="note">Chưa có phân công nhà thuốc.</td></tr>')}</div>
   <div class="grid2">
-    <div class="panel"><h2>Theo tỉnh / thành <small>12 tỉnh nhiều người nghỉ nhất</small></h2>${tbl(['Tỉnh','QS hiện tại','Tuyển mới','Nghỉ việc','Nghỉ / QS'],d.byArea.slice(0,12).map(x=>`<tr><td>${esc(x.a)}</td><td class="r num">${x.now}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.now?`<span class="pill ${x.q>=x.now?'bad':x.q/x.now>0.5?'warn':''}">${pct(x.q,x.now)}</span>`:'<span class="pill bad">hết người</span>'}</td></tr>`).join(''))}</div>
+    <div class="panel"><h2>Theo tỉnh / thành <small>12 tỉnh nhiều người nghỉ nhất (tuyển năm ${y})</small></h2>${tbl(['Tỉnh','QS hiện tại','Tuyển mới','Đã nghỉ','Nghỉ / tuyển'],d.byArea.slice(0,12).map(x=>`<tr><td>${esc(x.a)}</td><td class="r num">${x.now}</td><td class="r num">${x.h}</td><td class="r num">${x.q}</td><td class="r num">${x.h?`<span class="pill ${x.q/x.h>0.5?'bad':x.q/x.h>0.3?'warn':''}">${pct(x.q,x.h)}</span>`:'—'}</td></tr>`).join(''))}</div>
     <div class="panel"><h2>Hợp đồng, thử việc, thai sản <small>việc cần xử lý · <a href="#he-thong">mở danh sách chi tiết</a></small></h2>${tbl(['Việc cần xử lý','Số người'],[['Thử việc quá hạn, chưa cập nhật trạng thái',d.tvOver],['HĐLĐ hết hạn trong 30 ngày',sysAlerts('hd').length],['Kết thúc thử việc trong 14 ngày',sysAlerts('tv').length],['Đã báo nghỉ việc',sysAlerts('bn').length],['Thai sản đi làm lại trong 30 ngày',sysAlerts('ts').length]].map(([a,b])=>`<tr><td>${a}</td><td class="r num">${b?`<span class="pill ${b>20?'warn':''}">${b}</span>`:'0'}</td></tr>`).join(''))}
-  <p class="note">Cách tính: đang làm việc tại một ngày = đã bắt đầu và chưa nghỉ việc tính đến ngày đó (gồm cả nghỉ thai sản). Người ghi "Nghỉ việc" nhưng không có ngày nghỉ, hoặc có ngày nghỉ trước ngày vào làm, được loại khỏi phép tính tương ứng. Danh sách cụ thể ở mục Dữ liệu cần kiểm tra bên dưới.</p></div></div>
+  <p class="note">Cách tính: tuyển mới, đã nghỉ, thâm niên nghỉ và các bảng theo khối/vị trí/HCNS/tỉnh chỉ tính người có cột O "Năm" = ${y} (giống bộ lọc trên DSNS U). Quân số = đã bắt đầu và chưa nghỉ việc tính đến ngày đó (gồm cả nghỉ thai sản). Người ghi "Nghỉ việc" nhưng không có ngày nghỉ, hoặc có ngày nghỉ trước ngày vào làm, được loại khỏi phép tính tương ứng. Danh sách cụ thể ở mục Dữ liệu cần kiểm tra bên dưới.</p></div></div>
   ${hrIssuesPanel(y)}</div>`;
 }
 function swapDM(s){if(!s)return '';const [Y,M,D]=s.split('-');if(+D>12)return '';return `${Y}-${D}-${M}`}
@@ -765,9 +767,9 @@ function buildReport(){
   sec.push({h:'III. Công việc giao đã hoàn thành',groups:byOwner(done,t=>`${t.title}${t.module?' ['+t.module+']':''} – xong ${fmtD(t.doneAt)}${t.due&&t.doneAt>t.due?' (trễ '+diffDays(t.due,t.doneAt)+' ngày)':''}`)});
   sec.push({h:'IV. Việc đang triển khai và tồn đọng',groups:byOwner([...lateOpen,...doing],t=>`${t.title} – ${t.due&&t.due<refDay?'QUÁ HẠN từ '+fmtD(t.due):'hạn '+fmtD(t.due)+', '+(+t.progress||0)+'%'}`)});
   sec.push({h:'V. Kế hoạch kỳ tới ('+fmtD(nr[0])+' – '+fmtD(nr[1])+')',groups:byOwner(next,t=>`${t.title} – hạn ${fmtD(t.due)}`)});
-  if(sysRows().length){const R=sysRows();const hires=R.filter(x=>inR(x.start,r)),quits=R.filter(x=>x.status==='Nghỉ việc'&&inR(x.quit,r));const early=quits.filter(x=>x.start&&diffDays(x.start,x.quit)<=90);
+  if(sysRows().length){const R=sysRows();const yy=r[0].slice(0,4);const hires=R.filter(x=>inR(x.start,r)&&yrOf(x)===yy),quits=R.filter(x=>x.status==='Nghỉ việc'&&inR(x.quit,r)&&yrOf(x)===yy);const early=quits.filter(x=>x.start&&diffDays(x.start,x.quit)<=90);
     const ntShops=S.shops.filter(x=>x.type==='nt');const shortN=ntShops.filter(x=>shopStaff(x.code).short>0).length;
-    sec.push({h:'VI. Biến động nhân sự hệ thống (DSNS U)',lines:[`Đang làm việc: ${nf(R.filter(sysOn).length)} người (chưa gồm ${R.filter(x=>sysActive(x)&&!sysOn(x)).length} người nghỉ thai sản / không lương)`,`Vào mới trong kỳ: ${hires.length} người (${hires.filter(x=>/bán hàng/i.test(x.pos)).length} NVBH, ${hires.filter(x=>isCHT(x.pos)).length} CHT)`,`Nghỉ việc trong kỳ: ${quits.length} người, trong đó ${early.length} người nghỉ trong 90 ngày đầu`,`Nhà thuốc thiếu người theo định biên hiện tại: ${shortN}`,`HĐLĐ hết hạn trong 30 ngày tới: ${sysAlerts('hd').length}; thử việc kết thúc trong 14 ngày: ${sysAlerts('tv').length}`]})}
+    sec.push({h:'VI. Biến động nhân sự hệ thống (DSNS U)',lines:[`Đang làm việc: ${nf(R.filter(sysOn).length)} người (chưa gồm ${R.filter(x=>sysActive(x)&&!sysOn(x)).length} người nghỉ thai sản / không lương)`,`Vào mới trong kỳ: ${hires.length} người (${hires.filter(x=>/bán hàng/i.test(x.pos)).length} NVBH, ${hires.filter(x=>isCHT(x.pos)).length} CHT)`,`Nghỉ việc trong kỳ (người vào làm năm ${yy}): ${quits.length} người, trong đó ${early.length} người nghỉ trong 90 ngày đầu`,`Nhà thuốc thiếu người theo định biên hiện tại: ${shortN}`,`HĐLĐ hết hạn trong 30 ngày tới: ${sysAlerts('hd').length}; thử việc kết thúc trong 14 ngày: ${sysAlerts('tv').length}`]})}
   if(type!=='tuan'){
     if(type==='thang'){const m=months[0];sec.push({h:'VII. KPI và hiệu suất '+fmtM(m),table:{cols:['Nhân sự','Ngày BC','Điểm thực','Trừ lỗi','KPI','Loại','Điểm HS','Hạng D'],rows:staff.map(s=>{const k=kpiOf(m,s.id),e=effOf(m,s.id);return [s.name,k.days,k.has?nf(k.raw):'—',k.pen?nf(k.pen):'',k.has?nf(k.val):'—',k.grade,e.has?nf(e.score):'—',e.has?e.rank:'—']})}})}
     else sec.push({h:'VII. KPI và hạng D theo tháng',table:{cols:['Nhân sự',...months.map(m=>'KPI '+fmtM(m)),'KPI TB','Loại',...months.map(m=>'D '+fmtM(m))],rows:staff.map(s=>{const v=months.map(m=>kpiOf(m,s.id));const ok=v.filter(k=>k.has);const avg=ok.length?r1(ok.reduce((a,k)=>a+k.val,0)/ok.length):null;return [s.name,...v.map(k=>k.has?nf(k.val):'—'),avg==null?'—':nf(avg),avg==null?'—':gradeOf(avg/(+S.config.kpiMax||1000)*100),...months.map(m=>{const e=effOf(m,s.id);return e.has?e.rank:'—'})]})}});
