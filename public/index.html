@@ -633,6 +633,19 @@ async function sysTasks(){const al=sysAlerts(S.sysTab);let n=0,skip=0;
   toast(`Đã tạo ${n} việc nhắc`+(skip?`, bỏ qua ${skip} việc đã có`:''))}
 function parseDsnsDate(s){const m=String(s||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${pad(+m[2])}-${pad(+m[1])}`:''}
 function sysShop(nt,dept){nt=String(nt||'').trim().toUpperCase();if(nt.startsWith('SHOP'))return SHOP_ALIAS[nt]||nt;const m=String(dept||'').match(/Nhà thuốc số\s*(\d+)([A-Za-z]?)/i);if(!m)return '';const c='SHOP'+(m[2]?m[1].padStart(3,'0')+m[2].toUpperCase():m[1].padStart(4,'0'));return SHOP_ALIAS[c]||c}
+
+/* Đồng bộ danh sách nhà thuốc từ Data HCNS · sheet "Theo dõi nhà mới": loại hình (CHV/HV), khu vực, tình trạng; điền HCNS phụ trách còn trống theo địa bàn */
+const NT_SHEET='1m---YbVPTlLOeL6G6cXRkwty16TKqMrQ1SioPXa5AiM';
+async function syncShops(){
+  const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:NT_SHEET,range:"'Theo dõi nhà mới'!C2:M"},{cache:false});const v=(res.payload&&res.payload.values)||[];
+  if(!v.length)return null;const l=JSON.parse(JSON.stringify(S.shops));const m=ymOf(TODAY);const M=recOwnerMaps();let kind=0,add=0,own=0;
+  v.forEach(r=>{let code=String(r[0]||'').trim().toUpperCase();if(!/^SHOP/.test(code))return;code=SHOP_ALIAS[code]||code;
+    const area=String(r[2]||'').trim(),st=String(r[6]||'').trim(),open=parseDsnsDate(r[7]),k=/^HV$/i.test(String(r[10]||'').trim())?'HV':'CHV';
+    let x=l.find(s=>s.code===code);if(!x){x={code,area,type:'nt',kind:k,m:{}};l.push(x);add++}
+    if((x.kind||'CHV')!==k){x.kind=k;kind++}if(area&&(!x.area||x.area==='Chưa xác định'))x.area=area;if(st)x.status=st;if(open)x.open=open;
+    x.m=x.m||{};if(!x.m[m]){const o=M.area[normName(x.area)]||M.area[normName(Object.keys(REC_ALIAS).find(c=>REC_ALIAS[c].some(a=>normName(a)===normName(x.area)))||'')];if(o){x.m[m]=o;own++}}});
+  await saveShops(l);return {kind,add,own,hv:l.filter(s=>s.kind==='HV').length};
+}
 async function refreshSys(){if(!S.mcp||S.sysBusy)return;S.sysBusy=true;render();
   try{const parts=[];for(const rg of ['A3:T','X3:Z','AM3:AN','BI3:BI']){const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:SHEET_ID,range:`'DSNS U'!${rg}`},{cache:false});const p=res.payload;parts.push((p&&p.values)||[])}
     const cut=addDays(TODAY,-395);const rows=[];
@@ -643,7 +656,7 @@ async function refreshSys(){if(!S.mcp||S.sysBusy)return;S.sysBusy=true;render();
     const lim=window.HUB_STANDALONE?900000:240000;
     while(JSON.stringify(rows).length>lim){const i=rows.findIndex(r=>r[8]==='Nghỉ việc');if(i<0)break;rows.splice(i,1)}
     const body=window.HUB_STANDALONE?{source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rowsJson:JSON.stringify(rows)}:{source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rows};
-    await write('sys/dsns',body);toast('Đã cập nhật '+rows.length+' nhân sự từ DSNS U');
+    await write('sys/dsns',body);let sm='';try{const r=await syncShops();if(r)sm=` · nhà thuốc: ${r.hv} nhà HV, thêm ${r.add} nhà, gán phụ trách ${r.own} nhà`}catch(_){sm=' · chưa đọc được sheet Theo dõi nhà mới'}toast('Đã cập nhật '+rows.length+' nhân sự từ DSNS U'+sm);
   }catch(e){const c=e&&e.code;
     toast(c==='server_not_connected'?'Chưa kết nối Google Sheets: thêm trong claude.ai Settings → Connectors':c==='needs_reauth'?'Cần kết nối lại Google Sheets trong claude.ai Settings → Connectors':c==='not_in_manifest'||c==='approval_required'?'Bạn chưa cho phép trang đọc Google Sheets':c==='selection_required'?'Hãy chọn tài khoản Google Sheets trong hộp thoại của claude.ai':c==='tool_error'?'Google Sheets báo lỗi: có thể bạn chưa có quyền xem file Data HCNS':c==='server_unavailable'?'Google Sheets đang không phản hồi, thử lại sau ít phút':'Chưa cập nhật được dữ liệu, thử lại sau')}
   finally{S.sysBusy=false;render()}}
