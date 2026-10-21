@@ -16,10 +16,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LINH_HR }}
-          projectId: linh-hr
-          target: hru
-          channelId: live
+      - name: Deploy Firebase Hosting (site hru → hcnsupharma)
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LINH_HR }}
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          set +e
+          npx --yes firebase-tools@13 deploy --only hosting:hru --project linh-hr --non-interactive > "$RUNNER_TEMP/out.txt" 2>&1
+          code=$?
+          cat "$RUNNER_TEMP/out.txt"
+          if [ $code -ne 0 ]; then
+            tail -n 15 "$RUNNER_TEMP/out.txt" | while IFS= read -r l; do echo "::error::$l"; done
+          fi
+          rm -f "$RUNNER_TEMP/sa.json"
+          exit $code
