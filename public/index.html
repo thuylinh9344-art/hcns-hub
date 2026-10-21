@@ -548,6 +548,31 @@ function sysAlerts(tab){const R=sysRows().filter(sysActive),t=TODAY;
   if(tab==='ts')return R.filter(r=>r.status==='Nghỉ thai sản'&&r.tsTo&&diffDays(t,r.tsTo)<=30).map(r=>({r,date:r.tsTo,what:'Hết thai sản, đi làm lại',mod:'BHXH'}));
   return R.filter(r=>r.status==='Báo nghỉ việc').map(r=>({r,date:r.quit,what:'Báo nghỉ việc'+(r.quit?' từ '+fmtD(r.quit):''),mod:'Nhân sự'}));
 }
+
+/* Độ phủ nhân sự khối bán hàng theo định biên tối thiểu: CHV 1 CHT + 2 NVBH (không CHT: 3 NVBH) · HV 1 CHT + 2 NVBH (không CHT: 4 NVBH) */
+function covShop(s){const need=s.cht?3:(s.kind==='HV'?4:3);const nv=s.cht?2:need;const have=s.cht?1+Math.min(s.oth,2):Math.min(s.oth,need);return {need,have,gap:need-have,surplus:Math.max(0,s.oth-nv),pct:Math.round(have/need*100)}}
+function covAgg(list){const o={shops:list.length,need:0,have:0,gap:0,surplus:0,ppl:0,cht:0,full:0};list.forEach(s=>{const c=s.cov;o.need+=c.need;o.have+=c.have;o.gap+=c.gap;o.surplus+=c.surplus;o.ppl+=s.n;if(s.cht)o.cht++;if(!c.gap)o.full++});o.pct=o.need?r1(o.have/o.need*100):null;o.chtPct=o.shops?Math.round(o.cht/o.shops*100):null;return o}
+const covBar=p=>`<div class="row" style="gap:6px;flex-wrap:nowrap;justify-content:flex-end"><div class="bar" style="width:80px"><i class="${p>=95?'ok':p>=85?'warn':'bad'}" style="width:${Math.min(p||0,100)}%"></i></div><b class="num" style="min-width:46px;text-align:right">${p==null?'—':String(p).replace('.',',')+'%'}</b></div>`;
+function vCoverage(sh,m){
+  const act=sh.filter(s=>s.n>0).map(s=>({...s,cov:covShop(s)}));const empty=S.shops.filter(x=>x.type==='nt'&&!sh.some(s=>s.x.code===x.code&&s.n>0)).length;
+  if(!act.length)return '';
+  const A=covAgg(act);const by=(key)=>{const g={};act.forEach(s=>{const k=key(s)||'—';(g[k]??=[]).push(s)});return Object.entries(g).map(([k,l])=>({k,...covAgg(l)})).sort((a,b)=>(a.pct??0)-(b.pct??0)||b.gap-a.gap)};
+  const byArea=by(s=>s.x.area),byOwn=by(s=>s.own?shortName(s.own):'Chưa phân công'),byKind=by(s=>s.kind);
+  const tbl=(rows,first)=>`<div class="tbl-wrap" style="max-height:420px;overflow:auto"><table><thead><tr><th>${first}</th><th class="r">NT</th><th class="r">NT đủ</th><th class="r">Có CHT</th><th class="r">Nhân sự</th><th class="r">Định biên</th><th class="r">Thiếu</th><th class="r">Dư</th><th class="r">Độ phủ</th></tr></thead><tbody>${rows.map(r=>`<tr><td><b>${esc(r.k)}</b></td><td class="r num">${r.shops}</td><td class="r num">${r.full}</td><td class="r num">${r.cht}</td><td class="r num">${r.ppl}</td><td class="r num">${r.need}</td><td class="r">${r.gap?`<span class="pill bad">${r.gap}</span>`:'<span class="pill ok">0</span>'}</td><td class="r num">${r.surplus||''}</td><td class="r">${covBar(r.pct)}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div class="panel mt"><h2>Độ phủ nhân sự khối bán hàng <small>theo định biên tối thiểu · CHV: 1 CHT + 2 NVBH (không CHT: 3 NVBH) · HV: 1 CHT + 2 NVBH (không CHT: 4 NVBH)</small></h2>
+    <div class="stats" style="margin-bottom:12px">
+      <div class="stat ${A.pct>=95?'ok':A.pct>=85?'warn':'bad'}"><div class="k">Độ phủ định biên</div><div class="v">${String(A.pct).replace('.',',')}%</div><div class="s">${A.have}/${A.need} vị trí tối thiểu có người</div></div>
+      <div class="stat"><div class="k">Nhà thuốc đủ định biên</div><div class="v">${A.full}/${A.shops}</div><div class="s">${Math.round(A.full/A.shops*100)}% nhà thuốc đang hoạt động</div></div>
+      <div class="stat ${A.gap?'bad':'ok'}"><div class="k">Thiếu so với tối thiểu</div><div class="v">${A.gap}</div><div class="s">người tại ${A.shops-A.full} nhà thuốc</div></div>
+      <div class="stat ${A.chtPct>=60?'':'warn'}"><div class="k">Độ phủ CHT</div><div class="v">${A.chtPct}%</div><div class="s">${A.cht}/${A.shops} nhà thuốc có CHT</div></div>
+      <div class="stat"><div class="k">Dư có thể điều chuyển</div><div class="v">${A.surplus}</div><div class="s">NVBH vượt mức tối thiểu</div></div>
+      <div class="stat"><div class="k">Nhân sự bán hàng</div><div class="v">${A.ppl}</div><div class="s">đang làm, trừ thai sản/không lương${empty?` · ${empty} NT chưa có người`:''}</div></div>
+    </div>
+    <div class="stack"><div><h3 class="mini" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em">Theo HCNS phụ trách ${fmtM(m)}</h3>${tbl(byOwn,'HCNS')}</div>
+    <div><h3 class="mini" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em">Theo tỉnh (thấp nhất trước)</h3>${tbl(byArea,'Tỉnh')}</div>
+    <div><h3 class="mini" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em">Theo loại hình</h3>${tbl(byKind,'Loại hình')}</div></div>
+    <p class="note">Độ phủ = số vị trí tối thiểu có người ÷ tổng định biên tối thiểu. Mỗi nhà thuốc tính tối đa đúng mức tối thiểu (người vượt mức ghi vào cột Dư, là nguồn có thể điều chuyển). Nhà có CHT: cần 3 vị trí (1 CHT + 2 NVBH); nhà chưa có CHT: cần 3 NVBH (CHV) hoặc 4 NVBH (HV). Chỉ tính nhà thuốc đang có nhân sự; quân số loại người nghỉ thai sản / không lương.</p></div>`;
+}
 const SYS_TABS=[['hd','HĐ hết hạn ≤30 ngày'],['tv','Thử việc kết thúc ≤14 ngày'],['ts','Thai sản đi làm lại'],['bn','Báo nghỉ việc']];
 function vSys(){
   const m=S.month,R=sysRows();
@@ -580,6 +605,7 @@ function vSys(){
     </div>
     <div class="panel"><h2>Biến động 12 tháng <span class="legend"><span style="--c:var(--ok)">Vào mới</span><span style="--c:var(--bad)">Nghỉ việc</span></span></h2>${moveChart(mv)}</div>
   </div>
+  ${vCoverage(sh,m)}
   <div class="panel mt"><h2>Theo HCNS phụ trách địa bàn <small>${fmtM(m)} · theo bảng phân công nhà thuốc</small></h2>
     <div class="tbl-wrap"><table><thead><tr><th>HCNS</th><th class="r">Nhà thuốc</th><th class="r">NS đang làm</th><th class="r">CHT</th><th class="r">Vào mới</th><th class="r">Nghỉ việc</th><th class="r">Nghỉ ≤90 ngày</th><th class="r">NT thiếu người</th><th class="r">HĐ sắp hết</th><th class="r">Thử việc sắp hết</th></tr></thead><tbody>
     ${byH.map(x=>`<tr><td><b>${esc(x.s.name)}</b></td><td class="r num">${x.shops}</td><td class="r num">${x.n}</td><td class="r num">${x.cht}</td><td class="r num">${x.h||''}</td><td class="r num">${x.q||''}</td><td class="r num">${x.e?`<span class="pill bad">${x.e}</span>`:''}</td><td class="r num">${x.short?`<span class="pill warn">${x.short}</span>`:''}</td><td class="r num">${x.hd||''}</td><td class="r num">${x.tv||''}</td></tr>`).join('')||'<tr><td colspan="10" class="note">Chưa có phân công nhà thuốc cho tháng này.</td></tr>'}
