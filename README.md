@@ -54,6 +54,12 @@ Repo **không chứa dữ liệu nhân sự**. Dữ liệu ban đầu nằm tron
 ### 8. Gỡ địa chỉ cũ linh-hr.web.app (tùy chọn)
 [Hosting → site linh-hr](https://console.firebase.google.com/project/linh-hr/hosting/sites) → menu ⋮ → **Disable site**. Chỉ gỡ trang web cũ; Firestore và đăng nhập vẫn chạy. Không xóa được site mặc định, chỉ tắt được.
 
+## Hồ sơ tuyển dụng (Member)
+- Mục **Hồ sơ tuyển dụng** đọc sheet "Hồ sơ tuyển dụng" trong file *Dữ liệu CV trên member* (Google Sheets, chỉ đọc) và chấm chất lượng xử lý hồ sơ theo bàn giao T10.2026: đúng hạn (hẹn PV1 ≤ 3 ngày làm việc), thời gian tuyển, đi làm thực tế (đối chiếu DSNS U), nghỉ 90 ngày, hồ sơ treo.
+- Tự đọc lại khi mở trang nếu dữ liệu cũ hơn 30 phút và mỗi 30 phút khi trang đang mở; nút **Cập nhật ngay** để đọc tức thì. Kết quả lưu ở Firestore `rec/cv` cho mọi người cùng xem.
+- Chỉ lưu mã hồ sơ, vị trí, địa bàn, trạng thái, các mốc ngày và người phụ trách; không lưu họ tên, SĐT, CCCD, lương ứng viên.
+- Người bấm cập nhật cần có quyền xem file *Dữ liệu CV trên member*.
+
 ## Vận hành
 - Sửa giao diện: chỉnh file trong `public/`, đẩy lên `main`, hcnsupharma.web.app tự cập nhật sau khoảng 1 phút.
 - Đăng thủ công (nếu cần): cài Firebase CLI, chạy `firebase deploy --only hosting:hru` (đích `hru` trỏ tới site hcnsupharma) trong thư mục này.

@@ -26,6 +26,8 @@
   provider.addScope(SHEETS_SCOPE);
   provider.setCustomParameters({ prompt: 'select_account' });
   var sheetToken = null, sheetTokenAt = 0;
+  try { var _t = JSON.parse(sessionStorage.getItem('hubSheetTok') || 'null'); if (_t && _t.k && Date.now() - _t.at < 50 * 60 * 1000) { sheetToken = _t.k; sheetTokenAt = _t.at; } } catch (e) {}
+  function keepTok() { try { sessionStorage.setItem('hubSheetTok', JSON.stringify({ k: sheetToken, at: sheetTokenAt })); } catch (e) {} }
 
   /* ---------- Đăng nhập ---------- */
   var css = document.createElement('style');
@@ -47,7 +49,7 @@
     var msg = document.getElementById('hubLoginMsg');
     msg.textContent = 'Đang mở cửa sổ đăng nhập…';
     auth.signInWithPopup(provider).then(function (res) {
-      if (res.credential && res.credential.accessToken) { sheetToken = res.credential.accessToken; sheetTokenAt = Date.now(); }
+      if (res.credential && res.credential.accessToken) { sheetToken = res.credential.accessToken; sheetTokenAt = Date.now(); keepTok(); }
     }).catch(function (e) {
       msg.textContent = e && e.code === 'auth/unauthorized-domain'
         ? 'Tên miền này chưa được thêm vào Firebase Authentication → Settings → Authorized domains.'
@@ -138,22 +140,23 @@
   };
 
   /* ---------- mcp: Google Sheets API (chỉ đọc) ---------- */
-  function getSheetToken() {
+  function getSheetToken(silent) {
     if (sheetToken && Date.now() - sheetTokenAt < 50 * 60 * 1000) return Promise.resolve(sheetToken);
+    if (silent) return Promise.reject({ code: 'needs_reauth', message: 'Cần đăng nhập lại để đọc Google Sheets' });
     var u = auth.currentUser;
     if (!u) return Promise.reject({ code: 'needs_reauth', message: 'Chưa đăng nhập' });
     return u.reauthenticateWithPopup(provider).then(function (res) {
       if (!res.credential || !res.credential.accessToken) throw { code: 'needs_reauth', message: 'Không nhận được quyền đọc Google Sheets' };
-      sheetToken = res.credential.accessToken; sheetTokenAt = Date.now(); return sheetToken;
+      sheetToken = res.credential.accessToken; sheetTokenAt = Date.now(); keepTok(); return sheetToken;
     }).catch(function (e) {
       if (e && e.code && String(e.code).indexOf('auth/') === 0) throw { code: e.code === 'auth/popup-blocked' ? 'approval_required' : 'needs_reauth', message: e.message };
       throw e;
     });
   }
   var mcp = {
-    callTool: function (server, tool, input) {
+    callTool: function (server, tool, input, opts) {
       if (server !== 'Google Sheets' || tool !== 'get_values') return Promise.reject({ code: 'not_in_manifest', message: 'Chỉ hỗ trợ đọc Google Sheets' });
-      return getSheetToken().then(function (tok) {
+      return getSheetToken(opts && opts.silent).then(function (tok) {
         var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(input.spreadsheetId) + '/values/' + encodeURIComponent(input.range);
         return fetch(url, { headers: { Authorization: 'Bearer ' + tok } }).then(function (r) {
           if (r.status === 401) { sheetToken = null; throw { code: 'needs_reauth', message: 'Phiên Google hết hạn' }; }
