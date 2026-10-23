@@ -200,7 +200,7 @@
       }, Promise.resolve()).then(function () { return ops.length; });
     });
   };
-  var COLS = ['staff', 'tasks', 'logs', 'effort', 'okrs', 'config', 'catalog', 'assign', 'sys'];
+  var COLS = ['staff', 'tasks', 'logs', 'effort', 'okrs', 'config', 'catalog', 'assign', 'sys', 'rec', 'chtplan'];
   window.hubExport = function () {
     var out = {};
     return Promise.all(COLS.map(function (c) {
