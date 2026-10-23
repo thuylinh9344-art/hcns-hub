@@ -573,6 +573,49 @@ function vCoverage(sh,m){
     <div><h3 class="mini" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em">Theo loại hình</h3>${tbl(byKind,'Loại hình')}</div></div>
     <p class="note">Độ phủ NVBH = số vị trí NVBH có người ÷ tổng định biên NVBH (CHV 3, HV 4). Mỗi nhà tính tối đa bằng định biên; NVBH vượt mức ghi vào cột Dư (nguồn có thể điều chuyển). Nhà được tính đủ nhân sự khi đủ NVBH; CHT theo dõi riêng ở cột Có CHT và ô Độ phủ CHT. Chỉ tính nhà thuốc đang có nhân sự; quân số loại người nghỉ thai sản / không lương.</p></div>`;
 }
+
+/* Điểm nóng nghỉ việc: tỷ lệ nghỉ từ đầu năm theo nhà thuốc / tỉnh, đối chiếu với quân số NVBH hiện tại */
+const TURN_MERGE={'Quảng Nam':'Đà Nẵng','Bình Dương':'TP.HCM','Bắc Giang':'Bắc Ninh','Thái Bình':'Hưng Yên','Vĩnh Phúc':'Phú Thọ','Quảng Bình':'Quảng Trị','Bình Định':'Gia Lai'};
+function turnData(){
+  const R=sysRows(),y=TODAY.slice(0,4),y0=y+'-01-01',d90=addDays(TODAY,-90);const ends=[];for(let m=1;m<=+TODAY.slice(5,7);m++){const e=monthRange(y+'-'+pad(m))[1];ends.push(e>TODAY?TODAY:e)}
+  const by={};R.forEach(r=>{if(r.shop)(by[r.shop]??=[]).push(r)});
+  const hc=(rs,d)=>rs.filter(r=>r.start&&r.start<=d&&!(r.status==='Nghỉ việc'&&r.quit&&r.quit<=d)).length;
+  const L=[];Object.entries(by).forEach(([code,rs])=>{const x=shopObj(code);if(x&&x.type!=='nt')return;
+    const q=rs.filter(r=>r.status==='Nghỉ việc'&&r.quit&&r.quit>=y0&&r.quit<=TODAY);const st=shopStaff(code);
+    const hs=ends.map(e=>hc(rs,e)).filter(h=>h>0);const avg=hs.length?hs.reduce((a,b)=>a+b,0)/hs.length:0;if(!st.n&&!q.length)return;
+    const area=(x&&x.area)||(rs[0]&&rs[0].area)||'';
+    L.push({code,area:TURN_MERGE[area]||area,own:shopOwner(code,S.month),...st,q:q.length,q90:q.filter(r=>r.quit>=d90).length,early:q.filter(r=>r.start&&diffDays(r.start,r.quit)<=90).length,bn:rs.filter(r=>r.status==='Báo nghỉ việc').length,avg,rate:avg?Math.round(q.length/avg*100):null,sur:Math.max(0,st.oth-st.need)})});
+  return L;
+}
+function vTurnover(){
+  const L=turnData();if(!L.length)return '';
+  const tq=L.reduce((a,s)=>a+s.q,0),ta=L.reduce((a,s)=>a+s.avg,0),base=ta?Math.round(tq/ta*100):0;
+  const hot=L.filter(s=>s.q>=3&&s.rate>=100).sort((a,b)=>(b.short-a.short)||(b.rate-a.rate));
+  const tag=s=>s.short?`<span class="pill bad">Thiếu ${s.short} NVBH</span>`:(s.oth===s.need||s.bn)?`<span class="pill warn">Vừa đủ${s.bn?' · '+s.bn+' báo nghỉ':''}</span>`:`<span class="pill ok">Dư ${s.sur}</span>`;
+  const A={};L.forEach(s=>{const a=(A[s.area||'—']??={k:s.area||'—',shops:0,q:0,q90:0,avg:0,oth:0,need:0,gap:0,sur:0,hot:0,bn:0});a.shops++;a.q+=s.q;a.q90+=s.q90;a.avg+=s.avg;a.oth+=s.oth;a.need+=s.need;a.gap+=s.short;a.sur+=s.sur;a.bn+=s.bn;if(s.q>=3&&s.rate>=100)a.hot++});
+  const ar=Object.values(A).map(a=>({...a,rate:a.avg?Math.round(a.q/a.avg*100):0})).filter(a=>a.q).sort((a,b)=>b.rate-a.rate);
+  const judge=a=>a.rate>=base*1.3?(a.gap>a.sur?`<span class="pill bad">Nghỉ cao · thiếu, cần tuyển</span>`:a.gap?`<span class="pill warn">Nghỉ cao · thiếu ${a.gap}, bù được nội tỉnh</span>`:`<span class="pill warn">Nghỉ cao · hiện đủ, theo dõi</span>`):a.gap>a.sur?`<span class="pill warn">Thiếu ${a.gap}, cần tuyển ${a.gap-a.sur}</span>`:a.gap?`<span class="pill info">Thiếu ${a.gap}, bù được nội tỉnh</span>`:`<span class="pill ok">Ổn định</span>`;
+  return `<div class="panel mt"><h2>Điểm nóng nghỉ việc và thiếu người <small>nghỉ việc từ 01/01 đến ${fmtDY(TODAY)} · quân số NVBH hiện tại theo định biên CHV 3 / HV 4</small></h2>
+    <div class="stats" style="margin-bottom:12px">
+      <div class="stat"><div class="k">Tỷ lệ nghỉ khối nhà thuốc</div><div class="v">${base}%</div><div class="s">${tq} người nghỉ / quân số bình quân ${Math.round(ta)}</div></div>
+      <div class="stat warn"><div class="k">Nhà thuốc nghỉ cao</div><div class="v">${hot.length}</div><div class="s">tỷ lệ ≥ 100% và từ 3 người nghỉ</div></div>
+      <div class="stat ${hot.some(s=>s.short)?'bad':'ok'}"><div class="k">Trong đó đang thiếu</div><div class="v">${hot.filter(s=>s.short).length}</div><div class="s">thiếu ${hot.reduce((a,s)=>a+s.short,0)} NVBH</div></div>
+      <div class="stat warn"><div class="k">Vừa đủ, không dự phòng</div><div class="v">${hot.filter(s=>!s.short&&(s.oth===s.need||s.bn)).length}</div><div class="s">nghỉ thêm 1 người là thiếu</div></div>
+      <div class="stat ok"><div class="k">Đã bù đủ, còn dư</div><div class="v">${hot.filter(s=>!s.short&&s.oth>s.need&&!s.bn).length}</div><div class="s">tuyển bù kịp</div></div>
+      <div class="stat"><div class="k">Nghỉ 90 ngày gần nhất</div><div class="v">${L.reduce((a,s)=>a+s.q90,0)}</div><div class="s">người, khối nhà thuốc</div></div>
+    </div>
+    <div class="stack">
+      <div><h3 class="mini" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em">Nhà thuốc nghỉ việc cao</h3>
+      <div class="tbl-wrap hrt" style="max-height:440px;overflow:auto"><table><thead><tr><th>Nhà thuốc</th><th>Tỉnh</th><th>HCNS</th><th class="r">Nghỉ YTD</th><th class="r">90 ngày</th><th class="r">Nghỉ sớm</th><th class="r">QS BQ</th><th class="r">Tỷ lệ</th><th class="r">CHT</th><th class="r">NVBH/ĐB</th><th>Hiện tại</th></tr></thead><tbody>
+      ${hot.map(s=>`<tr class="${s.short?'recalert':''}"><td class="num"><b>${esc(s.code.replace(/^SHOP0*/,'NT '))}</b> <span class="mini">${s.kind}</span></td><td style="white-space:nowrap">${esc(s.area)}</td><td style="white-space:nowrap">${s.own?esc(shortName(s.own)):'—'}</td><td class="r num">${s.q}</td><td class="r num">${s.q90||''}</td><td class="r num">${s.early||''}</td><td class="r num">${String(Math.round(s.avg*10)/10).replace('.',',')}</td><td class="r"><span class="pill ${s.rate>=150?'bad':'warn'}">${s.rate}%</span></td><td class="r num">${s.cht}</td><td class="r num">${s.oth}/${s.need}</td><td>${tag(s)}</td></tr>`).join('')||'<tr><td colspan="11" class="note">Không có nhà thuốc nghỉ việc cao.</td></tr>'}
+      </tbody></table></div></div>
+      <div><h3 class="mini" style="margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em">Theo tỉnh (tỷ lệ nghỉ cao nhất trước)</h3>
+      <div class="tbl-wrap hrt" style="max-height:440px;overflow:auto"><table><thead><tr><th>Tỉnh</th><th class="r">NT</th><th class="r">Nghỉ YTD</th><th class="r">90 ngày</th><th class="r">Tỷ lệ</th><th class="r">NT nghỉ cao</th><th class="r">NVBH/ĐB</th><th class="r">Thiếu</th><th class="r">Dư</th><th>Đánh giá hiện tại</th></tr></thead><tbody>
+      ${ar.map(a=>`<tr><td><b>${esc(a.k)}</b></td><td class="r num">${a.shops}</td><td class="r num">${a.q}</td><td class="r num">${a.q90||''}</td><td class="r"><span class="pill ${a.rate>=base*1.3?'bad':a.rate>=base?'warn':'ok'}">${a.rate}%</span></td><td class="r num">${a.hot||''}</td><td class="r num">${a.oth}/${a.need}</td><td class="r">${a.gap?`<span class="pill bad">${a.gap}</span>`:'0'}</td><td class="r num">${a.sur||''}</td><td>${judge(a)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+    </div>
+    <p class="note">Tỷ lệ nghỉ = số người nghỉ việc từ 01/01 ÷ quân số bình quân các cuối tháng nhà thuốc có người (gồm cả CHT). Nhà nghỉ cao: tỷ lệ ≥ 100% và từ 3 người nghỉ. Nghỉ sớm: nghỉ khi làm chưa đủ 90 ngày. NVBH/ĐB: NVBH đang làm / định biên. Tỉnh “nghỉ cao” khi tỷ lệ ≥ 1,3 lần mức chung (${base}%). Thiếu/dư tính theo NVBH đang làm (trừ thai sản, không lương) so với định biên CHV 3, HV 4; “bù được từ dư nội tỉnh” khi số NVBH dư ở các nhà khác cùng tỉnh ≥ số thiếu.</p></div>`;
+}
 const SYS_TABS=[['hd','HĐ hết hạn ≤30 ngày'],['tv','Thử việc kết thúc ≤14 ngày'],['ts','Thai sản đi làm lại'],['bn','Báo nghỉ việc']];
 function vSys(){
   const m=S.month,R=sysRows();
@@ -606,6 +649,7 @@ function vSys(){
     <div class="panel"><h2>Biến động 12 tháng <span class="legend"><span style="--c:var(--ok)">Vào mới</span><span style="--c:var(--bad)">Nghỉ việc</span></span></h2>${moveChart(mv)}</div>
   </div>
   ${vCoverage(sh,m)}
+  ${vTurnover()}
   <div class="panel mt"><h2>Theo HCNS phụ trách địa bàn <small>${fmtM(m)} · theo bảng phân công nhà thuốc</small></h2>
     <div class="tbl-wrap"><table><thead><tr><th>HCNS</th><th class="r">Nhà thuốc</th><th class="r">NS đang làm</th><th class="r">CHT</th><th class="r">Vào mới</th><th class="r">Nghỉ việc</th><th class="r">Nghỉ ≤90 ngày</th><th class="r">NT thiếu người</th><th class="r">HĐ sắp hết</th><th class="r">Thử việc sắp hết</th></tr></thead><tbody>
     ${byH.map(x=>`<tr><td><b>${esc(x.s.name)}</b></td><td class="r num">${x.shops}</td><td class="r num">${x.n}</td><td class="r num">${x.cht}</td><td class="r num">${x.h||''}</td><td class="r num">${x.q||''}</td><td class="r num">${x.e?`<span class="pill bad">${x.e}</span>`:''}</td><td class="r num">${x.short?`<span class="pill warn">${x.short}</span>`:''}</td><td class="r num">${x.hd||''}</td><td class="r num">${x.tv||''}</td></tr>`).join('')||'<tr><td colspan="10" class="note">Chưa có phân công nhà thuốc cho tháng này.</td></tr>'}
