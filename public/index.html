@@ -1348,6 +1348,7 @@ document.addEventListener('change',e=>{const t=e.target;
    Báo đỏ: tỉnh đang thiếu NVBH theo định biên VÀ tỷ lệ nghỉ <90 ngày ≥ ngưỡng. */
 const NV_TH=40,NV_MIN=3;
 const NV_PER=[['ytd','Từ đầu năm'],['6m','6 tháng gần nhất'],['3m','3 tháng gần nhất']];
+function nvCohStart(){return S.nvF.per==='ytd'?nvStart():addDays(nvStart(),-90)}
 function nvStart(){const p=S.nvF.per;return p==='3m'?addDays(TODAY,-91):p==='6m'?addDays(TODAY,-182):TODAY.slice(0,4)+'-01-01'}
 let _nvCache=null;
 function nvData(){const key=S.nvF.per+'|'+(S.sys.updatedAt||'')+'|'+S.shops.length;if(_nvCache&&_nvCache.key===key)return _nvCache.v;
@@ -1358,7 +1359,7 @@ function nvData(){const key=S.nvF.per+'|'+(S.sys.updatedAt||'')+'|'+S.shops.leng
   const shops=[];Object.entries(by).forEach(([code,rs])=>{const x=shopObj(code);if(x&&x.type==='vp')return;
     const st=shopStaff(code);const q=rs.filter(r=>r.status==='Nghỉ việc'&&r.quit&&r.quit>=p0&&r.quit<=TODAY);
     const early=q.filter(r=>r.start&&diffDays(r.start,r.quit)<=90).length;
-    const coh=rs.filter(r=>r.start&&r.start>=p0&&r.start<=d90);const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
+    const coh=rs.filter(r=>r.start&&r.start>=nvCohStart()&&r.start<=d90);const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
     const hs=ends.map(e=>hc(rs,e));const avg=hs.length?hs.reduce((a,b)=>a+b,0)/hs.length:0;
     if(!st.n&&!q.length&&!coh.length)return;const area0=(x&&x.area)||(rs[0]&&rs[0].area)||'Chưa rõ tỉnh';
     shops.push({code,area:TURN_MERGE[area0]||area0,kind:st.kind,oth:st.oth,cht:st.cht,need:st.need,gap:st.n?st.short:st.need,q:q.length,early,coh:coh.length,c90,avg,bn:rs.filter(r=>r.status==='Báo nghỉ việc').length})});
@@ -1379,7 +1380,7 @@ function nvKho(){const R=sysRows(),p0=nvStart(),d90=addDays(TODAY,-90);
   const hc=(rs,d)=>rs.filter(r=>r.start&&r.start<=d&&!(r.status==='Nghỉ việc'&&r.quit&&r.quit<=d)).length;
   return NV_KHO.map(([name,re])=>{const rs=R.filter(r=>re.test(r.dept||'')||(!r.shop&&/kho/i.test(r.block||'')&&re.test('kho '+(r.area||''))));
     const on=rs.filter(sysOn);const q=rs.filter(r=>r.status==='Nghỉ việc'&&r.quit&&r.quit>=p0&&r.quit<=TODAY);const early=q.filter(r=>r.start&&diffDays(r.start,r.quit)<=90).length;
-    const coh=rs.filter(r=>r.start&&r.start>=p0&&r.start<=d90);const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
+    const coh=rs.filter(r=>r.start&&r.start>=nvCohStart()&&r.start<=d90);const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
     const mrows=mons.map(m=>{const [a,b0]=monthRange(m);const b=b0>TODAY?TODAY:b0;const qm=rs.filter(r=>r.status==='Nghỉ việc'&&r.quit>=a&&r.quit<=b);return {m,hire:rs.filter(r=>r.start>=a&&r.start<=b).length,q:qm.length,early:qm.filter(r=>r.start&&diffDays(r.start,r.quit)<=90).length,hc:hc(rs,b)}});
     const avg=mrows.length?mrows.reduce((s,x)=>s+x.hc,0)/mrows.length:0;
     const o={name,on:on.length,tv:on.filter(r=>r.status==='Thử việc').length,q:q.length,early,coh:coh.length,c90,bn:rs.filter(r=>r.status==='Báo nghỉ việc').length,avg,mrows};
@@ -1401,7 +1402,7 @@ function vNv(){
   const {prov,T}=nvData();const red=prov.filter(p=>p.lv===2),redShops=prov.flatMap(p=>p.shops.filter(s=>s.lv===2));const K=nvKho(),redK=K.filter(k=>k.lv===2);
   h+=`<div class="stats">
     <div class="stat ${red.length||redK.length?'bad':'ok'}"><div class="k">Tỉnh báo đỏ</div><div class="v">${red.length}</div><div class="s">${redShops.length} nhà thuốc${redK.length?' · '+redK.map(k=>k.name).join(', '):''} báo đỏ</div></div>
-    <div class="stat ${T.r90>=NV_TH?'bad':T.r90>=30?'warn':'ok'}"><div class="k">Nghỉ dưới 90 ngày</div><div class="v">${T.r90==null?'—':String(T.r90).replace('.',',')+'%'}</div><div class="s">${T.c90}/${T.coh} người vào làm trong kỳ · mục tiêu dưới ${NV_TH}%</div></div>
+    <div class="stat ${T.r90>=NV_TH?'bad':T.r90>=30?'warn':'ok'}"><div class="k">Nghỉ dưới 90 ngày</div><div class="v">${T.r90==null?'—':String(T.r90).replace('.',',')+'%'}</div><div class="s">${T.c90}/${T.coh} người vào làm từ ${fmtD(nvCohStart())} đến ${fmtD(addDays(TODAY,-90))} · mục tiêu dưới ${NV_TH}%</div></div>
     <div class="stat ${T.gap?'bad':'ok'}"><div class="k">NVBH còn thiếu</div><div class="v">${T.gap}</div><div class="s">${T.oth}/${T.need} theo định biên</div></div>
     <div class="stat"><div class="k">Nghỉ việc trong kỳ</div><div class="v">${T.q}</div><div class="s">${T.early} người nghỉ khi chưa đủ 90 ngày</div></div>
     <div class="stat"><div class="k">Tỷ lệ nghỉ việc</div><div class="v">${T.rate==null?'—':T.rate+'%'}</div><div class="s">số nghỉ / quân số bình quân cuối tháng</div></div>
@@ -1413,7 +1414,7 @@ function vNv(){
   h+=`<div class="panel mt"><h2>Theo tỉnh <small>báo đỏ lên đầu · bấm 1 tỉnh để xem từng nhà thuốc</small></h2><div class="tbl-wrap"><table><thead><tr><th>Tỉnh</th><th class="r">NVBH / định biên</th><th class="r">Thiếu NVBH</th><th class="r">Nghỉ trong kỳ</th><th class="r">Nghỉ &lt;90 ngày</th><th class="r">Vào làm → nghỉ &lt;90 ngày</th><th class="r">Tỷ lệ nghỉ &lt;90 ngày</th><th class="r">Tỷ lệ nghỉ việc</th><th class="r">Đang báo nghỉ</th><th>Mức</th></tr></thead><tbody>
     ${prov.map(p=>{const open=S.nvF.open===p.area;return `<tr class="click ${p.lv===2?'recalert':''}" data-act="nv-open" data-id="${esc(p.area)}"><td><b>${open?'▾':'▸'} ${esc(p.area)}</b> <span class="mini">${p.nt} NT${p.short?` · ${p.short} NT thiếu`:''}</span>${p.red&&p.lv<2?` <span class="pill bad">${p.red} nhà báo đỏ</span>`:''}</td><td class="r num">${p.oth}/${p.need}</td><td class="r">${p.gap?`<span class="pill bad">${p.gap}</span>`:'<span class="pill ok">0</span>'}</td><td class="r num">${p.q}</td><td class="r num">${p.early}${p.share!=null?` <span class="mini">(${p.share}%)</span>`:''}</td><td class="r num">${p.coh?`${p.c90}/${p.coh}`:'—'}</td><td class="r">${nvPct(p.r90)}</td><td class="r num">${p.rate==null?'—':p.rate+'%'}</td><td class="r num">${p.bn||''}</td><td>${nvTag(p.lv)}</td></tr>${open?p.shops.map(shopRow).join(''):''}`}).join('')}
     </tbody></table></div>
-    <p class="note">Tỷ lệ nghỉ &lt;90 ngày chỉ tính người vào làm trong kỳ và đã làm đủ 90 ngày tính đến hôm nay (người mới vào chưa đủ 90 ngày chưa đánh giá được). Tỉnh có dưới ${NV_MIN} người như vậy ghi "ít dữ liệu". Thiếu NVBH theo định biên CHV 3 NVBH, HV 4 NVBH. Tỷ lệ nghỉ việc = số nghỉ trong kỳ / quân số bình quân cuối các tháng trong kỳ.</p></div>`;
+    <p class="note">Tỷ lệ nghỉ &lt;90 ngày tính trên những người đã đủ 90 ngày tính đến hôm nay: kỳ "Từ đầu năm" lấy người vào làm từ 01/01; kỳ 3 tháng, 6 tháng lấy người vào làm trong khoảng ${fmtDY(nvCohStart())}–${fmtDY(addDays(TODAY,-90))}, tức những người có kết quả 90 ngày rơi vào kỳ đang xem. Tỉnh có dưới ${NV_MIN} người như vậy ghi "ít dữ liệu". Thiếu NVBH theo định biên CHV 3 NVBH, HV 4 NVBH. Tỷ lệ nghỉ việc = số nghỉ trong kỳ / quân số bình quân cuối các tháng trong kỳ.</p></div>`;
   return h}
 function nvCopyText(){const {prov}=nvData();const red=prov.filter(p=>p.lv===2||p.red);const kt=nvKho().filter(k=>k.lv===2).map(k=>`\n${k.name}: nghỉ dưới 90 ngày ${k.r90}% (${k.c90}/${k.coh}), nghỉ trong kỳ ${k.q}${k.bn?`, ${k.bn} người đang báo nghỉ`:''}`).join('');if(!red.length&&!kt)return 'Không có tỉnh nào vừa thiếu NVBH vừa có tỷ lệ nghỉ dưới 90 ngày từ '+NV_TH+'%.';
   return `CẢNH BÁO NGHỈ VIỆC THEO TỈNH · ${fmtDY(TODAY)} (kỳ từ ${fmtDY(nvStart())})\n`+red.map(p=>`\n${p.area}${p.lv===2?' (BÁO ĐỎ cả tỉnh)':''}: thiếu ${p.gap} NVBH tại ${p.short} nhà, nghỉ dưới 90 ngày ${p.r90==null?'—':p.r90+'%'} (${p.c90}/${p.coh})${p.bn?`, ${p.bn} người đang báo nghỉ`:''}\n`+p.shops.filter(s=>s.lv===2).map(s=>`- ${s.code.replace(/^SHOP0*/,'NT ')}: thiếu ${s.gap}, nghỉ <90 ngày ${s.c90}/${s.coh}`).join('\n')).join('\n')+kt}
