@@ -397,7 +397,7 @@ function vMe(){
   const myShops=shopsOf(m,s.id,'nt');const byArea={};myShops.forEach(x=>(byArea[x.area||'Khác']??=[]).push(x.code));
   const myTasks=S.tasks.filter(t=>t.owner===s.id&&!isDone(t)).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9'));
   const unit=dr.code?(catBy(dr.code)?.unit||''):'';
-  return head('Nhật ký công việc cá nhân',`${esc(s.name)}${s.code?' · '+esc(s.code):''}${s.title?' · '+esc(s.title):''} · kỳ ${fmtM(m)}`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-log">Xuất CSV</button>`:''))+
+  return head('Nhật ký công việc cá nhân',`${esc(s.name)}${s.code?' · '+esc(s.code):''}${s.title?' · '+esc(s.title):''} · kỳ ${fmtM(m)} · đồng bộ từ sheet Báo cáo công việc${S.logAt?' lúc '+S.logAt.slice(11,16):''}`,monthPicker()+lgBtn()+(S.dl?`<button class="btn" data-act="csv-log">Xuất CSV</button>`:''))+
   `<div class="chips">${st.map(x=>`<button class="chip" data-act="me" data-id="${x.id}" aria-pressed="${x.id===s.id}">${esc(x.name)}${(x.status||'active')!=='active'?' (nghỉ)':''}</button>`).join('')}</div>
   <div class="stats">
     <div class="stat"><div class="k">KPI tháng</div><div class="v">${k.has?nf(k.val):'—'}</div><div class="s">/ ${nf(k.max)} · ${k.has?'loại '+k.grade:'chưa có nhật ký'}</div></div>
@@ -466,7 +466,7 @@ function setStatus(t,st){const body=clean(t);body.status=st;if(st==='done'){body
 function vKpi(){
   const m=S.month;const st=activeStaff();const c=S.config;
   const rows=st.map(s=>({s,k:kpiOf(m,s.id),e:effOf(m,s.id)}));
-  return head('KPI & hiệu suất',`KPI 1.000 điểm/người = KPI tuyển dụng + công việc khác theo nhật ký trong quỹ điểm còn lại: A ≥${c.gradeA}%, B ≥${c.gradeB}%, C ≥${c.gradeC}%, dưới đó D · Hiệu suất xếp hạng D1–D6 theo khối lượng phụ trách`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-kpi">Xuất CSV</button>`:''))+
+  return head('KPI & hiệu suất',`KPI 1.000 điểm/người = KPI tuyển dụng + công việc khác theo nhật ký trong quỹ điểm còn lại: A ≥${c.gradeA}%, B ≥${c.gradeB}%, C ≥${c.gradeC}%, dưới đó D · Hiệu suất xếp hạng D1–D6 theo khối lượng phụ trách`,monthPicker()+lgBtn()+(S.dl?`<button class="btn" data-act="csv-kpi">Xuất CSV</button>`:''))+
   `<div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Ngày BC</th><th class="r">Dòng</th><th class="r">Điểm đạt / phân bổ</th><th class="r">Trừ lỗi</th><th class="r">KPI</th><th>Loại</th><th class="r">Điểm HS</th><th>Hạng D</th><th>D hiện hữu</th></tr></thead><tbody>
   ${rows.map(({s,k,e})=>`<tr class="click ${S.kpiOpen===s.id?'open':''}" data-act="kpi-open" data-id="${s.id}"><td><b>${esc(s.name)}</b><div class="note">${esc(s.title||'')}</div></td><td class="r num">${k.days||'—'}</td><td class="r num">${k.n||'—'}</td><td class="r num">${k.has?nf(k.raw)+(k.alloc?' <span class="mini">/ '+nf(k.plan)+'</span>':''):'—'}${k.over?' <span class="pill ok">vượt trần</span>':''}${k.log&&k.has?' <span class="mini">(nhật ký)</span>':''}</td><td class="r num">${k.pen?'−'+nf(k.pen):''}</td><td class="r num"><b>${k.has?nf(k.val):'—'}</b></td><td>${gradePill(k)}</td><td class="r num">${e.has?nf(e.score):'—'}</td><td>${e.has?rankPill(e.rank)+' '+dCompare(s.dCurrent,e.rank):'—'}</td><td>${s.dCurrent?rankPill(s.dCurrent):'—'}</td></tr>
   ${S.kpiOpen===s.id?`<tr><td colspan="10" style="background:var(--surface)">${kpiDetail(s,m,k)}</td></tr>`:''}`).join('')}
@@ -1549,6 +1549,35 @@ document.addEventListener('change',e=>{const t=e.target;const m=S.month;
   if(t.dataset.kpp!=null){const i=+t.dataset.i,v=+t.value||0;kpSave(m,t.dataset.kpp,l=>{if(l[i])l[i][1]=v})}
   else if(t.dataset.kpm!=null){const code=t.dataset.kpm,k=t.dataset.k;const p=JSON.parse(JSON.stringify(S.config.kpiPct||{}));p[m]=p[m]||{};p[m][code]=p[m][code]||{};if(t.value==='')delete p[m][code][k];else p[m][code][k]=Math.min(100,Math.max(0,+t.value));write('config/main',{...S.config,kpiPct:p})}
   else if(t.id&&t.id.startsWith('kpAdd-')&&t.value){const code=t.id.slice(6),k=t.value;kpSave(m,code,l=>{l.push([k,50])})}});
+/* ===================== Đồng bộ nhật ký công việc từ Google Trang tính "BÁO CÁO CÔNG VIỆC - HCNS UPHARMA" =====================
+   Mỗi sheet nhân viên (dòng 2 có "Mã NV: UPxxxxxx", dữ liệu từ dòng 6, cột A–N). Tháng lấy ở sheet Khung ô B3 (mm/yyyy).
+   Sheet là nguồn chính: mỗi lần đồng bộ thay toàn bộ nhật ký tháng của người đó, giữ nguyên trừ lỗi đã nhập trên trang. */
+const LOG_SHEET='1Kt-GcfWRoXCe8p5Rq34pz76ZJIDGHZr5-ykAHrOga54';
+const LOG_TABS=['Thư','Hương','Trinh','Ngân','Phương','Anh','Ngọc','Minh'];
+S.logBusy=false;S.logAt='';let _lgTried=0;
+const lgNum=v=>{let s=String(v??'').trim();if(!s)return null;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(',','.');const n=+s;return isNaN(n)?null:n};
+/* Sheet có cả kiểu ngày/tháng/năm và tháng/ngày/năm: chọn cách đọc khớp với tháng đang báo cáo */
+const lgDate=(v,ym)=>{const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(!m)return '';const a=+m[1],b=+m[2],tm=+ym.slice(5,7);let d,mo;if(b===tm){d=a;mo=b}else if(a===tm){d=b;mo=a}else if(a>12){d=a;mo=b}else{d=a;mo=b}return `${m[3]}-${pad(mo)}-${pad(d)}`};
+async function refreshLogs(silent){
+  if(!S.mcp||S.logBusy)return;S.logBusy=true;_lgTried=Date.now();if(!silent)render();
+  try{const get=async rg=>{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:LOG_SHEET,range:rg},{cache:false,silent:!!silent});return (res.payload&&res.payload.values)||[]};
+    const k=await get("'Khung'!B3");const mm=String((k[0]||[])[0]||'').match(/(\d{1,2})\/(\d{4})/);const ym=mm?`${mm[2]}-${pad(+mm[1])}`:ymOf(TODAY);
+    const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).trim().toUpperCase()]=s});let n=0,ppl=0;const miss=[];
+    for(const tab of LOG_TABS){let v;try{v=await get(`'${tab}'!A2:N`)}catch(e){miss.push(tab);continue}
+      const mc=String((v[0]||[])[0]||'').match(/UP\d{6}/i);const s=mc&&byCode[mc[0].toUpperCase()];if(!s){miss.push(tab);continue}
+      const es=[];let last='';
+      v.slice(4).forEach((r,i)=>{const g=j=>String(r[j]??'').trim();const code=g(2);if(!code&&!g(4)&&!g(6))return;
+        let d=lgDate(g(1),ym);if(!d||ymOf(d)!==ym)d=last||ym+'-01';last=d;
+        const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
+        es.push({id:'s'+(i+6),d,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
+      const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'sheet',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
+    S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật ${nf(n)} dòng nhật ký ${fmtM(ym)} của ${ppl} người`+(miss.length?` · chưa đọc được sheet ${miss.join(', ')}`:''));
+  }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc':'Chưa cập nhật được nhật ký, thử lại sau')}}
+  finally{S.logBusy=false;render()}}
+const lgBtn=()=>S.mcp&&S.canWrite?`<button class="btn" data-act="lg-refresh" ${S.logBusy?'disabled':''}>${S.logBusy?'Đang đọc nhật ký…':'Cập nhật nhật ký từ sheet'}</button>`:'';
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act="lg-refresh"]');if(el)refreshLogs(false)});
+/* Tự đọc khi mở mục Nhật ký cá nhân hoặc KPI (tối đa 1 lần mỗi 30 phút) */
+setInterval(()=>{if(['ca-nhan','kpi','tong-quan'].includes(S.view)&&document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.loaded.has('logs')&&Date.now()-_lgTried>30*60e3)refreshLogs(true)},20e3);
 init();
 </script>
 </body>
