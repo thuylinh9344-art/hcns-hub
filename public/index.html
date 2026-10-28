@@ -317,7 +317,7 @@ async function init(){
   if(!db){S.dbState='none';render();return}
   S.db=db;S.dbState='ok';
   COLS.forEach(c=>db.collection(c).onSnapshot(snap=>{S[c]=snap.docs.map(d=>({id:d.id,...d.data()}));S.loaded.add(c);render()},()=>{S.dbState='err';render()}));
-  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render();if(!(d.effVer>=3))setTimeout(()=>rkMigrate(d),2500)},()=>{});
+  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render();if(!(d.effVer>=3))setTimeout(()=>rkMigrate(d),2500);else if(!(d.areasVer>=2))setTimeout(()=>rkAreaMig(d),3500)},()=>{});
   db.doc('catalog/kpi').onSnapshot(s=>{S.catalog=s.exists?(s.data().items||[]):[];render()},()=>{});
   db.doc('catalog/hs').onSnapshot(s=>{S.hsRef=s.exists?(s.data().tiers||{}):{};render()},()=>{});
   db.doc('assign/shops').onSnapshot(s=>{S.shops=s.exists?(s.data().list||[]):[];render()},()=>{});
@@ -1434,9 +1434,11 @@ const RK_LIM={NVBH:15,CHT:20,QLKV:30,VP:15};
 const RK_BASE={NVBH:'tdNT',CHT:'tdCHT',QLKV:'tdQLKV',VP:'tdVP'};
 /* Vùng phụ trách theo file bàn giao 28/10/2026 */
 const RK_AREAS={UP000279:'Hà Nội, Hưng Yên, Thái Bình, Hải Phòng, Ninh Bình, Nam Định, Quảng Ninh',UP001200:'Thanh Hóa, Nghệ An, Hà Tĩnh',UP001340:'Huế, Quảng Trị, Đà Nẵng',
-  UP001336:'Quảng Nam, Quảng Ngãi, An Giang, Cần Thơ, Hồ Chí Minh, Bình Dương · tuyển vị trí Quản lý toàn hệ thống',UP001181:'Thái Nguyên, Phú Thọ, Bắc Ninh',UP001466:'Khánh Hòa, Gia Lai, Bình Định, Đắk Lắk, Lâm Đồng',UP001619:'Khối văn phòng (ngoài kênh bán lẻ)'};
+  UP001336:'Quảng Nam, Quảng Ngãi · tuyển vị trí Quản lý toàn hệ thống',UP001181:'Thái Nguyên, Phú Thọ, Bắc Ninh',UP001466:'Khánh Hòa, Bình Định, Gia Lai, Đắk Lắk, Lâm Đồng, An Giang, Cần Thơ, Bình Dương, Hồ Chí Minh',UP001619:'Khối văn phòng (ngoài kênh bán lẻ)'};
 const RK_EFF={nt:.005,vp:.01,tdNT:.02,tdCHT:.03,tdQLKV:.1,tdVP:.03,hs1:.1,hs2:.15,hs3:.2,hs4:.25,hs5:.4},RK_DCUT=[.65,.75,.85,.95,1.05];
-let _rkMig=false;
+let _rkMig=false,_rkArea=false;
+function rkAreaMig(d){if(_rkArea||!S.canWrite||!S.db||(d&&d.areasVer>=2)||!S.staff.length)return;_rkArea=true;
+  S.staff.forEach(s=>{const a=RK_AREAS[String(s.code||'').toUpperCase()];if(a&&s.areas!==a)write('staff/'+s.id,{...clean(s),areas:a}).catch(()=>{})});write('config/main',{...S.config,areasVer:2}).catch(()=>{})}
 function rkMigrate(d){if(_rkMig||!S.canWrite||!S.db||(d&&d.effVer>=3))return;_rkMig=true;
   const up=(d&&d.effVer>=2)?{}:{eff:{...((d&&d.eff)||{}),...RK_EFF},dCut:RK_DCUT};write('config/main',{...(d||{}),...up,gradeA:95,gradeB:85,gradeC:70,effVer:3}).catch(()=>{});
   S.staff.forEach(s=>{const a=RK_AREAS[String(s.code||'').toUpperCase()];if(a&&s.areas!==a)write('staff/'+s.id,{...clean(s),areas:a}).catch(()=>{})});}
