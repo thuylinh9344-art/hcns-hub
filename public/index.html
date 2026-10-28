@@ -466,7 +466,7 @@ function setStatus(t,st){const body=clean(t);body.status=st;if(st==='done'){body
 function vKpi(){
   const m=S.month;const st=activeStaff();const c=S.config;
   const rows=st.map(s=>({s,k:kpiOf(m,s.id),e:effOf(m,s.id)}));
-  return head('KPI & hiệu suất',`KPI theo phân bổ 1.000 điểm/người (điểm phân bổ × % hoàn thành từng hạng mục): A ≥${c.gradeA}%, B ≥${c.gradeB}%, C ≥${c.gradeC}%, dưới đó D · Hiệu suất xếp hạng D1–D6 theo khối lượng phụ trách`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-kpi">Xuất CSV</button>`:''))+
+  return head('KPI & hiệu suất',`KPI 1.000 điểm/người = KPI tuyển dụng + công việc khác theo nhật ký trong quỹ điểm còn lại: A ≥${c.gradeA}%, B ≥${c.gradeB}%, C ≥${c.gradeC}%, dưới đó D · Hiệu suất xếp hạng D1–D6 theo khối lượng phụ trách`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-kpi">Xuất CSV</button>`:''))+
   `<div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Ngày BC</th><th class="r">Dòng</th><th class="r">Điểm đạt / phân bổ</th><th class="r">Trừ lỗi</th><th class="r">KPI</th><th>Loại</th><th class="r">Điểm HS</th><th>Hạng D</th><th>D hiện hữu</th></tr></thead><tbody>
   ${rows.map(({s,k,e})=>`<tr class="click ${S.kpiOpen===s.id?'open':''}" data-act="kpi-open" data-id="${s.id}"><td><b>${esc(s.name)}</b><div class="note">${esc(s.title||'')}</div></td><td class="r num">${k.days||'—'}</td><td class="r num">${k.n||'—'}</td><td class="r num">${k.has?nf(k.raw)+(k.alloc?' <span class="mini">/ '+nf(k.plan)+'</span>':''):'—'}${k.over?' <span class="pill ok">vượt trần</span>':''}${k.log&&k.has?' <span class="mini">(nhật ký)</span>':''}</td><td class="r num">${k.pen?'−'+nf(k.pen):''}</td><td class="r num"><b>${k.has?nf(k.val):'—'}</b></td><td>${gradePill(k)}</td><td class="r num">${e.has?nf(e.score):'—'}</td><td>${e.has?rankPill(e.rank)+' '+dCompare(s.dCurrent,e.rank):'—'}</td><td>${s.dCurrent?rankPill(s.dCurrent):'—'}</td></tr>
   ${S.kpiOpen===s.id?`<tr><td colspan="10" style="background:var(--surface)">${kpiDetail(s,m,k)}</td></tr>`:''}`).join('')}
@@ -1520,28 +1520,27 @@ function kpWorkdays(m){const [a,b0]=monthRange(m);const b=b0>TODAY?TODAY:b0;let 
 let _kpRk=null;
 function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_kpRk.cfg===S.config)return _kpRk.v;const v={};try{rkData(m).rows.forEach(r=>{v[r.s.id]=r})}catch(_){}
   _kpRk={m,rec:S.rec,sys:S.sys,cfg:S.config,v};return v}
-function kpCats(m,sid){const plan=kpPlan(m,sid);if(!plan)return null;const es=(logDoc(m,sid)?.entries||[]).filter(isDoneLog);const ov=((S.config.kpiPct||{})[m]||{})[kpCode(sid)]||{};
-  const days=new Set((logDoc(m,sid)?.entries||[]).map(e=>e.d)).size,wd=kpWorkdays(m);
-  return plan.map(([k,pts])=>{let pct=null,src='',note='';
-    if(k==='Tuyển dụng'){const r=kpRk(m)[sid];if(r){pct=r.alloc?r.kpi/r.alloc:0;src='Bảng KPI tuyển dụng';note=`${r.real}/${r.tgt} người · ${nf(r.kpi)}/${nf(r.alloc)} điểm`}else{src='Khung tuyển dụng';note='Chưa có dữ liệu'}}
-    else if(k==='Báo cáo'){pct=wd?Math.min(1,days/wd):0;src='Số ngày có báo cáo';note=`${days}/${wd} ngày làm việc`}
-    else if(k==='Điều xe'){const got=es.filter(e=>/xe/i.test((e.content||'')+' '+(e.result||''))).reduce((a,e)=>a+entPts(e),0);pct=pts?Math.min(1,got/pts):0;src='Nhật ký có nội dung "xe"';note=`${nf(r1(got))} điểm nhật ký`}
-    else{const pre=KP_SRC[k]||[];const got=es.filter(e=>pre.some(p=>String(e.code||'').startsWith(p))).reduce((a,e)=>a+entPts(e),0);pct=pts?Math.min(1,got/pts):0;src='Điểm nhật ký mã '+pre.join(', ');note=`${nf(r1(got))} điểm nhật ký`}
-    const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
-    return {k,pts,pct,src,note,man:man??'',use,got:use==null?0:Math.round(pts*use)}})}
+const kpIsRec=e=>/^01\./.test(String(e.code||''))||/^tuyển dụng$/i.test(String(e.area||'').trim());
+function kpCats(m,sid){const code=kpCode(sid);const p=rkPlan(m)[code];const max=+S.config.kpiMax||1000;const td=p?Math.min(max,(()=>{const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');return tdp?tdp[1]:p[1]})()):0;
+  const es=(logDoc(m,sid)?.entries||[]).filter(isDoneLog);const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
+  const ov=((S.config.kpiPct||{})[m]||{})[code]||{};const cats=[];
+  if(td){const r=kpRk(m)[sid];const got=r?r.kpi:0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
+  const rest=max-td;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
+  cats.push({k,pts:rest,pct,src:'Điểm nhật ký công việc ngày, không tính các dòng tuyển dụng (mã 01.xx)',note:`${nf(r1(other))} điểm nhật ký${recLog?` · bỏ ${nf(r1(recLog))} điểm báo cáo tuyển dụng`:''}`,man:man??'',use,got:Math.round(Math.min(rest,rest*use))});
+  return cats}
 const _kpiLog=kpiOf;
 kpiOf=function(m,sid){const L=_kpiLog(m,sid);const cats=kpCats(m,sid);if(!cats)return {...L,log:true};
   const plan=cats.reduce((a,c)=>a+c.pts,0),got=cats.reduce((a,c)=>a+c.got,0);const val=Math.max(0,Math.min(got,+S.config.kpiMax||1000)-L.pen);const max=Math.max(plan,1);
   return {...L,has:true,cats,plan,logRaw:L.raw,raw:got,val:r1(val),max,pct:r1(val/max*100),grade:gradeOf(val/max*100),over:false,alloc:true}};
 function kpDetail(s,m,k){if(!k.cats)return '';const dis=S.canWrite?'':'disabled';const code=kpCode(s.id);
-  return `<div style="padding:6px 0 12px"><b style="font-size:13px">KPI theo phân bổ ${fmtM(m)}: ${nf(k.raw)}/${nf(k.plan)} điểm${k.plan!==1000?` <span class="pill warn">tổng phân bổ ${nf(k.plan)}, chưa đủ 1.000</span>`:''}</b>
+  return `<div style="padding:6px 0 12px"><b style="font-size:13px">KPI ${fmtM(m)}: ${nf(k.raw)}/${nf(k.plan)} điểm</b>
   <div class="tbl-wrap mt"><table><thead><tr><th>Hạng mục</th><th class="r">Điểm phân bổ</th><th>Căn cứ tính</th><th class="r">% tự tính</th><th class="r">% nhập tay</th><th class="r">Điểm đạt</th></tr></thead><tbody>
-  ${k.cats.map((c,i)=>`<tr><td><b>${esc(c.k)}</b></td><td class="r"><input class="num" type="number" min="0" step="50" id="kpp-${code}-${i}" data-kpp="${code}" data-i="${i}" value="${c.pts}" style="width:70px;text-align:right" ${dis}></td>
+  ${k.cats.map((c,i)=>`<tr><td><b>${esc(c.k)}</b></td><td class="r num">${nf(c.pts)}</td>
     <td class="mini">${esc(c.src)}<div>${esc(c.note)}</div></td><td class="r num">${c.pct==null?'—':Math.round(c.pct*100)+'%'}</td>
-    <td class="r"><input class="num" type="number" min="0" max="100" id="kpm-${code}-${i}" data-kpm="${code}" data-k="${esc(c.k)}" value="${esc(c.man)}" placeholder="tự tính" style="width:72px;text-align:right" ${dis}></td>
+    <td class="r">${c.fixed?'<span class="mini">—</span>':`<input class="num" type="number" min="0" max="100" id="kpm-${code}-${i}" data-kpm="${code}" data-k="${esc(c.k)}" value="${esc(c.man)}" placeholder="tự tính" style="width:72px;text-align:right" ${dis}>`}</td>
     <td class="r num"><b>${nf(c.got)}</b></td></tr>`).join('')}
   <tr><td><b>Cộng</b></td><td class="r num"><b>${nf(k.plan)}</b></td><td colspan="3" class="mini">Trừ lỗi ${nf(k.pen||0)} · KPI = ${nf(k.val)}</td><td class="r num"><b>${nf(k.raw)}</b></td></tr></tbody></table></div>
-  ${S.canWrite?`<div class="row mt"><select id="kpAdd-${code}"><option value="">+ Thêm hạng mục</option>${KP_CATS.filter(c=>!k.cats.some(x=>x.k===c)).map(c=>`<option>${c}</option>`).join('')}</select><span class="note">Điểm phân bổ bằng 0 thì hạng mục bị bỏ khỏi kế hoạch. Nhật ký tháng: ${nf(r1(k.logRaw||0))} điểm.</span></div>`:''}</div>`}
+  <p class="note">KPI = điểm KPI tuyển dụng + điểm công việc khác trong quỹ còn lại (${nf(k.plan)} − điểm tuyển dụng), lấy từ nhật ký ngày; các dòng báo cáo việc tuyển dụng không được cộng thêm. Điểm tuyển dụng phân bổ sửa ở bảng KPI tuyển dụng.</p></div>`}
 async function kpSave(m,code,mut){const all=JSON.parse(JSON.stringify(kpPlanAll(m)));all[code]=all[code]||[];mut(all[code]);all[code]=all[code].filter(x=>x[1]>0||x[0]==='Tuyển dụng');
   const rp=JSON.parse(JSON.stringify(S.config.recPlan||{}));const td=all[code].find(x=>x[0]==='Tuyển dụng');if(td){const cur=rkPlan(m);rp[m]=rp[m]||JSON.parse(JSON.stringify(cur));if(rp[m][code])rp[m][code][1]=td[1]}
   await write('config/main',{...S.config,kpiPlan:{...(S.config.kpiPlan||{}),[m]:all},recPlan:rp})}
