@@ -217,7 +217,7 @@ const PRIO={cao:'Cao',tb:'Trung bình',thap:'Thấp'};
 const LOG_ST=['Hoàn thành','Đang thực hiện','Chậm tiến độ','Tạm dừng / Hủy'];
 const EFF_KEYS=[['tdNT','Tuyển NT'],['tdCHT','Tuyển CHT'],['tdQLKV','Tuyển QLKV'],['tdVP','Tuyển VP'],['hs1','HS 1'],['hs2','HS 2'],['hs3','HS 3'],['hs4','HS 4'],['hs5','HS 5']];
 const STAFF_ST={active:'Đang làm',leave:'Nghỉ thai sản / tạm nghỉ',quit:'Đã nghỉ việc'};
-const DEFAULT_CFG={gradeA:90,gradeB:80,gradeC:65,kpiMax:1000,remindDays:3,eff:{nt:.005,vp:.01,tdNT:.04,tdCHT:.05,tdQLKV:.1,tdVP:.04,hs1:.15,hs2:.2,hs3:.25,hs4:.3,hs5:.45},dCut:[.65,.85,1,1.2,1.3]};
+const DEFAULT_CFG={gradeA:90,gradeB:80,gradeC:65,kpiMax:1000,remindDays:3,eff:{nt:.005,vp:.01,tdNT:.02,tdCHT:.03,tdQLKV:.1,tdVP:.03,hs1:.1,hs2:.15,hs3:.2,hs4:.25,hs5:.4},dCut:[.65,.75,.85,.95,1.05]};
 const S={staff:[],tasks:[],logs:[],effort:[],okrs:[],shops:[],catalog:[],hsRef:{},config:JSON.parse(JSON.stringify(DEFAULT_CFG)),loaded:new Set(),db:null,dl:null,dbState:'wait',canWrite:true,
   view:'tong-quan',taskMode:'board',f:{owner:'',module:'',status:'',q:''},me:'',month:'',kpiOpen:'',okrQ:'',rep:{type:'tuan',date:''},sf:{area:'',who:'',only:''},draft:null,sys:{},mcp:null,sysBusy:false,sysTab:'hd',sysF:{who:'',short:false},sysAssign:'',hrYear:'',rec:{},recBusy:false,recF:{grp:'',mon:''},recTried:0,chtPlan:{},chtF:{mgr:'',area:'',plan:'',st:'',only:true},chtSeeding:false,who:'',chtMeta:{},nvF:{per:'ytd',open:''}};
 
@@ -317,7 +317,7 @@ async function init(){
   if(!db){S.dbState='none';render();return}
   S.db=db;S.dbState='ok';
   COLS.forEach(c=>db.collection(c).onSnapshot(snap=>{S[c]=snap.docs.map(d=>({id:d.id,...d.data()}));S.loaded.add(c);render()},()=>{S.dbState='err';render()}));
-  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render()},()=>{});
+  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render();if(!(d.effVer>=2))setTimeout(()=>rkMigrate(d),2500)},()=>{});
   db.doc('catalog/kpi').onSnapshot(s=>{S.catalog=s.exists?(s.data().items||[]):[];render()},()=>{});
   db.doc('catalog/hs').onSnapshot(s=>{S.hsRef=s.exists?(s.data().tiers||{}):{};render()},()=>{});
   db.doc('assign/shops').onSnapshot(s=>{S.shops=s.exists?(s.data().list||[]):[];render()},()=>{});
@@ -475,7 +475,7 @@ function vKpi(){
     <div class="panel"><h2>Ma trận KPI × hiệu suất <small>${fmtM(m)}</small></h2>${scatter(rows)}</div>
     <div class="panel"><h2>Xếp hạng KPI ${fmtM(m)}</h2>${rows.filter(r=>r.k.has).sort((a,b)=>b.k.val-a.k.val).map((r,i)=>`<div class="load"><span class="nm"><span class="num note">${i+1}.</span> ${esc(r.s.name)}</span><div class="bar"><i class="${r.k.grade==='A'?'ok':r.k.grade==='D'?'bad':r.k.grade==='C'?'warn':''}" style="width:${Math.min(r.k.pct,100)}%"></i></div><span class="num r">${nf(r.k.val)}</span></div>`).join('')||'<div class="empty">Chưa có nhật ký trong tháng.</div>'}
     <p class="note mt">Bấm vào một dòng ở bảng trên để xem điểm theo mảng và nhập trừ lỗi.</p></div>
-  </div>`;
+  </div>`+vRecKpi(m);
 }
 function kpiDetail(s,m,k){const ap=areaPts(m,s.id);const d=logDoc(m,s.id);const dis=S.canWrite?'':'disabled';
   return `<div class="grid2" style="padding:6px 0"><div><b style="font-size:13px">Điểm theo mảng</b>${ap.map(([a,p])=>`<div class="row" style="justify-content:space-between;font-size:13px;border-bottom:1px solid var(--line);padding:4px 0"><span>${esc(a)}</span><span class="num">${nf(r1(p))}</span></div>`).join('')||'<p class="note">Chưa có nhật ký.</p>'}
@@ -1000,13 +1000,13 @@ async function refreshRec(silent){
       let o='',src=0;
       if(ic&&REC_EXCL.includes(ic))o='x';else if(ic&&M.byCode[ic]){o=M.byCode[ic];src=1}
       else{o=g===2?M.mgr:g===1?M.office:'';if(!o)o=M.area[normName(ar)]||''}
-      cv.push({code,name:normName(a[1]),p,g,ar,st,sub,v1:recD(y[0]),v2:recD(y[2]),o,src,start:'',quit:''})});
+      cv.push({code,name:normName(a[1]),p,g,ar,st,sub,v1:recD(y[0]),v2:recD(y[2]),ac:recD(y[4]),o,src,start:'',quit:''})});
     /* Đối chiếu người đi làm thực tế với DSNS U theo họ tên (chỉ khi tên là duy nhất) */
     const dsn={};sysRows().forEach(r=>{const k=normName(r.name);if(!k||!r.start)return;(dsn[k]??=[]).push(r)});
     const byName={};cv.forEach(c=>{if(c.name)(byName[c.name]??=[]).push(c)});
     let matched=0;Object.entries(dsn).forEach(([k,list])=>{if(list.length!==1)return;const r=list[0];const cs=(byName[k]||[]).filter(c=>c.sub<=addDays(r.start,3)&&c.sub>=addDays(r.start,-120));
       if(!cs.length)return;cs.sort((a,b)=>b.sub.localeCompare(a.sub));cs[0].start=r.start;cs[0].quit=r.quit||'';matched++});
-    const rows=cv.map(c=>[c.code,idx(pos,c.p),idx(areas,c.ar),d2n(c.sub),idx(sts,c.st),d2n(c.v1),d2n(c.v2),c.o==='x'?-2:c.o?idx(own,c.o):-1,c.src,d2n(c.start),d2n(c.quit)]);
+    const rows=cv.map(c=>[c.code,idx(pos,c.p),idx(areas,c.ar),d2n(c.sub),idx(sts,c.st),d2n(c.v1),d2n(c.v2),c.o==='x'?-2:c.o?idx(own,c.o):-1,c.src,d2n(c.start),d2n(c.quit),d2n(c.ac)]);
     const body={source:'Dữ liệu CV trên member · sheet '+REC_TAB,updatedAt:new Date().toISOString(),from,pos,areas,sts,own,matched,dsnsAt:S.sys.updatedAt||'',rowsJson:JSON.stringify(rows)};
     await write('rec/cv',body);if(!silent)toast(`Đã cập nhật ${nf(rows.length)} hồ sơ, ${nf(matched)} người đi làm thực tế`);
   }catch(e){if(!silent){const c=e&&e.code;
@@ -1018,7 +1018,7 @@ function recRows(){
   const R=S.rec||{};if(_recCache&&_recCache.src===R)return _recCache.d;
   let raw=[];try{raw=JSON.parse(R.rowsJson||'[]')}catch(_){}
   const d=raw.map(a=>{const sub=n2d(a[3]),v1=n2d(a[5]),v2=n2d(a[6]),start=n2d(a[9]),quit=n2d(a[10]);const p=(R.pos||[])[a[1]]||'';const st=(R.sts||[])[a[4]]||'';const g=recGrp(p);
-    const o=a[7]===-2?'x':a[7]>=0?(R.own||[])[a[7]]:'';const x={code:a[0],p,g,ar:(R.areas||[])[a[2]]||'',sub,st,v1,v2,o,src:a[8],start,quit};
+    const o=a[7]===-2?'x':a[7]>=0?(R.own||[])[a[7]]:'';const x={code:a[0],p,g,ar:(R.areas||[])[a[2]]||'',sub,st,v1,v2,o,src:a[8],start,quit,ac:n2d(a[11])};
     x.wd=v1?wdBetween(sub,v1):null;x.ontime=x.wd!=null?x.wd<=3:null;
     x.ttf=start?diffDays(sub,start):null;x.ttfOk=x.ttf!=null?x.ttf<=REC_TTF[g]:null;
     x.q90b=start&&start<=addDays(TODAY,-90);x.q90=x.q90b&&quit&&diffDays(start,quit)<=90;
@@ -1427,6 +1427,74 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="nv-
 });
 document.addEventListener('change',e=>{if(e.target.id==='nvPer'){S.nvF.per=e.target.value;render()}});
 const nvRedN=()=>{try{return sysRows().length?(()=>{const P=nvData().prov;return P.filter(p=>p.lv===2).length+P.reduce((n,p)=>n+p.red,0)+nvKho().filter(k=>k.lv===2).length})():0}catch(_){return 0}};
+/* ===================== KPI tuyển dụng theo khung 500 điểm (bàn giao T10/2026) =====================
+   Lấp đầy 250 · Thời gian trúng tuyển 100 · Chất lượng 50 · Tuân thủ quy trình 100; quy đổi theo điểm tuyển dụng phân bổ cho từng người. */
+const RK_PLAN_DEF={'2026-10':{UP001200:[16,500],UP001340:[8,500],UP001181:[11,500],UP001336:[13,600],UP000279:[12,500],UP001466:[14,500],UP001619:[9,400]}};
+const RK_LIM={NVBH:15,CHT:20,QLKV:30,VP:15};
+const RK_BASE={NVBH:'tdNT',CHT:'tdCHT',QLKV:'tdQLKV',VP:'tdVP'};
+/* Vùng phụ trách theo file bàn giao 28/10/2026 */
+const RK_AREAS={UP000279:'Hà Nội, Hưng Yên, Thái Bình, Hải Phòng, Ninh Bình, Nam Định, Quảng Ninh',UP001200:'Thanh Hóa, Nghệ An, Hà Tĩnh',UP001340:'Huế, Quảng Trị, Đà Nẵng',
+  UP001336:'Quảng Nam, Quảng Ngãi, An Giang, Cần Thơ, Hồ Chí Minh, Bình Dương · tuyển vị trí Quản lý toàn hệ thống',UP001181:'Thái Nguyên, Phú Thọ, Bắc Ninh',UP001466:'Khánh Hòa, Gia Lai, Bình Định, Đắk Lắk, Lâm Đồng',UP001619:'Khối văn phòng (ngoài kênh bán lẻ)'};
+const RK_EFF={nt:.005,vp:.01,tdNT:.02,tdCHT:.03,tdQLKV:.1,tdVP:.03,hs1:.1,hs2:.15,hs3:.2,hs4:.25,hs5:.4},RK_DCUT=[.65,.75,.85,.95,1.05];
+let _rkMig=false;
+function rkMigrate(d){if(_rkMig||!S.canWrite||!S.db||(d&&d.effVer>=2))return;_rkMig=true;
+  write('config/main',{...(d||{}),eff:{...((d&&d.eff)||{}),...RK_EFF},dCut:RK_DCUT,effVer:2}).catch(()=>{});
+  S.staff.forEach(s=>{const a=RK_AREAS[String(s.code||'').toUpperCase()];if(a&&s.areas!==a)write('staff/'+s.id,{...clean(s),areas:a}).catch(()=>{})});}
+const rkGrp=p=>{p=(p||'').toLowerCase();return /quản lý địa bàn|quản lý khu vực/.test(p)?'QLKV':/cửa hàng trưởng|phụ trách cửa hàng/.test(p)?'CHT':/bán hàng|học việc/.test(p)?'NVBH':'VP'};
+function rkPlan(m){const c=(S.config.recPlan||{})[m];if(c)return c;if(RK_PLAN_DEF[m])return RK_PLAN_DEF[m];
+  const ks=Object.keys({...RK_PLAN_DEF,...(S.config.recPlan||{})}).filter(k=>k<m).sort();const k=ks.pop();return k?((S.config.recPlan||{})[k]||RK_PLAN_DEF[k]):{}}
+function rkHireOwner(r,M){const g=rkGrp(r.pos);if(g==='QLKV'||g==='CHT')return M.mgr;if(!r.shop)return M.office;
+  const x=shopObj(r.shop)||{};let a=x.area||r.area||'';if(x.mgr==='Trần Thị Hà Phương'&&/Đà Nẵng|Quảng Nam/.test(a))a='Quảng Nam';
+  const k=normName(a);if(M.area[k])return M.area[k];const al=Object.keys(REC_ALIAS).find(c=>REC_ALIAS[c].some(z=>normName(z)===k)||normName(c)===k);return al?M.area[normName(al)]||'':''}
+function rkData(m){
+  const [a,b0]=monthRange(m),b=b0>TODAY?TODAY:b0;const M=recOwnerMaps();const plan=rkPlan(m);
+  const pm=(()=>{const d=pd(m+'-01');d.setMonth(d.getMonth()-3);return iso(d).slice(0,7)})();const [qa,qb]=monthRange(pm);
+  const R=sysRows().filter(r=>r.start&&!/thực tập/i.test(r.pos||'')).map(r=>({...r,g:rkGrp(r.pos),o:rkHireOwner(r,M)}));
+  const cv=recRows();const out=[];
+  allStaff().forEach(s=>{const code=String(s.code||'').toUpperCase();const p=plan[code];if(!p)return;const [tgt,alloc]=p;
+    const H=R.filter(r=>r.o===s.id&&r.start>=a&&r.start<=b);
+    const real=H.filter(r=>!(r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=7));const pend=real.filter(r=>diffDays(r.start,TODAY)<7);
+    const cnt={NVBH:0,CHT:0,QLKV:0,VP:0};real.forEach(r=>cnt[r.g]++);
+    const T=cv.filter(x=>x.o===s.id&&x.start&&x.start>=a&&x.start<=b&&!(x.quit&&diffDays(x.start,x.quit)<=7));
+    const tOk=T.filter(x=>{const end=x.ac&&x.ac>=x.sub?x.ac:x.start;return diffDays(x.sub,end)<=RK_LIM[rkGrp(x.p)]}).length;
+    const C=R.filter(r=>r.o===s.id&&r.start>=qa&&r.start<=qb);const cq=C.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
+    const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>x.v1&&x.v1>=x.sub);const fast=v1.filter(x=>wdBetween(x.sub,x.v1)<2).length;const stale=CV.filter(x=>x.stale).length;
+    const fill=tgt?Math.min(1,real.length/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=CV.length?1-stale/CV.length:null;
+    const sF=250*fill,sT=ttf==null?0:100*ttf,sQ=q90==null?50:(q90<=.4?50:0),sC=100*(.5*(p1??0)+.5*(p2??0));const tot=sF+sT+sQ+sC;
+    const eff=Object.entries(cnt).reduce((t,[g,n])=>t+n*(S.config.eff[RK_BASE[g]]||0),0);
+    out.push({s,code,tgt,alloc,real:real.length,pend:pend.length,cnt,fill,sF,T:T.length,tOk,ttf,sT,C:C.length,cq,q90,sQ,CV:CV.length,v1:v1.length,fast,p1,stale,p2,sC,tot,kpi:Math.round(tot/500*alloc),eff})});
+  return {rows:out,a,b,pm}}
+const rkPct=v=>v==null?'—':String(Math.round(v*1000)/10).replace('.',',')+'%';
+function vRecKpi(m){
+  if(!sysRows().length&&!recRows().length)return '';const {rows,b,pm}=rkData(m);if(!rows.length)return `<div class="panel mt"><h2>KPI tuyển dụng ${fmtM(m)}</h2><p class="note">Chưa có kế hoạch tuyển dụng cho tháng này.${S.canWrite?' <button class="btn sm" data-act="rk-copy">Lấy kế hoạch tháng trước</button>':''}</p></div>`;
+  const dis=S.canWrite?'':'disabled';const sum=rows.reduce((t,r)=>({tgt:t.tgt+r.tgt,real:t.real+r.real}),{tgt:0,real:0});
+  return `<div class="panel mt"><h2>KPI tuyển dụng ${fmtM(m)} <small>khung 500 điểm quy đổi theo điểm phân bổ · dữ liệu đến ${fmtDY(b)} · DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} · hồ sơ ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'}</small></h2>
+  <div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Target</th><th class="r">Điểm phân bổ</th><th class="r">Thực tuyển</th><th class="r">Lấp đầy /250</th><th class="r">Trúng tuyển đúng hạn /100</th><th class="r">Nghỉ &lt;90 ngày (${fmtM(pm)}) /50</th><th class="r">Tuân thủ /100</th><th class="r">Tổng /500</th><th class="r">KPI tuyển dụng</th><th class="r">Điểm HS tuyển</th></tr></thead><tbody>
+  ${rows.sort((x,y)=>y.tot-x.tot).map(r=>`<tr class="${r.tot<300?'recalert':''}"><td><b>${esc(r.s.name)}</b></td>
+    <td class="r"><input class="num" type="number" min="0" id="rkt-${r.code}" data-rkt="${r.code}" value="${r.tgt}" style="width:58px;text-align:right" ${dis}></td>
+    <td class="r"><input class="num" type="number" min="0" step="50" id="rka-${r.code}" data-rka="${r.code}" value="${r.alloc}" style="width:66px;text-align:right" ${dis}></td>
+    <td class="r num">${r.real}${r.pend?` <span class="mini">(${r.pend} chưa đủ 7 ngày)</span>`:''}<div class="mini">${Object.entries(r.cnt).filter(([,n])=>n).map(([g,n])=>g+' '+n).join(' · ')}</div></td>
+    <td class="r num">${nf(Math.round(r.sF))}<div class="mini">${rkPct(r.fill)}</div></td>
+    <td class="r num">${nf(Math.round(r.sT))}<div class="mini">${r.T?`${r.tOk}/${r.T} · ${rkPct(r.ttf)}`:'chưa khớp hồ sơ'}</div></td>
+    <td class="r num">${r.sQ}<div class="mini">${r.C?`${r.cq}/${r.C} · ${rkPct(r.q90)}`:'chưa có dữ liệu'}</div></td>
+    <td class="r num">${nf(Math.round(r.sC))}<div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
+    <td class="r num"><b>${nf(Math.round(r.tot))}</b></td><td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
+    <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
+  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="7" class="mini">Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr></tbody></table></div>
+  <div class="row mt">${S.canWrite?`<button class="btn" data-act="rk-eff">Ghi số tuyển vào bảng Hiệu suất ${fmtM(m)}</button>`:''}<span class="note">Bôi đỏ khi tổng dưới 300/500.</span></div>
+  <details class="mt"><summary class="note">Cách tính</summary><ul class="note">
+    <li>Thực tuyển: người vào làm trong tháng theo DSNS, còn làm sau 7 ngày, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người tuyển vị trí quản lý; khối văn phòng và kho gán cho người phụ trách khối văn phòng. QLKV quy đổi 1 người.</li>
+    <li>Trúng tuyển đúng hạn: từ ngày nộp CV đến ngày nhận việc trên Member (thiếu thì lấy ngày vào làm DSNS) ≤ NVBH 15 · CHT 20 · QLKV 30 · VP 15 ngày. Member chưa ghi ngày gửi thư mời nên đây là cách đo chặt hơn quy định.</li>
+    <li>Chất lượng: nhóm vào làm 3 tháng trước (${fmtM(pm)}), tỷ lệ nghỉ trong 90 ngày ≤ 40% được 50 điểm; không có người vào làm thì để đủ điểm.</li>
+    <li>Tuân thủ: ½ × % hồ sơ có lịch PV vòng 1 trong dưới 2 ngày làm việc kể từ ngày nộp + ½ × % hồ sơ không bị treo (thay cho "cập nhật Member đúng hạn" vì sheet chưa ghi thời điểm cập nhật).</li>
+    <li>KPI tuyển dụng = Tổng /500 × điểm phân bổ. Điểm HS tuyển = số thực tuyển × điểm cơ sở (NVBH ${S.config.eff.tdNT} · CHT ${S.config.eff.tdCHT} · QLKV ${S.config.eff.tdQLKV} · VP ${S.config.eff.tdVP}), cộng vào hiệu suất D khi bấm "Ghi số tuyển".</li></ul></details></div>`}
+async function rkSetPlan(m,code,idx,val){const cur=JSON.parse(JSON.stringify(rkPlan(m)));if(!cur[code])cur[code]=[0,500];cur[code][idx]=val;const rp={...(S.config.recPlan||{}),[m]:cur};await write('config/main',{...S.config,recPlan:rp})}
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset.rkt!=null)rkSetPlan(S.month,t.dataset.rkt,0,+t.value||0);else if(t.dataset.rka!=null)rkSetPlan(S.month,t.dataset.rka,1,+t.value||0)});
+document.addEventListener('click',async e=>{const el=e.target.closest('[data-act^="rk-"]');if(!el)return;const a=el.dataset.act;
+  if(a==='rk-copy'){const p=rkPlan(S.month);await write('config/main',{...S.config,recPlan:{...(S.config.recPlan||{}),[S.month]:JSON.parse(JSON.stringify(p))}});toast('Đã lấy kế hoạch tháng trước')}
+  else if(a==='rk-eff'){if(!needWrite())return;const m=S.month;const {rows}=rkData(m);let n=0;
+    for(const r of rows){const old=effDoc(m,r.s.id);await write('effort/'+m+'_'+r.s.id,{...(old?clean(old):{month:m,staffId:r.s.id}),tdNT:r.cnt.NVBH,tdCHT:r.cnt.CHT,tdQLKV:r.cnt.QLKV,tdVP:r.cnt.VP}).then(()=>n++).catch(()=>{})}
+    toast('Đã ghi số tuyển của '+n+' người vào bảng Hiệu suất')}});
 init();
 </script>
 </body>
