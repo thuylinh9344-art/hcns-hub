@@ -1522,6 +1522,7 @@ function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_k
   _kpRk={m,rec:S.rec,sys:S.sys,cfg:S.config,v};return v}
 const kpIsRec=e=>/^01\./.test(String(e.code||''))||/^tuyển dụng$/i.test(String(e.area||'').trim());
 function kpCats(m,sid){const code=kpCode(sid);const p=rkPlan(m)[code];const max=+S.config.kpiMax||1000;const td=p?Math.min(max,(()=>{const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');return tdp?tdp[1]:p[1]})()):0;
+  if(!td)return null; /* không có phần tuyển dụng: KPI tính đúng theo nhật ký công việc */
   const es=(logDoc(m,sid)?.entries||[]).filter(isDoneLog);const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
   const ov=((S.config.kpiPct||{})[m]||{})[code]||{};const cats=[];
   if(td){const r=kpRk(m)[sid];const got=r?r.kpi:0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
