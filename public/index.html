@@ -1462,34 +1462,34 @@ function rkData(m){
     const C=R.filter(r=>r.o===s.id&&r.start>=qa&&r.start<=qb);const cq=C.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
     const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>x.v1&&x.v1>=x.sub);const fast=v1.filter(x=>wdBetween(x.sub,x.v1)<2).length;const stale=CV.filter(x=>x.stale).length;
     const fill=tgt?Math.min(1,real.length/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=CV.length?1-stale/CV.length:null;
-    const sF=250*fill,sT=ttf==null?0:100*ttf,sQ=q90==null?50:(q90<=.4?50:0),sC=100*(.5*(p1??0)+.5*(p2??0));const tot=sF+sT+sQ+sC;
+    const f=alloc/500,mF=Math.round(250*f),mT=Math.round(100*f),mQ=Math.round(50*f),mC=alloc-mF-mT-mQ;const sF=Math.round(mF*fill),sT=ttf==null?0:Math.round(mT*ttf),sQ=q90==null?mQ:(q90<=.4?mQ:0),sC=Math.round(mC*(.5*(p1??0)+.5*(p2??0)));const kpi=sF+sT+sQ+sC;const tot=alloc?kpi/alloc*500:0;
     const eff=Object.entries(cnt).reduce((t,[g,n])=>t+n*(S.config.eff[RK_BASE[g]]||0),0);
-    out.push({s,code,tgt,alloc,real:real.length,pend:pend.length,left,cnt,fill,sF,T:T.length,tOk,ttf,sT,C:C.length,cq,q90,sQ,CV:CV.length,v1:v1.length,fast,p1,stale,p2,sC,tot,kpi:Math.round(tot/500*alloc),eff})});
+    out.push({s,code,tgt,alloc,mF,mT,mQ,mC,real:real.length,pend:pend.length,left,cnt,fill,sF,T:T.length,tOk,ttf,sT,C:C.length,cq,q90,sQ,CV:CV.length,v1:v1.length,fast,p1,stale,p2,sC,tot,kpi,eff})});
   return {rows:out,a,b,pm}}
 const rkPct=v=>v==null?'—':String(Math.round(v*1000)/10).replace('.',',')+'%';
 function vRecKpi(m){
   if(!sysRows().length&&!recRows().length)return '';const {rows,b,pm}=rkData(m);if(!rows.length)return `<div class="panel mt"><h2>KPI tuyển dụng ${fmtM(m)}</h2><p class="note">Chưa có kế hoạch tuyển dụng cho tháng này.${S.canWrite?' <button class="btn sm" data-act="rk-copy">Lấy kế hoạch tháng trước</button>':''}</p></div>`;
   const dis=S.canWrite?'':'disabled';const sum=rows.reduce((t,r)=>({tgt:t.tgt+r.tgt,real:t.real+r.real}),{tgt:0,real:0});
   return `<div class="panel mt"><h2>KPI tuyển dụng ${fmtM(m)} <small>khung 500 điểm quy đổi theo điểm phân bổ · dữ liệu đến ${fmtDY(b)} · DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} · hồ sơ ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'}</small></h2>
-  <div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Target</th><th class="r">Điểm phân bổ</th><th class="r">Thực tuyển</th><th class="r">Lấp đầy /250</th><th class="r">Trúng tuyển đúng hạn /100</th><th class="r">Nghỉ &lt;90 ngày (${fmtM(pm)}) /50</th><th class="r">Tuân thủ /100</th><th class="r">Tổng /500</th><th class="r">KPI tuyển dụng</th><th class="r">Điểm HS tuyển</th></tr></thead><tbody>
+  <div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Target</th><th class="r">Điểm phân bổ</th><th class="r">Thực tuyển</th><th class="r">Lấp đầy (50%)</th><th class="r">Trúng tuyển đúng hạn (20%)</th><th class="r">Nghỉ &lt;90 ngày ${fmtM(pm)} (10%)</th><th class="r">Tuân thủ (20%)</th><th class="r">KPI tuyển dụng = tổng</th><th class="r">Điểm HS tuyển</th></tr></thead><tbody>
   ${rows.sort((x,y)=>y.tot-x.tot).map(r=>`<tr class="${r.tot<300?'recalert':''}"><td><b>${esc(r.s.name)}</b></td>
     <td class="r"><input class="num" type="number" min="0" id="rkt-${r.code}" data-rkt="${r.code}" value="${r.tgt}" style="width:58px;text-align:right" ${dis}></td>
     <td class="r"><input class="num" type="number" min="0" step="50" id="rka-${r.code}" data-rka="${r.code}" value="${r.alloc}" style="width:66px;text-align:right" ${dis}></td>
     <td class="r num">${r.real}${r.left?` <span class="mini">(${r.left} đã nghỉ)</span>`:''}<div class="mini">${Object.entries(r.cnt).filter(([,n])=>n).map(([g,n])=>g+' '+n).join(' · ')}</div></td>
-    <td class="r num">${nf(Math.round(r.sF))}<div class="mini">${rkPct(r.fill)}</div></td>
-    <td class="r num">${nf(Math.round(r.sT))}<div class="mini">${r.T?`${r.tOk}/${r.T} · ${rkPct(r.ttf)}`:'chưa khớp hồ sơ'}</div></td>
-    <td class="r num">${r.sQ}<div class="mini">${r.C?`${r.cq}/${r.C} · ${rkPct(r.q90)}`:'chưa có dữ liệu'}</div></td>
-    <td class="r num">${nf(Math.round(r.sC))}<div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
-    <td class="r num"><b>${nf(Math.round(r.tot))}</b></td><td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
+    <td class="r num">${nf(r.sF)}<span class="mini">/${r.mF}</span><div class="mini">${rkPct(r.fill)}</div></td>
+    <td class="r num">${nf(r.sT)}<span class="mini">/${r.mT}</span><div class="mini">${r.T?`${r.tOk}/${r.T} · ${rkPct(r.ttf)}`:'chưa khớp hồ sơ'}</div></td>
+    <td class="r num">${r.sQ}<span class="mini">/${r.mQ}</span><div class="mini">${r.C?`${r.cq}/${r.C} · ${rkPct(r.q90)}`:'chưa có dữ liệu'}</div></td>
+    <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
+    <td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
     <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
-  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="7" class="mini">Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr></tbody></table></div>
+  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr></tbody></table></div>
   <div class="row mt">${S.canWrite?`<button class="btn" data-act="rk-eff">Ghi số tuyển vào bảng Hiệu suất ${fmtM(m)}</button>`:''}<span class="note">Bôi đỏ khi tổng dưới 300/500.</span></div>
   <details class="mt"><summary class="note">Cách tính</summary><ul class="note">
     <li>Thực tuyển: người nhận việc trong tháng theo DSNS và đang làm; ai nghỉ việc thì tự trừ ra khi cập nhật DSNS, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người tuyển vị trí quản lý; khối văn phòng và kho gán cho người phụ trách khối văn phòng. QLKV quy đổi 1 người.</li>
     <li>Trúng tuyển đúng hạn: từ ngày nộp CV đến ngày nhận việc trên Member (thiếu thì lấy ngày vào làm DSNS) ≤ NVBH 15 · CHT 20 · QLKV 30 · VP 15 ngày. Member chưa ghi ngày gửi thư mời nên đây là cách đo chặt hơn quy định.</li>
     <li>Chất lượng: nhóm vào làm 3 tháng trước (${fmtM(pm)}), tỷ lệ nghỉ trong 90 ngày ≤ 40% được 50 điểm; không có người vào làm thì để đủ điểm.</li>
     <li>Tuân thủ: ½ × % hồ sơ có lịch PV vòng 1 trong dưới 2 ngày làm việc kể từ ngày nộp + ½ × % hồ sơ không bị treo (thay cho "cập nhật Member đúng hạn" vì sheet chưa ghi thời điểm cập nhật).</li>
-    <li>KPI tuyển dụng = Tổng /500 × điểm phân bổ. Điểm HS tuyển = số thực tuyển × điểm cơ sở (NVBH ${S.config.eff.tdNT} · CHT ${S.config.eff.tdCHT} · QLKV ${S.config.eff.tdQLKV} · VP ${S.config.eff.tdVP}), cộng vào hiệu suất D khi bấm "Ghi số tuyển".</li></ul></details></div>`}
+    <li>Điểm tối đa từng tiêu chí = tỷ trọng × điểm phân bổ của người đó (ví dụ phân bổ 600: lấp đầy 300, trúng tuyển 120, chất lượng 60, tuân thủ 120). KPI tuyển dụng = tổng điểm 4 tiêu chí. Điểm HS tuyển = số thực tuyển × điểm cơ sở (NVBH ${S.config.eff.tdNT} · CHT ${S.config.eff.tdCHT} · QLKV ${S.config.eff.tdQLKV} · VP ${S.config.eff.tdVP}), cộng vào hiệu suất D khi bấm "Ghi số tuyển".</li></ul></details></div>`}
 async function rkSetPlan(m,code,idx,val){const cur=JSON.parse(JSON.stringify(rkPlan(m)));if(!cur[code])cur[code]=[0,500];cur[code][idx]=val;const rp={...(S.config.recPlan||{}),[m]:cur};await write('config/main',{...S.config,recPlan:rp})}
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.rkt!=null)rkSetPlan(S.month,t.dataset.rkt,0,+t.value||0);else if(t.dataset.rka!=null)rkSetPlan(S.month,t.dataset.rka,1,+t.value||0)});
 document.addEventListener('click',async e=>{const el=e.target.closest('[data-act^="rk-"]');if(!el)return;const a=el.dataset.act;
@@ -1523,7 +1523,7 @@ function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_k
 function kpCats(m,sid){const plan=kpPlan(m,sid);if(!plan)return null;const es=(logDoc(m,sid)?.entries||[]).filter(isDoneLog);const ov=((S.config.kpiPct||{})[m]||{})[kpCode(sid)]||{};
   const days=new Set((logDoc(m,sid)?.entries||[]).map(e=>e.d)).size,wd=kpWorkdays(m);
   return plan.map(([k,pts])=>{let pct=null,src='',note='';
-    if(k==='Tuyển dụng'){const r=kpRk(m)[sid];if(r){pct=r.tot/500;src='Khung tuyển dụng 500 điểm';note=`${r.real}/${r.tgt} người · ${nf(Math.round(r.tot))}/500`}else{src='Khung tuyển dụng';note='Chưa có dữ liệu'}}
+    if(k==='Tuyển dụng'){const r=kpRk(m)[sid];if(r){pct=r.alloc?r.kpi/r.alloc:0;src='Bảng KPI tuyển dụng';note=`${r.real}/${r.tgt} người · ${nf(r.kpi)}/${nf(r.alloc)} điểm`}else{src='Khung tuyển dụng';note='Chưa có dữ liệu'}}
     else if(k==='Báo cáo'){pct=wd?Math.min(1,days/wd):0;src='Số ngày có báo cáo';note=`${days}/${wd} ngày làm việc`}
     else if(k==='Điều xe'){const got=es.filter(e=>/xe/i.test((e.content||'')+' '+(e.result||''))).reduce((a,e)=>a+entPts(e),0);pct=pts?Math.min(1,got/pts):0;src='Nhật ký có nội dung "xe"';note=`${nf(r1(got))} điểm nhật ký`}
     else{const pre=KP_SRC[k]||[];const got=es.filter(e=>pre.some(p=>String(e.code||'').startsWith(p))).reduce((a,e)=>a+entPts(e),0);pct=pts?Math.min(1,got/pts):0;src='Điểm nhật ký mã '+pre.join(', ');note=`${nf(r1(got))} điểm nhật ký`}
