@@ -217,7 +217,7 @@ const PRIO={cao:'Cao',tb:'Trung bình',thap:'Thấp'};
 const LOG_ST=['Hoàn thành','Đang thực hiện','Chậm tiến độ','Tạm dừng / Hủy'];
 const EFF_KEYS=[['tdNT','Tuyển NT'],['tdCHT','Tuyển CHT'],['tdQLKV','Tuyển QLKV'],['tdVP','Tuyển VP'],['hs1','HS 1'],['hs2','HS 2'],['hs3','HS 3'],['hs4','HS 4'],['hs5','HS 5']];
 const STAFF_ST={active:'Đang làm',leave:'Nghỉ thai sản / tạm nghỉ',quit:'Đã nghỉ việc'};
-const DEFAULT_CFG={gradeA:90,gradeB:80,gradeC:65,kpiMax:1000,remindDays:3,eff:{nt:.005,vp:.01,tdNT:.02,tdCHT:.03,tdQLKV:.1,tdVP:.03,hs1:.1,hs2:.15,hs3:.2,hs4:.25,hs5:.4},dCut:[.65,.75,.85,.95,1.05]};
+const DEFAULT_CFG={gradeA:95,gradeB:85,gradeC:70,kpiMax:1000,remindDays:3,eff:{nt:.005,vp:.01,tdNT:.02,tdCHT:.03,tdQLKV:.1,tdVP:.03,hs1:.1,hs2:.15,hs3:.2,hs4:.25,hs5:.4},dCut:[.65,.75,.85,.95,1.05]};
 const S={staff:[],tasks:[],logs:[],effort:[],okrs:[],shops:[],catalog:[],hsRef:{},config:JSON.parse(JSON.stringify(DEFAULT_CFG)),loaded:new Set(),db:null,dl:null,dbState:'wait',canWrite:true,
   view:'tong-quan',taskMode:'board',f:{owner:'',module:'',status:'',q:''},me:'',month:'',kpiOpen:'',okrQ:'',rep:{type:'tuan',date:''},sf:{area:'',who:'',only:''},draft:null,sys:{},mcp:null,sysBusy:false,sysTab:'hd',sysF:{who:'',short:false},sysAssign:'',hrYear:'',rec:{},recBusy:false,recF:{grp:'',mon:''},recTried:0,chtPlan:{},chtF:{mgr:'',area:'',plan:'',st:'',only:true},chtSeeding:false,who:'',chtMeta:{},nvF:{per:'ytd',open:''}};
 
@@ -317,7 +317,7 @@ async function init(){
   if(!db){S.dbState='none';render();return}
   S.db=db;S.dbState='ok';
   COLS.forEach(c=>db.collection(c).onSnapshot(snap=>{S[c]=snap.docs.map(d=>({id:d.id,...d.data()}));S.loaded.add(c);render()},()=>{S.dbState='err';render()}));
-  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render();if(!(d.effVer>=2))setTimeout(()=>rkMigrate(d),2500)},()=>{});
+  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render();if(!(d.effVer>=3))setTimeout(()=>rkMigrate(d),2500)},()=>{});
   db.doc('catalog/kpi').onSnapshot(s=>{S.catalog=s.exists?(s.data().items||[]):[];render()},()=>{});
   db.doc('catalog/hs').onSnapshot(s=>{S.hsRef=s.exists?(s.data().tiers||{}):{};render()},()=>{});
   db.doc('assign/shops').onSnapshot(s=>{S.shops=s.exists?(s.data().list||[]):[];render()},()=>{});
@@ -466,9 +466,9 @@ function setStatus(t,st){const body=clean(t);body.status=st;if(st==='done'){body
 function vKpi(){
   const m=S.month;const st=activeStaff();const c=S.config;
   const rows=st.map(s=>({s,k:kpiOf(m,s.id),e:effOf(m,s.id)}));
-  return head('KPI & hiệu suất',`KPI từ nhật ký (trần ${nf(c.kpiMax)}đ): A ≥${c.gradeA}%, B ≥${c.gradeB}%, C ≥${c.gradeC}%, dưới đó D · Hiệu suất xếp hạng D1–D6 theo khối lượng phụ trách`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-kpi">Xuất CSV</button>`:''))+
-  `<div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Ngày BC</th><th class="r">Dòng</th><th class="r">Điểm thực</th><th class="r">Trừ lỗi</th><th class="r">KPI</th><th>Loại</th><th class="r">Điểm HS</th><th>Hạng D</th><th>D hiện hữu</th></tr></thead><tbody>
-  ${rows.map(({s,k,e})=>`<tr class="click ${S.kpiOpen===s.id?'open':''}" data-act="kpi-open" data-id="${s.id}"><td><b>${esc(s.name)}</b><div class="note">${esc(s.title||'')}</div></td><td class="r num">${k.days||'—'}</td><td class="r num">${k.n||'—'}</td><td class="r num">${k.has?nf(k.raw):'—'}${k.over?' <span class="pill ok">vượt trần</span>':''}</td><td class="r num">${k.pen?'−'+nf(k.pen):''}</td><td class="r num"><b>${k.has?nf(k.val):'—'}</b></td><td>${gradePill(k)}</td><td class="r num">${e.has?nf(e.score):'—'}</td><td>${e.has?rankPill(e.rank)+' '+dCompare(s.dCurrent,e.rank):'—'}</td><td>${s.dCurrent?rankPill(s.dCurrent):'—'}</td></tr>
+  return head('KPI & hiệu suất',`KPI theo phân bổ 1.000 điểm/người (điểm phân bổ × % hoàn thành từng hạng mục): A ≥${c.gradeA}%, B ≥${c.gradeB}%, C ≥${c.gradeC}%, dưới đó D · Hiệu suất xếp hạng D1–D6 theo khối lượng phụ trách`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-kpi">Xuất CSV</button>`:''))+
+  `<div class="tbl-wrap"><table><thead><tr><th>Nhân sự</th><th class="r">Ngày BC</th><th class="r">Dòng</th><th class="r">Điểm đạt / phân bổ</th><th class="r">Trừ lỗi</th><th class="r">KPI</th><th>Loại</th><th class="r">Điểm HS</th><th>Hạng D</th><th>D hiện hữu</th></tr></thead><tbody>
+  ${rows.map(({s,k,e})=>`<tr class="click ${S.kpiOpen===s.id?'open':''}" data-act="kpi-open" data-id="${s.id}"><td><b>${esc(s.name)}</b><div class="note">${esc(s.title||'')}</div></td><td class="r num">${k.days||'—'}</td><td class="r num">${k.n||'—'}</td><td class="r num">${k.has?nf(k.raw)+(k.alloc?' <span class="mini">/ '+nf(k.plan)+'</span>':''):'—'}${k.over?' <span class="pill ok">vượt trần</span>':''}${k.log&&k.has?' <span class="mini">(nhật ký)</span>':''}</td><td class="r num">${k.pen?'−'+nf(k.pen):''}</td><td class="r num"><b>${k.has?nf(k.val):'—'}</b></td><td>${gradePill(k)}</td><td class="r num">${e.has?nf(e.score):'—'}</td><td>${e.has?rankPill(e.rank)+' '+dCompare(s.dCurrent,e.rank):'—'}</td><td>${s.dCurrent?rankPill(s.dCurrent):'—'}</td></tr>
   ${S.kpiOpen===s.id?`<tr><td colspan="10" style="background:var(--surface)">${kpiDetail(s,m,k)}</td></tr>`:''}`).join('')}
   </tbody></table></div>
   <div class="grid2 mt">
@@ -478,10 +478,10 @@ function vKpi(){
   </div>`+vRecKpi(m);
 }
 function kpiDetail(s,m,k){const ap=areaPts(m,s.id);const d=logDoc(m,s.id);const dis=S.canWrite?'':'disabled';
-  return `<div class="grid2" style="padding:6px 0"><div><b style="font-size:13px">Điểm theo mảng</b>${ap.map(([a,p])=>`<div class="row" style="justify-content:space-between;font-size:13px;border-bottom:1px solid var(--line);padding:4px 0"><span>${esc(a)}</span><span class="num">${nf(r1(p))}</span></div>`).join('')||'<p class="note">Chưa có nhật ký.</p>'}
+  return kpDetail(s,m,k)+`<div class="grid2" style="padding:6px 0"><div><b style="font-size:13px">Điểm nhật ký theo mảng</b>${ap.map(([a,p])=>`<div class="row" style="justify-content:space-between;font-size:13px;border-bottom:1px solid var(--line);padding:4px 0"><span>${esc(a)}</span><span class="num">${nf(r1(p))}</span></div>`).join('')||'<p class="note">Chưa có nhật ký.</p>'}
   ${k.noQty?`<p class="note"><span class="pill warn">${k.noQty} dòng</span> đã hoàn thành nhưng chưa nhập số lượng nên chưa được tính điểm.</p>`:''}${k.open?`<p class="note">${k.open} dòng chưa hoàn thành (không tính điểm).</p>`:''}</div>
   <div><b style="font-size:13px">Trừ lỗi tháng</b><div class="form" style="margin-top:6px"><label>Số điểm trừ<input type="number" step="any" id="pen-${s.id}" data-pen="${s.id}" value="${esc(d?.penalty||'')}" ${dis}></label><label>Lý do<input id="pennote-${s.id}" data-pennote="${s.id}" value="${esc(d?.penaltyNote||'')}" ${dis}></label></div>
-  <p class="note">KPI = min(điểm thực, ${nf(k.max)}) − trừ lỗi. <a href="#ca-nhan" data-act="me" data-id="${s.id}">Mở nhật ký của ${esc(s.name)}</a></p></div></div>`}
+  <p class="note">${k.alloc?'KPI = Σ điểm đạt các hạng mục − trừ lỗi.':'KPI = min(điểm thực, '+nf(k.max)+') − trừ lỗi.'} <a href="#ca-nhan" data-act="me" data-id="${s.id}">Mở nhật ký của ${esc(s.name)}</a></p></div></div>`}
 function scatter(rows){const pts=rows.filter(r=>r.k.has||r.e.has);if(!pts.length)return '<div class="empty">Chưa có dữ liệu.</div>';
   const W=520,H=300,L=44,R=12,T=14,B=34;const ymax=Math.max(1.5,...pts.map(r=>r.e.score))*1.08;const X=p=>L+(Math.min(p,110)/110)*(W-L-R),Y=v=>T+(1-v/ymax)*(H-T-B);
   const xc=X(+S.config.gradeC||65),yc=Y(1);const ticks=[0,.5,1,1.5,2,2.5].filter(v=>v<=ymax);
@@ -1437,8 +1437,8 @@ const RK_AREAS={UP000279:'Hà Nội, Hưng Yên, Thái Bình, Hải Phòng, Ninh
   UP001336:'Quảng Nam, Quảng Ngãi, An Giang, Cần Thơ, Hồ Chí Minh, Bình Dương · tuyển vị trí Quản lý toàn hệ thống',UP001181:'Thái Nguyên, Phú Thọ, Bắc Ninh',UP001466:'Khánh Hòa, Gia Lai, Bình Định, Đắk Lắk, Lâm Đồng',UP001619:'Khối văn phòng (ngoài kênh bán lẻ)'};
 const RK_EFF={nt:.005,vp:.01,tdNT:.02,tdCHT:.03,tdQLKV:.1,tdVP:.03,hs1:.1,hs2:.15,hs3:.2,hs4:.25,hs5:.4},RK_DCUT=[.65,.75,.85,.95,1.05];
 let _rkMig=false;
-function rkMigrate(d){if(_rkMig||!S.canWrite||!S.db||(d&&d.effVer>=2))return;_rkMig=true;
-  write('config/main',{...(d||{}),eff:{...((d&&d.eff)||{}),...RK_EFF},dCut:RK_DCUT,effVer:2}).catch(()=>{});
+function rkMigrate(d){if(_rkMig||!S.canWrite||!S.db||(d&&d.effVer>=3))return;_rkMig=true;
+  const up=(d&&d.effVer>=2)?{}:{eff:{...((d&&d.eff)||{}),...RK_EFF},dCut:RK_DCUT};write('config/main',{...(d||{}),...up,gradeA:95,gradeB:85,gradeC:70,effVer:3}).catch(()=>{});
   S.staff.forEach(s=>{const a=RK_AREAS[String(s.code||'').toUpperCase()];if(a&&s.areas!==a)write('staff/'+s.id,{...clean(s),areas:a}).catch(()=>{})});}
 const rkGrp=p=>{p=(p||'').toLowerCase();return /quản lý địa bàn|quản lý khu vực/.test(p)?'QLKV':/cửa hàng trưởng|phụ trách cửa hàng/.test(p)?'CHT':/bán hàng|học việc/.test(p)?'NVBH':'VP'};
 function rkPlan(m){const c=(S.config.recPlan||{})[m];if(c)return c;if(RK_PLAN_DEF[m])return RK_PLAN_DEF[m];
@@ -1451,7 +1451,7 @@ function rkData(m){
   const pm=(()=>{const d=pd(m+'-01');d.setMonth(d.getMonth()-3);return iso(d).slice(0,7)})();const [qa,qb]=monthRange(pm);
   const R=sysRows().filter(r=>r.start&&!/thực tập/i.test(r.pos||'')).map(r=>({...r,g:rkGrp(r.pos),o:rkHireOwner(r,M)}));
   const cv=recRows();const out=[];
-  allStaff().forEach(s=>{const code=String(s.code||'').toUpperCase();const p=plan[code];if(!p)return;const [tgt,alloc]=p;
+  allStaff().forEach(s=>{const code=String(s.code||'').toUpperCase();const p=plan[code];if(!p)return;const [tgt,alloc0]=p;const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');const alloc=tdp?tdp[1]:alloc0;
     const H=R.filter(r=>r.o===s.id&&r.start>=a&&r.start<=b);
     const real=H.filter(r=>!(r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=7));const pend=real.filter(r=>diffDays(r.start,TODAY)<7);
     const cnt={NVBH:0,CHT:0,QLKV:0,VP:0};real.forEach(r=>cnt[r.g]++);
@@ -1495,6 +1495,58 @@ document.addEventListener('click',async e=>{const el=e.target.closest('[data-act
   else if(a==='rk-eff'){if(!needWrite())return;const m=S.month;const {rows}=rkData(m);let n=0;
     for(const r of rows){const old=effDoc(m,r.s.id);await write('effort/'+m+'_'+r.s.id,{...(old?clean(old):{month:m,staffId:r.s.id}),tdNT:r.cnt.NVBH,tdCHT:r.cnt.CHT,tdQLKV:r.cnt.QLKV,tdVP:r.cnt.VP}).then(()=>n++).catch(()=>{})}
     toast('Đã ghi số tuyển của '+n+' người vào bảng Hiệu suất')}});
+/* ===================== KPI tháng theo phân bổ 1.000 điểm =====================
+   KPI = Σ (điểm phân bổ hạng mục × % hoàn thành), tối đa 100%/hạng mục, trừ lỗi.
+   % hoàn thành: Tuyển dụng theo khung 500 điểm; Báo cáo theo số ngày có báo cáo; hạng mục khác theo điểm nhật ký của mảng so với điểm phân bổ; trưởng phòng nhập tay để ghi đè. */
+const KP_CATS=['Tuyển dụng','Lương','BHXH','HĐLĐ','Công đoàn','HR khu vực','Hành chính','Hành chính khác','Đồng phục','CCDC–VPP','Pháp lý địa điểm','Điều xe','Khác','Báo cáo'];
+const KP_SRC={'Lương':['02.'],'BHXH':['03.'],'HĐLĐ':['08.08'],'Công đoàn':['07.'],'HR khu vực':['04.'],'Hành chính':['08.03','08.04','08.05','08.06','08.07'],'Hành chính khác':['08.03','08.04','08.05','08.06','08.07'],
+  'Đồng phục':['08.01'],'CCDC–VPP':['08.02'],'Pháp lý địa điểm':['05.'],'Khác':['06.']};
+const KP_DEF={'2026-10':{
+  UP000504:[['Lương',300],['BHXH',400],['Công đoàn',100],['Khác',150],['Báo cáo',50]],
+  UP001181:[['Tuyển dụng',500],['Đồng phục',150],['Công đoàn',100],['HR khu vực',200],['Báo cáo',50]],
+  UP001200:[['Tuyển dụng',500],['CCDC–VPP',250],['HR khu vực',200],['Báo cáo',50]],
+  UP001336:[['Tuyển dụng',600],['HR khu vực',200],['Hành chính khác',150],['Báo cáo',50]],
+  UP000279:[['Tuyển dụng',500],['Hành chính',250],['HR khu vực',200],['Báo cáo',50]],
+  UP001340:[['Tuyển dụng',500],['Lương',250],['HR khu vực',150],['HĐLĐ',50],['Báo cáo',50]],
+  UP001466:[['Tuyển dụng',500],['Hành chính',100],['HR khu vực',200],['Pháp lý địa điểm',150],['Báo cáo',50]],
+  UP001619:[['Tuyển dụng',400],['Điều xe',100],['Pháp lý địa điểm',100],['Hành chính khác',350],['Báo cáo',50]]}};
+function kpPlanAll(m){const c=(S.config.kpiPlan||{})[m];if(c)return c;if(KP_DEF[m])return KP_DEF[m];
+  const ks=Object.keys({...KP_DEF,...(S.config.kpiPlan||{})}).filter(k=>k<m).sort();const k=ks.pop();return k?((S.config.kpiPlan||{})[k]||KP_DEF[k]):{}}
+const kpCode=sid=>String((S.staff.find(x=>x.id===sid)||{}).code||'').toUpperCase();
+function kpPlan(m,sid){return kpPlanAll(m)[kpCode(sid)]||null}
+function kpWorkdays(m){const [a,b0]=monthRange(m);const b=b0>TODAY?TODAY:b0;let n=0;const d=pd(a);while(iso(d)<=b){if(d.getDay()!==0)n++;d.setDate(d.getDate()+1)}return n}
+let _kpRk=null;
+function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_kpRk.cfg===S.config)return _kpRk.v;const v={};try{rkData(m).rows.forEach(r=>{v[r.s.id]=r})}catch(_){}
+  _kpRk={m,rec:S.rec,sys:S.sys,cfg:S.config,v};return v}
+function kpCats(m,sid){const plan=kpPlan(m,sid);if(!plan)return null;const es=(logDoc(m,sid)?.entries||[]).filter(isDoneLog);const ov=((S.config.kpiPct||{})[m]||{})[kpCode(sid)]||{};
+  const days=new Set((logDoc(m,sid)?.entries||[]).map(e=>e.d)).size,wd=kpWorkdays(m);
+  return plan.map(([k,pts])=>{let pct=null,src='',note='';
+    if(k==='Tuyển dụng'){const r=kpRk(m)[sid];if(r){pct=r.tot/500;src='Khung tuyển dụng 500 điểm';note=`${r.real}/${r.tgt} người · ${nf(Math.round(r.tot))}/500`}else{src='Khung tuyển dụng';note='Chưa có dữ liệu'}}
+    else if(k==='Báo cáo'){pct=wd?Math.min(1,days/wd):0;src='Số ngày có báo cáo';note=`${days}/${wd} ngày làm việc`}
+    else if(k==='Điều xe'){const got=es.filter(e=>/xe/i.test((e.content||'')+' '+(e.result||''))).reduce((a,e)=>a+entPts(e),0);pct=pts?Math.min(1,got/pts):0;src='Nhật ký có nội dung "xe"';note=`${nf(r1(got))} điểm nhật ký`}
+    else{const pre=KP_SRC[k]||[];const got=es.filter(e=>pre.some(p=>String(e.code||'').startsWith(p))).reduce((a,e)=>a+entPts(e),0);pct=pts?Math.min(1,got/pts):0;src='Điểm nhật ký mã '+pre.join(', ');note=`${nf(r1(got))} điểm nhật ký`}
+    const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
+    return {k,pts,pct,src,note,man:man??'',use,got:use==null?0:Math.round(pts*use)}})}
+const _kpiLog=kpiOf;
+kpiOf=function(m,sid){const L=_kpiLog(m,sid);const cats=kpCats(m,sid);if(!cats)return {...L,log:true};
+  const plan=cats.reduce((a,c)=>a+c.pts,0),got=cats.reduce((a,c)=>a+c.got,0);const val=Math.max(0,Math.min(got,+S.config.kpiMax||1000)-L.pen);const max=Math.max(plan,1);
+  return {...L,has:true,cats,plan,logRaw:L.raw,raw:got,val:r1(val),max,pct:r1(val/max*100),grade:gradeOf(val/max*100),over:false,alloc:true}};
+function kpDetail(s,m,k){if(!k.cats)return '';const dis=S.canWrite?'':'disabled';const code=kpCode(s.id);
+  return `<div style="padding:6px 0 12px"><b style="font-size:13px">KPI theo phân bổ ${fmtM(m)}: ${nf(k.raw)}/${nf(k.plan)} điểm${k.plan!==1000?` <span class="pill warn">tổng phân bổ ${nf(k.plan)}, chưa đủ 1.000</span>`:''}</b>
+  <div class="tbl-wrap mt"><table><thead><tr><th>Hạng mục</th><th class="r">Điểm phân bổ</th><th>Căn cứ tính</th><th class="r">% tự tính</th><th class="r">% nhập tay</th><th class="r">Điểm đạt</th></tr></thead><tbody>
+  ${k.cats.map((c,i)=>`<tr><td><b>${esc(c.k)}</b></td><td class="r"><input class="num" type="number" min="0" step="50" id="kpp-${code}-${i}" data-kpp="${code}" data-i="${i}" value="${c.pts}" style="width:70px;text-align:right" ${dis}></td>
+    <td class="mini">${esc(c.src)}<div>${esc(c.note)}</div></td><td class="r num">${c.pct==null?'—':Math.round(c.pct*100)+'%'}</td>
+    <td class="r"><input class="num" type="number" min="0" max="100" id="kpm-${code}-${i}" data-kpm="${code}" data-k="${esc(c.k)}" value="${esc(c.man)}" placeholder="tự tính" style="width:72px;text-align:right" ${dis}></td>
+    <td class="r num"><b>${nf(c.got)}</b></td></tr>`).join('')}
+  <tr><td><b>Cộng</b></td><td class="r num"><b>${nf(k.plan)}</b></td><td colspan="3" class="mini">Trừ lỗi ${nf(k.pen||0)} · KPI = ${nf(k.val)}</td><td class="r num"><b>${nf(k.raw)}</b></td></tr></tbody></table></div>
+  ${S.canWrite?`<div class="row mt"><select id="kpAdd-${code}"><option value="">+ Thêm hạng mục</option>${KP_CATS.filter(c=>!k.cats.some(x=>x.k===c)).map(c=>`<option>${c}</option>`).join('')}</select><span class="note">Điểm phân bổ bằng 0 thì hạng mục bị bỏ khỏi kế hoạch. Nhật ký tháng: ${nf(r1(k.logRaw||0))} điểm.</span></div>`:''}</div>`}
+async function kpSave(m,code,mut){const all=JSON.parse(JSON.stringify(kpPlanAll(m)));all[code]=all[code]||[];mut(all[code]);all[code]=all[code].filter(x=>x[1]>0||x[0]==='Tuyển dụng');
+  const rp=JSON.parse(JSON.stringify(S.config.recPlan||{}));const td=all[code].find(x=>x[0]==='Tuyển dụng');if(td){const cur=rkPlan(m);rp[m]=rp[m]||JSON.parse(JSON.stringify(cur));if(rp[m][code])rp[m][code][1]=td[1]}
+  await write('config/main',{...S.config,kpiPlan:{...(S.config.kpiPlan||{}),[m]:all},recPlan:rp})}
+document.addEventListener('change',e=>{const t=e.target;const m=S.month;
+  if(t.dataset.kpp!=null){const i=+t.dataset.i,v=+t.value||0;kpSave(m,t.dataset.kpp,l=>{if(l[i])l[i][1]=v})}
+  else if(t.dataset.kpm!=null){const code=t.dataset.kpm,k=t.dataset.k;const p=JSON.parse(JSON.stringify(S.config.kpiPct||{}));p[m]=p[m]||{};p[m][code]=p[m][code]||{};if(t.value==='')delete p[m][code][k];else p[m][code][k]=Math.min(100,Math.max(0,+t.value));write('config/main',{...S.config,kpiPct:p})}
+  else if(t.id&&t.id.startsWith('kpAdd-')&&t.value){const code=t.id.slice(6),k=t.value;kpSave(m,code,l=>{l.push([k,50])})}});
 init();
 </script>
 </body>
