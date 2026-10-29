@@ -151,6 +151,7 @@ td input{width:90px}
 .wr-pv{font-family:"Times New Roman",serif}
 .wr-pv h3{color:var(--fg)}
 .wb{max-width:900px}
+.wb-warn{max-width:900px;margin:0 0 12px;padding:10px 14px;border-radius:8px;background:#fdf1d6;color:#6b4c00;font-size:13px;border:1px solid #f0d58a}
 .wb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:3px solid var(--accent);padding-bottom:12px}
 .wb-org{font-size:11.5px;color:var(--muted);line-height:1.5}.wb-org b{color:var(--fg)}
 .wb-ttl{text-align:center}.wb-ttl h2{margin:0;font-size:22px;text-transform:uppercase;color:var(--accent);letter-spacing:.02em}.wb-ttl p{margin:2px 0 0;color:var(--muted);font-size:13px}
@@ -1615,9 +1616,9 @@ async function refreshLogs(silent){
       const mc=String((v[0]||[])[0]||'').match(/UP\d{6}/i);const s=mc&&byCode[mc[0].toUpperCase()];if(!s){miss.push(tab);continue}
       const es=[];let last='';
       v.slice(4).forEach((r,i)=>{const g=j=>String(r[j]??'').trim();const code=g(2);if(!code&&!g(4)&&!g(6))return;
-        let d=lgDate(g(1),ym);if(!d||ymOf(d)!==ym)d=last||ym+'-01';last=d;
+        const d0=lgDate(g(1),ym);const nod=!d0||ymOf(d0)!==ym;const d=nod?(last||ym+'-01'):d0;last=d;
         const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
-        const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
+        const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,nod,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
       const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'sheet',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
     S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật ${nf(n)} dòng nhật ký ${fmtM(ym)} của ${ppl} người`+(miss.length?` · chưa đọc được sheet ${miss.join(', ')}`:''));
   }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc':'Chưa cập nhật được nhật ký, thử lại sau')}}
@@ -1640,6 +1641,7 @@ const wrShort=n=>String(n||'').trim().split(/\s+/).pop();
 const wrPct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 /* Bỏ tên người trong nội dung báo cáo (chỉ giữ việc + số lượng) */
 function wrClean(t){let s=String(t||'').split('\n')[0].trim();if(/UP\d{6}/i.test(s)||/^(\p{Lu}\p{Ll}*\s+){2,}\p{Lu}\p{Ll}*\s*(-|,|$)/u.test(s))return '';s=s.replace(/\s+cho\s*:?\s*(\p{Lu}\p{Ll}*\s+){1,}\p{Lu}\p{Ll}*.*$/u,'').replace(/[:;,\s]+$/,'').replace(/\s+cho$/i,'');return s}
+const wrNT=t=>{const s=String(t||'');if(/[a-zà-ỹ]{4,}/i.test(s.replace(/đkkd|dkkd|nt|và/gi,'')))return [];return [...new Set((s.match(/\b\d{1,3}[A-Z]?(?:\.0)?\b/g)||[]).map(x=>x.replace(/\.0$/,'')))]};
 const wrIsLegal=e=>/^05\./.test(String(e.code||''))||/pháp lý/i.test(String(e.area||''));
 const wrIsRecTask=t=>/tuyển dụng|chỉ tiêu tuyển/i.test((t.title||'')+' '+(t.module||''));
 const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.title||'').trim());
@@ -1696,7 +1698,8 @@ function wrBuild(){
     parts.push({note:'s2'});secs.push({h:`II. Tình hình tuyển dụng tháng ${+m.slice(5,7)}/${m.slice(0,4)} (lũy kế đến ${fmtDY(ref)})`,parts,src:`Nguồn: DSNS U (thực tuyển = vào làm trong tháng, chưa nghỉ) và hồ sơ tuyển dụng ${S.rec.updatedAt?'ngày '+fmtDY(S.rec.updatedAt.slice(0,10)):''}.`})}
   /* ---------- III. Công việc thường quy ---------- */
   const months=[...new Set([ymOf(r[0]),ymOf(r[1])])];const staff=activeStaff();
-  const logs=staff.flatMap(s=>months.flatMap(mm=>logDoc(mm,s.id)?.entries||[]).filter(e=>inR(e.d,r)&&!isVoidLog(e)).map(e=>({...e,who:s})));
+  const logs=staff.flatMap(s=>months.flatMap(mm=>logDoc(mm,s.id)?.entries||[]).filter(e=>inR(e.d,r)&&!e.nod&&!isVoidLog(e)).map(e=>({...e,who:s})));
+  X.undated=staff.map(s=>[s.name,months.flatMap(mm=>logDoc(mm,s.id)?.entries||[]).filter(e=>e.nod&&!isVoidLog(e)).length]).filter(x=>x[1]);
   {const parts=[];const ok=logs.filter(e=>!kpIsRec(e)&&!wrIsLegal(e));const by={};
     ok.forEach(e=>{const area=e.area||(catBy(e.code)||{}).area||'Khác';const txt=wrClean(e.result)||wrClean(e.content)||e.content||'';if(!txt)return;const g=(by[area]??={});const k=txt.toLowerCase();const it=(g[k]??={txt,qty:0,who:new Set(),open:false});it.qty+=(+e.qty||0);it.who.add(wrShort(e.who.name));if(!isDoneLog(e))it.open=true});
     const groups=Object.entries(by).map(([area,g])=>({who:area,items:Object.values(g).map(it=>`${it.txt}${it.qty?` – SL ${nf(it.qty)}`:''}${it.open?' (đang thực hiện)':''} · ${[...it.who].join(', ')}`)})).sort((a,b)=>b.items.length-a.items.length);
@@ -1709,9 +1712,16 @@ function wrBuild(){
     if(L.length)parts.push({sub:'Công việc giao',lines:L});X.work={by,done:done.length,late:late.filter(t=>!wrIsHdTask(t)),hdLate,nLogs:ok.length};
     parts.push({note:'s3'});secs.push({h:'III. Các công việc thường quy trong tuần',parts,src:'Nguồn: nhật ký công việc hằng ngày của nhân sự phòng (không gồm các dòng tuyển dụng đã báo cáo ở mục II).'})}
   /* ---------- IV. Pháp lý ---------- */
-  {const parts=[];const lg=logs.filter(wrIsLegal);const lt=S.tasks.filter(t=>/pháp lý/i.test((t.module||'')+' '+(t.title||''))&&((isDone(t)&&inR(t.doneAt,r))||(!isDone(t)&&t.status!=='todo')));
-    const L=[...lg.map(e=>`${wrClean(e.result)||e.content}${isDoneLog(e)?'':' (đang thực hiện)'} · ${wrShort(e.who.name)}`),...lt.map(t=>`${t.title} – ${isDone(t)?'đã xong '+fmtD(t.doneAt):'đang thực hiện'+(t.due?', hạn '+fmtD(t.due):'')}`)];
-    parts.push({lines:L.length?L:['Không phát sinh.']});X.legal=L;parts.push({note:'s4'});secs.push({h:'IV. Pháp lý',parts})}
+  {const parts=[];const lab=e=>((catBy(e.code)||{}).content||e.content||'Hồ sơ pháp lý').replace(/\s+/g,' ').trim();
+    const what=e=>{const nt=wrNT(e.result);return nt.length?'NT '+nt.join(', '):(wrClean(e.result)||'')};
+    const lg=logs.filter(wrIsLegal);const lt=S.tasks.filter(t=>/pháp lý/i.test((t.module||'')+' '+(t.title||''))&&((isDone(t)&&inR(t.doneAt,r))||(!isDone(t)&&t.status!=='todo')));
+    const L=[...lg.map(e=>`${lab(e)}${what(e)?': '+what(e):''}${+e.qty>1?` (${nf(e.qty)} hồ sơ)`:''}${isDoneLog(e)?'':' – đang thực hiện'} · ${wrShort(e.who.name)}`),...lt.map(t=>`${t.title} – ${isDone(t)?'đã xong '+fmtD(t.doneAt):'đang thực hiện'+(t.due?', hạn '+fmtD(t.due):'')}`)];
+    const ml=staff.flatMap(s=>(logDoc(m,s.id)?.entries||[]).filter(e=>!isVoidLog(e)&&wrIsLegal(e)&&e.d<=ref));const G={};
+    ml.forEach(e=>{const g=(G[lab(e)]??={n:0,nt:new Set()});g.n+=(+e.qty||1);wrNT(e.result).forEach(x=>g.nt.add(x))});
+    const mt=Object.entries(G).map(([k,g])=>`${k} ${g.nt.size||g.n}${g.nt.size?` (NT ${[...g.nt].join(', ')})`:''}`).join('; ');
+    if(!L.length&&mt)L.push('Trong tuần chưa ghi nhận hồ sơ pháp lý mới.');
+    if(mt)L.push(`Lũy kế tháng ${+m.slice(5,7)}: ${mt}.`);
+    parts.push({lines:L.length?L:['Không phát sinh.']});X.legal=L;X.legalWeek=lg.length+lt.length;parts.push({note:'s4'});secs.push({h:'IV. Hồ sơ pháp lý / giấy tờ',parts})}
   /* ---------- V. Kế hoạch tuần tới ---------- */
   {const parts=[];let rows=[];try{rows=rkData(m).rows}catch(_){}
     const L1=[];const left=rows.filter(x=>x.tgt>x.real).sort((a,b)=>(b.tgt-b.real)-(a.tgt-a.real));
@@ -1797,16 +1807,16 @@ function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0
   if(w.done||w.late.length)S3.push(`Việc giao: hoàn thành ${w.done}${w.late.length?`, quá hạn ${w.late.length} (${w.late.slice(0,3).map(t=>t.title).join('; ')}${w.late.length>3?'…':''})`:''}.`);
   st3=w.late.length>3?'bad':w.late.length?'warn':'ok';
   tiles.push(['Việc giao quá hạn',nf(w.late.length+(w.hdLate||0)),w.hdLate?`gồm ${w.hdLate} việc HĐLĐ`:'việc chưa xong quá hạn',(w.late.length+(w.hdLate||0))>3?'bad':(w.late.length+(w.hdLate||0))?'warn':'ok']);
-  (X.legal||[]).slice(0,3).forEach(l=>S4.push(l));if(!S4.length)S4.push('Không phát sinh.');st4=(X.legal||[]).some(l=>/đang thực hiện/.test(l))?'warn':'ok';
+  (X.legal||[]).slice(0,4).forEach(l=>S4.push(l));if(!S4.length)S4.push('Không phát sinh.');st4=(X.legal||[]).some(l=>/đang thực hiện/.test(l))?'warn':'ok';
   const pl=X.plan||{L1:[],L2:[],L3:[]};[...pl.L1,...pl.L2,...pl.L3].slice(0,6).forEach(l=>S5.push(l));if(!S5.length)S5.push('Tiếp tục các công việc theo kế hoạch tháng.');
-  return {tiles,secs:[{k:'b1',sk:'st1',n:'1',h:'Biến động nhân sự',sub:`tháng ${+X.m.slice(5,7)}, đến ${fmtD(d.ref)}`,auto:S1,st:st1},{k:'b2',sk:'st2',n:'2',h:'Tuyển dụng',sub:`lũy kế tháng ${+X.m.slice(5,7)}`,auto:S2,st:st2},{k:'b3',sk:'st3',n:'3',h:'Công việc thường quy',sub:'trong tuần',auto:S3,st:st3},{k:'b4',sk:'st4',n:'4',h:'Pháp lý',sub:'nếu phát sinh',auto:S4,st:st4},{k:'b5',n:'5',h:'Kế hoạch tuần tới',sub:`${fmtD(X.nr[0])} – ${fmtD(X.nr[1])}`,auto:S5}]}}
+  return {tiles,secs:[{k:'b1',sk:'st1',n:'1',h:'Biến động nhân sự',sub:`tháng ${+X.m.slice(5,7)}, đến ${fmtD(d.ref)}`,auto:S1,st:st1},{k:'b2',sk:'st2',n:'2',h:'Tuyển dụng',sub:`lũy kế tháng ${+X.m.slice(5,7)}`,auto:S2,st:st2},{k:'b3',sk:'st3',n:'3',h:'Công việc thường quy',sub:'trong tuần',auto:S3,st:st3},{k:'b4',sk:'st4',n:'4',h:'Hồ sơ pháp lý / giấy tờ',sub:'ĐKKD, hồ sơ DSCM…',auto:S4,st:st4},{k:'b5',n:'5',h:'Kế hoạch tuần tới',sub:`${fmtD(X.nr[0])} – ${fmtD(X.nr[1])}`,auto:S5}]}}
 const wbLines=s=>{const v=wrNote(s.k);return v?v.split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean):s.auto};
 const wbSt=s=>s.sk?(wrNote(s.sk)||s.st):'';
 function wbHtml(d,edit){const B=wbBrief(d);const by=wrNote('by')||S.who||'';const adv=wrNote('adv');
   const stSel=s=>edit&&s.sk?`<select class="wb-st ${wbSt(s)}" data-wbst="${s.sk}" ${S.canWrite?'':'disabled'}>${Object.entries(WB_ST).map(([k,[l]])=>`<option value="${k}" ${wbSt(s)===k?'selected':''}>${l}</option>`).join('')}</select>`:s.sk?`<span class="wb-pill ${wbSt(s)}">${WB_ST[wbSt(s)][0]}</span>`:'';
   return `<div class="wb-head"><div class="wb-org">CÔNG TY CỔ PHẦN UPHARMA<br><b>PHÒNG HÀNH CHÍNH – NHÂN SỰ</b></div><div class="wb-ttl"><h2>Báo cáo tuần ${d.wk}</h2><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])}</p></div><div class="wb-by">Người báo cáo<br>${edit?`<input class="wr-by" data-wrnote="by" value="${esc(by)}" placeholder="Họ tên" ${S.canWrite?'':'disabled'}>`:`<b>${esc(by)}</b>`}</div></div>
   <div class="wb-tiles">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join('')}</div>
-  <div class="wb-rows">${B.secs.map(s=>{const own=!!wrNote(s.k);return `<div class="wb-row"><div class="wb-lbl"><i>${s.n}</i><div><b>${esc(s.h)}</b><small>${esc(s.sub)}</small>${stSel(s)}</div></div><div class="wb-body">${edit?`<textarea class="wr-note wb-ta" data-wrnote="${s.k}" rows="${Math.max(3,wbLines(s).length+1)}" ${S.canWrite?'':'disabled'}>${esc(wbLines(s).map(x=>'- '+x).join('\n'))}</textarea><div class="wb-hint">${own?`Đã sửa tay · <button class="lnk" data-act="wb-reset" data-k="${s.k}">lấy lại số liệu tự động</button>`:'Số liệu tự động, sửa trực tiếp nếu cần'}</div>`:`<ul>${wbLines(s).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`}</div></div>`}).join('')}
+  <div class="wb-rows">${B.secs.map(s=>{const own=!!wrNote(s.k);return `<div class="wb-row"><div class="wb-lbl"><i>${s.n}</i><div><b>${esc(s.h)}</b><small>${esc(s.sub)}</small>${stSel(s)}</div></div><div class="wb-body">${edit?`<textarea class="wr-note wb-ta" data-wrnote="${s.k}" rows="${Math.max(3,wbLines(s).reduce((n,l)=>n+Math.ceil((l.length+2)/92),0)+1)}" ${S.canWrite?'':'disabled'}>${esc(wbLines(s).map(x=>'- '+x).join('\n'))}</textarea><div class="wb-hint">${own?`Đã sửa tay · <button class="lnk" data-act="wb-reset" data-k="${s.k}">lấy lại số liệu tự động</button>`:'Số liệu tự động, sửa trực tiếp nếu cần'}</div>`:`<ul>${wbLines(s).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`}</div></div>`}).join('')}
   ${edit||adv?`<div class="wb-row wb-adv"><div class="wb-lbl"><i>!</i><div><b>Đề xuất – kiến nghị</b><small>cần lãnh đạo cho ý kiến</small></div></div><div class="wb-body">${edit?`<textarea class="wr-note" data-wrnote="adv" rows="2" placeholder="Để trống thì không in mục này" ${S.canWrite?'':'disabled'}>${esc(wrRaw('adv'))}</textarea>`:`<ul>${adv.split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`}</div></div>`:''}</div>
   <p class="wb-foot">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS</p>`}
 function wbText(d){const B=wbBrief(d);let s=`BÁO CÁO TUẦN ${d.wk} – PHÒNG HCNS (${fmtD(d.r[0])} – ${fmtDY(d.r[1])})\n`;
@@ -1861,7 +1871,7 @@ const _vReport0=vReport;
 vReport=function(){if(S.rep.type!=='tuan')return _vReport0();const d=wrBuild();wrDoc(wrKey());const pv=!!S.rep.preview,short=S.rep.mode!=='chitiet';
   return head('Báo cáo tổng hợp',short?'Bản ngắn 1 trang để báo cáo lãnh đạo: số liệu tự điền, sửa trực tiếp từng mục, chọn mức độ cho mỗi mục · lưu theo tuần':'Bản chi tiết theo 5 đầu mục chuẩn · ô ghi chú dưới mỗi mục được lưu theo tuần và in kèm báo cáo',
     `<div class="seg">${[['tuan','Tuần'],['thang','Tháng'],['quy','Quý']].map(([k,l])=>`<button data-act="rep-type" data-v="${k}" aria-pressed="${S.rep.type===k}">${l}</button>`).join('')}</div><div class="seg">${[['ngan','Bản ngắn'],['chitiet','Bản chi tiết']].map(([k,l])=>`<button data-act="wb-mode" data-v="${k}" aria-pressed="${(short?'ngan':'chitiet')===k}">${l}</button>`).join('')}</div><button class="btn sm" data-act="wr-prev" aria-label="Tuần trước">‹</button><input type="date" id="repDate" value="${S.rep.date}"><button class="btn sm" data-act="wr-next" aria-label="Tuần sau">›</button><button class="btn" data-act="wr-view">${pv?'Chỉnh sửa':'Xem bản in'}</button><button class="btn" data-act="wr-copy">Sao chép</button>${S.dl?`<button class="btn" data-act="wr-html">Tải .html</button><button class="btn pri" data-act="wr-docx">Tải file Word</button>`:''}`)+
-  (short?`<div class="rep wb${pv?' wb-pv':''}" id="repBody">${wbHtml(d,!pv)}</div>`:`<div class="rep wr${pv?' wr-pv':''}" id="repBody">${wrHtml(d,!pv)}</div>`)};
+  ((!pv&&d.X.undated&&d.X.undated.length)?`<div class="wb-warn">⚠ ${d.X.undated.map(([n,c])=>`${wrShort(n)} ${c} dòng`).join(', ')} trong file báo cáo công việc chưa ghi ngày nên chưa đưa vào báo cáo tuần. Nhắc các bạn điền cột Ngày rồi bấm "Cập nhật nhật ký từ sheet".</div>`:'')+(short?`<div class="rep wb${pv?' wb-pv':''}" id="repBody">${wbHtml(d,!pv)}</div>`:`<div class="rep wr${pv?' wr-pv':''}" id="repBody">${wrHtml(d,!pv)}</div>`)};
 
 init();
 </script>
