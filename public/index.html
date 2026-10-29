@@ -276,7 +276,8 @@ const fmtD=s=>s?s.slice(8,10)+'/'+s.slice(5,7):'—';
 const fmtDY=s=>s?s.slice(8,10)+'/'+s.slice(5,7)+'/'+s.slice(0,4):'—';
 const fmtM=m=>'T'+(+m.slice(5,7))+'/'+m.slice(0,4);
 const fmtQ=q=>'Quý '+['I','II','III','IV'][+q.slice(-1)-1]+'/'+q.slice(0,4);
-function weekRange(s){const d=pd(s);const wd=(d.getDay()+6)%7;const a=addDays(s,-wd);return [a,addDays(a,6)]}
+/* Tuần báo cáo của phòng HCNS: từ thứ 6 tuần này đến hết thứ 5 tuần sau */
+function weekRange(s){const d=pd(s);const wd=(d.getDay()+2)%7;const a=addDays(s,-wd);return [a,addDays(a,6)]}
 function monthRange(m){const a=m+'-01';const d=pd(a);d.setMonth(d.getMonth()+1);d.setDate(0);return [a,iso(d)]}
 function quarterRange(q){const y=+q.slice(0,4),k=+q.slice(-1);return [y+'-'+pad((k-1)*3+1)+'-01',iso(new Date(y,k*3,0))]}
 function monthsOfQ(q){const y=q.slice(0,4),k=+q.slice(-1);return [0,1,2].map(i=>y+'-'+pad((k-1)*3+1+i))}
@@ -1739,7 +1740,7 @@ function wrBuild(){
     const L3=S.tasks.filter(t=>!isDone(t)&&/pháp lý/i.test((t.module||'')+' '+(t.title||''))&&(!t.due||t.due<=nr[1])).map(t=>`${t.title}${t.due?' – hạn '+fmtD(t.due):''}`);
     parts.push({sub:'3. Pháp lý',lines:L3.length?L3:['Không có kế hoạch phát sinh.']});
     X.plan={L1,L2,L3};parts.push({note:'s5'});secs.push({h:`V. Kế hoạch tuần tới (${fmtD(nr[0])} – ${fmtDY(nr[1])})`,parts})}
-  return {secs,sum,r,ref,X,wk:wrWeekNo(r[0])}}
+  return {secs,sum,r,ref,X,wk:wrWeekNo(r[1])}}
 
 const wrTitle=d=>`Báo cáo công việc tuần ${d.wk}`;
 const wrSub=d=>`Phòng Hành chính – Nhân sự · Công ty Cổ phần Upharma · Từ ${fmtDY(d.r[0])} đến ${fmtDY(d.r[1])}`;
