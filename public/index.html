@@ -1729,7 +1729,7 @@ function wrBuild(){
   /* ---------- V. Kế hoạch tuần tới ---------- */
   {const parts=[];let rows=[];try{rows=rkData(m).rows}catch(_){}
     const L1=[];const left=rows.filter(x=>x.tgt>x.real).sort((a,b)=>(b.tgt-b.real)-(a.tgt-a.real));
-    if(nr[0]<=me&&left.length)L1.push(`Hoàn thành chỉ tiêu tháng ${+m.slice(5,7)}: còn ${left.reduce((a,x)=>a+x.tgt-x.real,0)} người – ${left.map(x=>`${wrShort(x.s.name)} ${x.tgt-x.real}`).join(', ')}.`);
+    if(nr[0]<=me&&left.length){const tt=teamTgt(m),done=rows.reduce((a,x)=>a+x.real,0);L1.push(tt?`Chỉ tiêu team tháng ${+m.slice(5,7)}: ${done>=tt?`đã đạt ${done}/${tt}, tiếp tục tuyển`:`còn ${tt-done} người (${done}/${tt})`}; cá nhân còn thiếu so với chỉ tiêu riêng: ${left.map(x=>`${wrShort(x.s.name)} ${x.tgt-x.real}`).join(', ')}.`:`Hoàn thành chỉ tiêu tháng ${+m.slice(5,7)}: còn ${left.reduce((a,x)=>a+x.tgt-x.real,0)} người – ${left.map(x=>`${wrShort(x.s.name)} ${x.tgt-x.real}`).join(', ')}.`)}
     if(ymOf(nr[1])!==m)L1.push(`Chốt kết quả tuyển dụng tháng ${+m.slice(5,7)}, triển khai chỉ tiêu tháng ${+nr[1].slice(5,7)}.`);
     const red=hasSys?wrRedQ():{shops:[]};if(red.shops.length)L1.push(`Ưu tiên tuyển / điều chuyển cho nhà báo đỏ: ${red.shops.slice(0,10).map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', ')}.`);
     parts.push({sub:'1. Tuyển dụng',lines:L1.length?L1:['Tiếp tục tuyển theo kế hoạch tháng.']});
