@@ -262,7 +262,9 @@ async function copyText(txt){try{await navigator.clipboard.writeText(txt);toast(
 /* ===================== Tính KPI & hiệu suất ===================== */
 const logDoc=(m,sid)=>S.logs.find(l=>l.month===m&&l.staffId===sid);
 const isDoneLog=e=>(e.status||'Hoàn thành')==='Hoàn thành';
-const entPts=e=>isDoneLog(e)?(+e.base||0)*(+e.qty||0):0;
+/* Điểm tính theo đúng file báo cáo: dòng 'Đang thực hiện' vẫn được tính, chỉ bỏ dòng hủy; có cột Điểm từ sheet thì lấy cột Điểm */
+const isVoidLog=e=>/hủy|huỷ|không thực hiện/i.test(String(e.status||''));
+const entPts=e=>isVoidLog(e)?0:(e.pts!=null&&e.pts!==''&&!isNaN(+e.pts)?+e.pts:(+e.base||0)*(+e.qty||0));
 function gradeOf(p){const c=S.config;return p>=c.gradeA?'A':p>=c.gradeB?'B':p>=c.gradeC?'C':'D'}
 function kpiOf(m,sid){
   const d=logDoc(m,sid);const es=d?.entries||[];const max=+S.config.kpiMax||1000;
@@ -1157,7 +1159,7 @@ document.addEventListener('click',async e=>{
       S.draft={...freshDraft(),d:d.d,code:d.code,base:d.base,area:d.area,status:d.status};render();document.getElementById('lf-result')?.focus();break}
     case 'edit-log':{const ent=(logDoc(S.month,S.me)?.entries||[]).find(x=>x.id===id);if(ent)logDlg(ent);break}
     case 'save-log':{e.preventDefault();const fd=Object.fromEntries(new FormData($('#dlgForm')));const c=catBy(fd.code);const changed=fd.code!==el.dataset.code;
-      saveLog(S.month,S.me,b=>{const x=b.entries.find(y=>y.id===id);if(!x)return;Object.assign(x,{d:fd.d,code:fd.code,area:changed&&c?c.area:fd.area,content:changed&&c?c.content:fd.content,qty:fd.qty===''?null:+fd.qty,base:changed&&c?c.base:(fd.base===''?null:+fd.base),status:fd.status,ontime:fd.ontime,result:fd.result,note:fd.note})}).then(()=>toast('Đã lưu dòng nhật ký')).catch(()=>{});closeDlg();break}
+      saveLog(S.month,S.me,b=>{const x=b.entries.find(y=>y.id===id);if(!x)return;Object.assign(x,{d:fd.d,code:fd.code,area:changed&&c?c.area:fd.area,content:changed&&c?c.content:fd.content,qty:fd.qty===''?null:+fd.qty,base:changed&&c?c.base:(fd.base===''?null:+fd.base),status:fd.status,ontime:fd.ontime,result:fd.result,note:fd.note,pts:null})}).then(()=>toast('Đã lưu dòng nhật ký')).catch(()=>{});closeDlg();break}
     case 'kpi-open':if(e.target.closest('input,button,a'))break;S.kpiOpen=S.kpiOpen===id?'':id;render();break;
     case 'new-staff':if(needWrite())staffDlg(null);break;
     case 'edit-staff':if(needWrite())staffDlg(S.staff.find(x=>x.id===id));break;
@@ -1529,7 +1531,7 @@ function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_k
 const kpIsRec=e=>/^01\./.test(String(e.code||''))||/^tuyển dụng$/i.test(String(e.area||'').trim());
 function kpCats(m,sid){const code=kpCode(sid);const p=rkPlan(m)[code];const max=+S.config.kpiMax||1000;const td=p?Math.min(max,(()=>{const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');return tdp?tdp[1]:p[1]})()):0;
   if(!td)return null; /* không có phần tuyển dụng: KPI tính đúng theo nhật ký công việc */
-  const es=(logDoc(m,sid)?.entries||[]).filter(isDoneLog);const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
+  const es=(logDoc(m,sid)?.entries||[]).filter(e=>!isVoidLog(e));const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
   const ov=((S.config.kpiPct||{})[m]||{})[code]||{};const cats=[];
   if(td){const r=kpRk(m)[sid];const got=r?r.kpi:0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
   const rest=max-td;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
@@ -1575,7 +1577,7 @@ async function refreshLogs(silent){
       v.slice(4).forEach((r,i)=>{const g=j=>String(r[j]??'').trim();const code=g(2);if(!code&&!g(4)&&!g(6))return;
         let d=lgDate(g(1),ym);if(!d||ymOf(d)!==ym)d=last||ym+'-01';last=d;
         const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
-        es.push({id:'s'+(i+6),d,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
+        const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
       const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'sheet',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
     S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật ${nf(n)} dòng nhật ký ${fmtM(ym)} của ${ppl} người`+(miss.length?` · chưa đọc được sheet ${miss.join(', ')}`:''));
   }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc':'Chưa cập nhật được nhật ký, thử lại sau')}}
