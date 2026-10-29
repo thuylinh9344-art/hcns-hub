@@ -150,6 +150,27 @@ td input{width:90px}
 .wr-by{margin-top:40px;text-align:center;font-weight:600;border:1px dashed var(--line);border-radius:6px;padding:4px 8px;background:var(--bg);color:var(--fg)}
 .wr-pv{font-family:"Times New Roman",serif}
 .wr-pv h3{color:var(--fg)}
+.wb{max-width:900px}
+.wb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:3px solid var(--accent);padding-bottom:12px}
+.wb-org{font-size:11.5px;color:var(--muted);line-height:1.5}.wb-org b{color:var(--fg)}
+.wb-ttl{text-align:center}.wb-ttl h2{margin:0;font-size:22px;text-transform:uppercase;color:var(--accent);letter-spacing:.02em}.wb-ttl p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.wb-by{text-align:right;font-size:11.5px;color:var(--muted)}.wb-by b{color:var(--fg);font-size:14px}.wb-by .wr-by{margin-top:2px;width:150px}
+.wb-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}
+.wb-tiles div{border:1px solid var(--line);border-top:3px solid var(--muted);border-radius:8px;padding:8px 10px;background:var(--bg)}
+.wb-tiles .ok{border-top-color:#1f8a4c}.wb-tiles .warn{border-top-color:#d99a00}.wb-tiles .bad{border-top-color:#c8372d}
+.wb-tiles span,.wb-tiles small{display:block;font-size:11.5px;color:var(--muted)}.wb-tiles b{display:block;font-size:22px;font-variant-numeric:tabular-nums;margin:2px 0}
+.wb-row{display:grid;grid-template-columns:210px minmax(0,1fr);gap:14px;border-top:1px solid var(--line);padding:12px 0}
+.wb-lbl{display:flex;gap:10px;align-items:flex-start}.wb-lbl i{font-style:normal;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex:none}
+.wb-lbl b{display:block;font-size:14px}.wb-lbl small{display:block;color:var(--muted);font-size:12px;margin-bottom:6px}
+.wb-adv .wb-lbl i{background:#c8372d}
+.wb-pill,.wb-st{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid transparent}
+.wb-st{padding:3px 8px;cursor:pointer}
+.wb-pill.ok,.wb-st.ok{background:#e3f3e9;color:#17703c}.wb-pill.warn,.wb-st.warn{background:#fdf1d6;color:#8a6100}.wb-pill.bad,.wb-st.bad{background:#fbe3e1;color:#a52a21}
+.wb-body ul{margin:0;padding-left:18px}.wb-body li{margin:3px 0;line-height:1.5}
+.wb-ta{margin-top:0;line-height:1.55}
+.wb-hint{font-size:11.5px;color:var(--muted);margin-top:4px}.wb-hint .lnk{background:none;border:0;padding:0;color:var(--accent);cursor:pointer;font:inherit;text-decoration:underline}
+.wb-foot{font-size:11.5px;color:var(--muted);font-style:italic;border-top:1px solid var(--line);padding-top:8px;margin:0}
+@media (max-width:700px){.wb-row{grid-template-columns:1fr;gap:8px}.wb-head{flex-wrap:wrap}.wb-ttl{order:-1;width:100%;text-align:left}.wb-by{text-align:left}}
 .form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
 .form label.full{grid-column:1/-1}
@@ -1611,7 +1632,9 @@ setInterval(()=>{if(['ca-nhan','kpi','tong-quan'].includes(S.view)&&document.vis
 S.repDocs={};
 function wrDoc(key){if(!(key in S.repDocs)){S.repDocs[key]=null;if(S.db)S.db.doc('reports/'+key).onSnapshot(s=>{S.repDocs[key]=s.exists?s.data():{};render()},()=>{S.repDocs[key]={}})}return S.repDocs[key]||{}}
 const wrKey=()=>'w_'+repRange()[0];
-const wrNote=k=>((wrDoc(wrKey()).notes||{})[k]||'').trim();
+S.wrDraft={};
+const wrRaw=k=>{const dk=wrKey()+'|'+k;return dk in S.wrDraft?S.wrDraft[dk]:((wrDoc(wrKey()).notes||{})[k]||'')};
+const wrNote=k=>String(wrRaw(k)||'').trim();
 function wrWeekNo(s){const d=pd(s);const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const day=t.getUTCDay()||7;t.setUTCDate(t.getUTCDate()+4-day);const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil(((t-y0)/864e5+1)/7)}
 const wrShort=n=>String(n||'').trim().split(/\s+/).pop();
 const wrPct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
@@ -1625,7 +1648,7 @@ function wrRedQ(){const keep=S.nvF.per;const q=Math.floor((+TODAY.slice(5,7)-1)/
 
 function wrBuild(){
   const r=repRange(),ref=r[1]<TODAY?r[1]:TODAY,m=ymOf(ref),[ma,me]=monthRange(m),nr=[addDays(r[1],1),addDays(r[1],7)];
-  const R=sysRows(),hasSys=R.length>0,secs=[],sum=[];
+  const R=sysRows(),hasSys=R.length>0,secs=[],sum=[],X={nr,m,hasSys};
   /* ---------- I. Biến động nhân sự ---------- */
   {const parts=[];
     if(!hasSys)parts.push({lines:['Chưa có dữ liệu DSNS. Bấm "Cập nhật từ Google Sheet" ở mục Nhân sự hệ thống để tải.']});
@@ -1646,7 +1669,7 @@ function wrBuild(){
         `Đang báo nghỉ việc: ${bn} người${away?`; nghỉ thai sản / không lương: ${away} người (đã tính trong hiện hữu)`:''}.`];
       if(nt.length)L.push(`Nhà thuốc thiếu NVBH theo định biên: ${shortN} nhà, thiếu ${gap} NVBH; ${noCht} nhà chưa có CHT.`);
       if(red.prov.length||red.shops.length||red.kho.length)L.push(`Cảnh báo nghỉ dưới 90 ngày quý ${['I','II','III','IV'][red.q-1]}: ${[red.prov.length?'tỉnh '+red.prov.map(p=>p.area).join(', '):'',red.kho.length?red.kho.map(k=>`${k.name} (${k.r90}%)`).join(', '):'',red.shops.length?'nhà thuốc '+red.shops.map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', '):''].filter(Boolean).join('; ')}.`);
-      parts.push({lines:L});
+      parts.push({lines:L});X.hc={T,G,bn,shortN,gap,noCht,red,rate:avg?r1(T.quits.length/avg*100):0,nt:nt.length};
       sum.push(['Nhân sự hiện hữu',nf(T.cur),`${T.cur-T.start>=0?'+':''}${T.cur-T.start} so với đầu tháng`],['Tuyển mới / nghỉ việc tháng',`${T.hires.length} / ${T.quits.length}`,`${T.early} người nghỉ < 90 ngày`]);
       if(nt.length)sum.push(['Nhà thiếu NVBH',nf(shortN),`thiếu ${gap} NVBH`]);
     }
@@ -1667,7 +1690,7 @@ function wrBuild(){
       const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
       if(slow.length)L.push(`Chậm so với tiến độ: ${slow.map(x=>`${wrShort(x.s.name)} (${x.real}/${x.tgt})`).join(', ')}.`);
       if(tot.st)L.push(`${tot.st} hồ sơ đang treo quá hạn xử lý (mới tạo quá 7 ngày hoặc phỏng vấn quá hạn).`);
-      parts.push({lines:L});
+      parts.push({lines:L});X.rec={tot,exp,rs,slow};
       sum.push(['Tuyển dụng tháng',`${tot.real}/${tot.tgt}`,`đạt ${wrPct(tot.real,tot.tgt)} · tiến độ thời gian ${Math.round(exp*100)}%`]);
     }
     parts.push({note:'s2'});secs.push({h:`II. Tình hình tuyển dụng tháng ${+m.slice(5,7)}/${m.slice(0,4)} (lũy kế đến ${fmtDY(ref)})`,parts,src:`Nguồn: DSNS U (thực tuyển = vào làm trong tháng, chưa nghỉ) và hồ sơ tuyển dụng ${S.rec.updatedAt?'ngày '+fmtDY(S.rec.updatedAt.slice(0,10)):''}.`})}
@@ -1683,12 +1706,12 @@ function wrBuild(){
     const L=[];const dl=done.filter(t=>!wrIsHdTask(t));
     if(done.length)L.push(`Công việc giao hoàn thành trong tuần: ${done.length} việc${hdDone?` (gồm ${hdDone} việc xử lý HĐLĐ hết hạn / kết thúc thử việc)`:''}${dl.length?': '+dl.map(t=>t.title).join('; '):''}.`);
     if(late.length)L.push(`Việc quá hạn chưa xong: ${late.length} việc${hdLate?` (gồm ${hdLate} việc HĐLĐ)`:''}${late.filter(t=>!wrIsHdTask(t)).length?': '+late.filter(t=>!wrIsHdTask(t)).map(t=>`${t.title} (${wrShort(staffName(t.owner))})`).join('; '):''}.`);
-    if(L.length)parts.push({sub:'Công việc giao',lines:L});
+    if(L.length)parts.push({sub:'Công việc giao',lines:L});X.work={by,done:done.length,late:late.filter(t=>!wrIsHdTask(t)),hdLate,nLogs:ok.length};
     parts.push({note:'s3'});secs.push({h:'III. Các công việc thường quy trong tuần',parts,src:'Nguồn: nhật ký công việc hằng ngày của nhân sự phòng (không gồm các dòng tuyển dụng đã báo cáo ở mục II).'})}
   /* ---------- IV. Pháp lý ---------- */
   {const parts=[];const lg=logs.filter(wrIsLegal);const lt=S.tasks.filter(t=>/pháp lý/i.test((t.module||'')+' '+(t.title||''))&&((isDone(t)&&inR(t.doneAt,r))||(!isDone(t)&&t.status!=='todo')));
     const L=[...lg.map(e=>`${wrClean(e.result)||e.content}${isDoneLog(e)?'':' (đang thực hiện)'} · ${wrShort(e.who.name)}`),...lt.map(t=>`${t.title} – ${isDone(t)?'đã xong '+fmtD(t.doneAt):'đang thực hiện'+(t.due?', hạn '+fmtD(t.due):'')}`)];
-    parts.push({lines:L.length?L:['Không phát sinh.']});parts.push({note:'s4'});secs.push({h:'IV. Pháp lý',parts})}
+    parts.push({lines:L.length?L:['Không phát sinh.']});X.legal=L;parts.push({note:'s4'});secs.push({h:'IV. Pháp lý',parts})}
   /* ---------- V. Kế hoạch tuần tới ---------- */
   {const parts=[];let rows=[];try{rows=rkData(m).rows}catch(_){}
     const L1=[];const left=rows.filter(x=>x.tgt>x.real).sort((a,b)=>(b.tgt-b.real)-(a.tgt-a.real));
@@ -1702,8 +1725,8 @@ function wrBuild(){
     parts.push({sub:'2. Công việc thường quy',lines:L2.length?L2:['Thực hiện các công việc thường quy theo kế hoạch.']});
     const L3=S.tasks.filter(t=>!isDone(t)&&/pháp lý/i.test((t.module||'')+' '+(t.title||''))&&(!t.due||t.due<=nr[1])).map(t=>`${t.title}${t.due?' – hạn '+fmtD(t.due):''}`);
     parts.push({sub:'3. Pháp lý',lines:L3.length?L3:['Không có kế hoạch phát sinh.']});
-    parts.push({note:'s5'});secs.push({h:`V. Kế hoạch tuần tới (${fmtD(nr[0])} – ${fmtDY(nr[1])})`,parts})}
-  return {secs,sum,r,ref,wk:wrWeekNo(r[0])}}
+    X.plan={L1,L2,L3};parts.push({note:'s5'});secs.push({h:`V. Kế hoạch tuần tới (${fmtD(nr[0])} – ${fmtDY(nr[1])})`,parts})}
+  return {secs,sum,r,ref,X,wk:wrWeekNo(r[0])}}
 
 const wrTitle=d=>`Báo cáo công việc tuần ${d.wk}`;
 const wrSub=d=>`Phòng Hành chính – Nhân sự · Công ty Cổ phần Upharma · Từ ${fmtDY(d.r[0])} đến ${fmtDY(d.r[1])}`;
@@ -1745,19 +1768,100 @@ async function wrDocx(d){
   ch.push(P(`Hà Nội, ngày ${+TODAY.slice(8,10)} tháng ${+TODAY.slice(5,7)} năm ${TODAY.slice(0,4)}`,{i:true,before:360,after:0}));ch.push(P('Người lập báo cáo',{b:true,after:900}));ch.push(P(wrNote('by')||S.who||'',{b:true}));
   const doc=new X.Document({sections:[{properties:{page:{margin:{top:1134,bottom:1134,left:1418,right:1134}}},children:ch}]});
   const blob=await X.Packer.toBlob(doc);await saveFile(`Bao-cao-tuan-${d.wk}_HCNS_${d.r[0]}.docx`,blob)}
+/* ===================== Bản ngắn 1 trang: form báo cáo tuần chuẩn để trưởng phòng báo cáo lãnh đạo ===================== */
+const WB_ST={ok:['Ổn định','🟢'],warn:['Cần lưu ý','🟡'],bad:['Rủi ro','🔴']};
+const wbL=a=>a.filter(Boolean);
+function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0};const S1=[],S2=[],S3=[],S4=[],S5=[];let st1='ok',st2='ok',st3='ok',st4='ok';const tiles=[];
+  if(hc){const T=hc.T,dl=T.cur-T.start;
+    S1.push(`Hiện hữu ${nf(T.cur)} người (${dl>=0?'+':''}${dl} so với đầu tháng); trong tuần vào ${T.wh}, nghỉ ${T.wq}.`);
+    S1.push(`Lũy kế tháng: tuyển mới ${T.hires.length}, nghỉ việc ${T.quits.length} (tỷ lệ ${String(hc.rate).replace('.',',')}%), trong đó ${T.early} người nghỉ trước 90 ngày.`);
+    const rd=hc.red;const rl=wbL([rd.prov.length?rd.prov.map(p=>p.area).join(', '):'',rd.kho.map(k=>`${k.name} (${k.r90}%)`).join(', '),rd.shops.length?rd.shops.map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', '):'']).join('; ');
+    if(rl)S1.push(`Báo đỏ nghỉ sớm quý ${['I','II','III','IV'][rd.q-1]}: ${rl}.`);
+    if(hc.nt)S1.push(`Thiếu ${hc.gap} NVBH tại ${hc.shortN} nhà thuốc; ${hc.bn} người đang báo nghỉ.`);
+    st1=rl?'bad':(T.quits.length&&T.early/T.quits.length>.4)||hc.shortN?'warn':'ok';
+    tiles.push(['Nhân sự hiện hữu',nf(T.cur),`${dl>=0?'+':''}${dl} so với đầu tháng`,'']);
+    tiles.push(['Nghỉ việc tháng',nf(T.quits.length),`${T.early} người nghỉ < 90 ngày`,T.quits.length&&T.early/T.quits.length>.4?'bad':'']);
+    if(hc.nt)tiles.push(['Nhà thiếu NVBH',nf(hc.shortN),`thiếu ${hc.gap} NVBH`,hc.shortN?'warn':'ok'])}
+  else S1.push('Chưa có dữ liệu DSNS.');
+  if(rc){const t=rc.tot,p=t.tgt?t.real/t.tgt:0;
+    S2.push(`Đạt ${t.real}/${t.tgt} người (${wrPct(t.real,t.tgt)}) – tiến độ thời gian ${Math.round(rc.exp*100)}%; trong tuần tuyển thêm ${t.w}.`);
+    const good=rc.rs.filter(x=>x.tgt&&x.real>=x.tgt);if(good.length)S2.push(`Đạt / vượt chỉ tiêu: ${good.map(x=>`${wrShort(x.s.name)} ${x.real}/${x.tgt}`).join(', ')}.`);
+    const lag=rc.rs.filter(x=>x.tgt&&x.real/x.tgt<rc.exp*.8);if(lag.length)S2.push(`Chậm tiến độ: ${lag.map(x=>`${wrShort(x.s.name)} ${x.real}/${x.tgt}`).join(', ')}.`);
+    if(t.st)S2.push(`${t.st} hồ sơ treo quá hạn xử lý – yêu cầu xử lý dứt điểm trong tuần.`);
+    st2=p>=rc.exp?'ok':p>=rc.exp*.8?'warn':'bad';tiles.splice(1,0,['Tuyển dụng tháng',`${t.real}/${t.tgt}`,`đạt ${wrPct(t.real,t.tgt)} · tiến độ ${Math.round(rc.exp*100)}%`,st2])}
+  else S2.push('Chưa có kế hoạch tuyển dụng của tháng.');
+  const ar=Object.entries(w.by).map(([a,g])=>[a,Object.values(g)]).sort((a,b)=>b[1].length-a[1].length);
+  ar.slice(0,4).forEach(([a,items])=>S3.push(`${a}: ${items.slice(0,3).map(it=>it.txt+(it.qty>1?` (${nf(it.qty)})`:'')+(it.open?' – đang làm':'')).join('; ')}${items.length>3?` và ${items.length-3} việc khác`:''}.`));
+  if(ar.length>4)S3.push(`Các mảng khác: ${ar.slice(4).map(([a])=>a).join(', ')}.`);
+  if(!ar.length)S3.push('Chưa có nhật ký công việc trong tuần.');
+  if(w.done||w.late.length)S3.push(`Việc giao: hoàn thành ${w.done}${w.late.length?`, quá hạn ${w.late.length} (${w.late.slice(0,3).map(t=>t.title).join('; ')}${w.late.length>3?'…':''})`:''}.`);
+  st3=w.late.length>3?'bad':w.late.length?'warn':'ok';
+  tiles.push(['Việc giao quá hạn',nf(w.late.length+(w.hdLate||0)),w.hdLate?`gồm ${w.hdLate} việc HĐLĐ`:'việc chưa xong quá hạn',(w.late.length+(w.hdLate||0))>3?'bad':(w.late.length+(w.hdLate||0))?'warn':'ok']);
+  (X.legal||[]).slice(0,3).forEach(l=>S4.push(l));if(!S4.length)S4.push('Không phát sinh.');st4=(X.legal||[]).some(l=>/đang thực hiện/.test(l))?'warn':'ok';
+  const pl=X.plan||{L1:[],L2:[],L3:[]};[...pl.L1,...pl.L2,...pl.L3].slice(0,6).forEach(l=>S5.push(l));if(!S5.length)S5.push('Tiếp tục các công việc theo kế hoạch tháng.');
+  return {tiles,secs:[{k:'b1',sk:'st1',n:'1',h:'Biến động nhân sự',sub:`tháng ${+X.m.slice(5,7)}, đến ${fmtD(d.ref)}`,auto:S1,st:st1},{k:'b2',sk:'st2',n:'2',h:'Tuyển dụng',sub:`lũy kế tháng ${+X.m.slice(5,7)}`,auto:S2,st:st2},{k:'b3',sk:'st3',n:'3',h:'Công việc thường quy',sub:'trong tuần',auto:S3,st:st3},{k:'b4',sk:'st4',n:'4',h:'Pháp lý',sub:'nếu phát sinh',auto:S4,st:st4},{k:'b5',n:'5',h:'Kế hoạch tuần tới',sub:`${fmtD(X.nr[0])} – ${fmtD(X.nr[1])}`,auto:S5}]}}
+const wbLines=s=>{const v=wrNote(s.k);return v?v.split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean):s.auto};
+const wbSt=s=>s.sk?(wrNote(s.sk)||s.st):'';
+function wbHtml(d,edit){const B=wbBrief(d);const by=wrNote('by')||S.who||'';const adv=wrNote('adv');
+  const stSel=s=>edit&&s.sk?`<select class="wb-st ${wbSt(s)}" data-wbst="${s.sk}" ${S.canWrite?'':'disabled'}>${Object.entries(WB_ST).map(([k,[l]])=>`<option value="${k}" ${wbSt(s)===k?'selected':''}>${l}</option>`).join('')}</select>`:s.sk?`<span class="wb-pill ${wbSt(s)}">${WB_ST[wbSt(s)][0]}</span>`:'';
+  return `<div class="wb-head"><div class="wb-org">CÔNG TY CỔ PHẦN UPHARMA<br><b>PHÒNG HÀNH CHÍNH – NHÂN SỰ</b></div><div class="wb-ttl"><h2>Báo cáo tuần ${d.wk}</h2><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])}</p></div><div class="wb-by">Người báo cáo<br>${edit?`<input class="wr-by" data-wrnote="by" value="${esc(by)}" placeholder="Họ tên" ${S.canWrite?'':'disabled'}>`:`<b>${esc(by)}</b>`}</div></div>
+  <div class="wb-tiles">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join('')}</div>
+  <div class="wb-rows">${B.secs.map(s=>{const own=!!wrNote(s.k);return `<div class="wb-row"><div class="wb-lbl"><i>${s.n}</i><div><b>${esc(s.h)}</b><small>${esc(s.sub)}</small>${stSel(s)}</div></div><div class="wb-body">${edit?`<textarea class="wr-note wb-ta" data-wrnote="${s.k}" rows="${Math.max(3,wbLines(s).length+1)}" ${S.canWrite?'':'disabled'}>${esc(wbLines(s).map(x=>'- '+x).join('\n'))}</textarea><div class="wb-hint">${own?`Đã sửa tay · <button class="lnk" data-act="wb-reset" data-k="${s.k}">lấy lại số liệu tự động</button>`:'Số liệu tự động, sửa trực tiếp nếu cần'}</div>`:`<ul>${wbLines(s).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`}</div></div>`}).join('')}
+  ${edit||adv?`<div class="wb-row wb-adv"><div class="wb-lbl"><i>!</i><div><b>Đề xuất – kiến nghị</b><small>cần lãnh đạo cho ý kiến</small></div></div><div class="wb-body">${edit?`<textarea class="wr-note" data-wrnote="adv" rows="2" placeholder="Để trống thì không in mục này" ${S.canWrite?'':'disabled'}>${esc(wrRaw('adv'))}</textarea>`:`<ul>${adv.split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('')}</ul>`}</div></div>`:''}</div>
+  <p class="wb-foot">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS</p>`}
+function wbText(d){const B=wbBrief(d);let s=`BÁO CÁO TUẦN ${d.wk} – PHÒNG HCNS (${fmtD(d.r[0])} – ${fmtDY(d.r[1])})\n`;
+  s+=B.tiles.map(([k,v,x])=>`▪ ${k}: ${v} (${x})`).join('\n')+'\n';
+  B.secs.forEach(x=>{s+=`\n${x.n}. ${x.h.toUpperCase()}${x.sk?' '+WB_ST[wbSt(x)][1]:''}\n`+wbLines(x).map(l=>'- '+l).join('\n')+'\n'});
+  const adv=wrNote('adv');if(adv)s+='\nĐỀ XUẤT – KIẾN NGHỊ\n'+adv.split('\n').filter(x=>x.trim()).map(x=>'- '+x.replace(/^[-•+]\s*/,'')).join('\n')+'\n';
+  return s+`\nNgười báo cáo: ${wrNote('by')||S.who||''}`}
+const WB_CSS='body{font-family:Arial,Helvetica,sans-serif;font-size:11pt;max-width:800px;margin:24px auto;color:#1b1f1c}.wb-head{display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:3px solid #1f8a4c;padding-bottom:10px}.wb-org{font-size:9pt;color:#555}.wb-org b{color:#1b1f1c}.wb-ttl{text-align:center}.wb-ttl h2{margin:0;font-size:18pt;text-transform:uppercase;color:#1f8a4c}.wb-ttl p{margin:2px 0 0;font-size:10pt;color:#555}.wb-by{text-align:right;font-size:9pt;color:#555}.wb-by b{color:#1b1f1c;font-size:10.5pt}.wb-tiles{display:flex;gap:8px;margin:12px 0}.wb-tiles div{flex:1;border:1px solid #d9e2dc;border-top:3px solid #9aa79f;border-radius:6px;padding:6px 8px}.wb-tiles .ok{border-top-color:#1f8a4c}.wb-tiles .warn{border-top-color:#d99a00}.wb-tiles .bad{border-top-color:#c8372d}.wb-tiles span,.wb-tiles small{display:block;font-size:8.5pt;color:#555}.wb-tiles b{display:block;font-size:16pt;margin:1px 0}.wb-row{display:flex;border-top:1px solid #d9e2dc;padding:8px 0}.wb-lbl{width:190px;flex:none;display:flex;gap:8px}.wb-lbl i{font-style:normal;width:22px;height:22px;border-radius:50%;background:#1f8a4c;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:10pt;flex:none}.wb-lbl b{display:block}.wb-lbl small{display:block;color:#666;font-size:8.5pt}.wb-pill{display:inline-block;margin-top:4px;font-size:8.5pt;font-weight:bold;padding:1px 8px;border-radius:10px}.wb-pill.ok{background:#e3f3e9;color:#17703c}.wb-pill.warn{background:#fdf1d6;color:#8a6100}.wb-pill.bad{background:#fbe3e1;color:#a52a21}.wb-body{flex:1}.wb-body ul{margin:0;padding-left:18px}.wb-body li{margin:2px 0}.wb-adv .wb-lbl i{background:#c8372d}.wb-foot{font-size:8.5pt;color:#777;font-style:italic;border-top:1px solid #d9e2dc;padding-top:6px;margin-top:4px}';
+async function wbDocx(d){
+  if(!window.docx){await new Promise((ok,no)=>{const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js';s.onload=ok;s.onerror=no;document.head.appendChild(s)}).catch(()=>{})}
+  const X=window.docx;if(!X){toast('Không tải được bộ tạo file Word, hãy dùng "Tải .html"');return}
+  const B=wbBrief(d);const F='Arial',G='1F8A4C',W=9638;const C={ok:'1F8A4C',warn:'B07D00',bad:'C8372D'},FILL={ok:'E3F3E9',warn:'FDF1D6',bad:'FBE3E1'};
+  const run=(t,o={})=>new X.TextRun({text:String(t),font:F,size:o.size||21,bold:o.b,italics:o.i,color:o.color});
+  const P=(ch,o={})=>new X.Paragraph({children:Array.isArray(ch)?ch:[run(ch,o)],alignment:o.al,spacing:{before:o.before||0,after:o.after??40},bullet:o.bl?{level:0}:undefined});
+  const nob={top:{style:X.BorderStyle.NONE,size:0,color:'FFFFFF'},bottom:{style:X.BorderStyle.NONE,size:0,color:'FFFFFF'},left:{style:X.BorderStyle.NONE,size:0,color:'FFFFFF'},right:{style:X.BorderStyle.NONE,size:0,color:'FFFFFF'}};
+  const cell=(kids,o={})=>new X.TableCell({children:kids,width:{size:o.w,type:X.WidthType.DXA},shading:o.fill?{fill:o.fill,type:X.ShadingType.CLEAR,color:'auto'}:undefined,borders:o.borders,margins:{top:60,bottom:60,left:100,right:100},verticalAlign:o.va});
+  const ch=[];
+  const hw=[3700,3338,2600];
+  ch.push(new X.Table({width:{size:W,type:X.WidthType.DXA},columnWidths:hw,layout:X.TableLayoutType.FIXED,rows:[new X.TableRow({children:[
+    cell([P('CÔNG TY CỔ PHẦN UPHARMA',{size:16,color:'555555',after:0}),P('PHÒNG HÀNH CHÍNH – NHÂN SỰ',{size:18,b:true})],{w:hw[0],borders:{...nob,bottom:{style:X.BorderStyle.SINGLE,size:18,color:G}},va:X.VerticalAlign.CENTER}),
+    cell([P(`BÁO CÁO TUẦN ${d.wk}`,{size:32,b:true,color:G,al:X.AlignmentType.CENTER,after:0}),P(`${fmtDY(d.r[0])} – ${fmtDY(d.r[1])}`,{size:18,color:'555555',al:X.AlignmentType.CENTER})],{w:hw[1],borders:{...nob,bottom:{style:X.BorderStyle.SINGLE,size:18,color:G}}}),
+    cell([P('Người báo cáo',{size:16,color:'555555',al:X.AlignmentType.RIGHT,after:0}),P(wrNote('by')||S.who||'',{size:20,b:true,al:X.AlignmentType.RIGHT})],{w:hw[2],borders:{...nob,bottom:{style:X.BorderStyle.SINGLE,size:18,color:G}},va:X.VerticalAlign.CENTER})]})]}));
+  ch.push(P('',{after:120}));
+  const tw=Math.floor(W/B.tiles.length);
+  ch.push(new X.Table({width:{size:W,type:X.WidthType.DXA},columnWidths:B.tiles.map(()=>tw),layout:X.TableLayoutType.FIXED,rows:[new X.TableRow({children:B.tiles.map(([k,v,s,c])=>cell([P(k,{size:16,color:'555555',after:0}),P(v,{size:30,b:true,after:0,color:c==='bad'?C.bad:c==='warn'?C.warn:'1B1F1C'}),P(s,{size:15,color:'555555'})],{w:tw,borders:{top:{style:X.BorderStyle.SINGLE,size:18,color:c?C[c]:'9AA79F'},bottom:{style:X.BorderStyle.SINGLE,size:4,color:'D9E2DC'},left:{style:X.BorderStyle.SINGLE,size:4,color:'FFFFFF'},right:{style:X.BorderStyle.SINGLE,size:4,color:'FFFFFF'}}}))})]}));
+  ch.push(P('',{after:120}));
+  const lw=[2600,W-2600];const line={top:{style:X.BorderStyle.SINGLE,size:4,color:'D9E2DC'},bottom:{style:X.BorderStyle.SINGLE,size:4,color:'D9E2DC'},left:{style:X.BorderStyle.NONE,size:0,color:'FFFFFF'},right:{style:X.BorderStyle.NONE,size:0,color:'FFFFFF'}};
+  const rows=B.secs.map(s=>{const st=wbSt(s);return new X.TableRow({cantSplit:true,children:[cell([P([run(s.n+'. ',{b:true,color:G,size:22}),run(s.h,{b:true,size:22})],{after:0}),P(s.sub,{size:16,color:'666666',after:st?40:0}),...(st?[P(' '+WB_ST[st][0]+' ',{size:16,b:true,color:C[st]})]:[])],{w:lw[0],borders:line,fill:st?FILL[st]:'F3F6F4'}),cell(wbLines(s).map(l=>P(l,{bl:true,after:30})),{w:lw[1],borders:line})]})});
+  const adv=wrNote('adv');if(adv)rows.push(new X.TableRow({cantSplit:true,children:[cell([P('Đề xuất – kiến nghị',{b:true,size:22,color:C.bad,after:0}),P('cần lãnh đạo cho ý kiến',{size:16,color:'666666'})],{w:lw[0],borders:line,fill:'FBE3E1'}),cell(adv.split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean).map(l=>P(l,{bl:true,after:30})),{w:lw[1],borders:line})]}));
+  ch.push(new X.Table({width:{size:W,type:X.WidthType.DXA},columnWidths:lw,layout:X.TableLayoutType.FIXED,rows}));
+  ch.push(P(`Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS`,{size:15,i:true,color:'777777',before:100}));
+  const doc=new X.Document({sections:[{properties:{page:{margin:{top:850,bottom:850,left:1134,right:1134}}},children:ch}]});
+  await saveFile(`Bao-cao-tuan-${d.wk}_HCNS_ban-ngan_${d.r[0]}.docx`,await X.Packer.toBlob(doc))}
+/* Lưu ghi chú: giữ bản nháp tại chỗ để không mất chữ khi trang vẽ lại */
 let _wrT={};
-document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.wrnote!=null){const k=t.dataset.wrnote,key=wrKey(),v=t.value;clearTimeout(_wrT[k]);_wrT[k]=setTimeout(()=>{const cur=wrDoc(key);write('reports/'+key,{...cur,notes:{...(cur.notes||{}),[k]:v},updatedAt:new Date().toISOString()}).catch(()=>{})},900)}});
-document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="wr-"]');if(!el)return;const a=el.dataset.act;const d=wrBuild();
-  if(a==='wr-copy')copyText(wrText(d));
-  else if(a==='wr-html')saveFile(`Bao-cao-tuan-${d.wk}_HCNS_${d.r[0]}.html`,`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(wrTitle(d))}</title><style>${WR_CSS}</style></head><body>${wrHtml(d,false)}</body></html>`);
-  else if(a==='wr-docx'){el.disabled=true;el.textContent='Đang tạo file…';wrDocx(d).finally(()=>{render()})}
-  else if(a==='wr-prev'||a==='wr-next'){S.rep.date=addDays(S.rep.date,a==='wr-prev'?-7:7);render()}
-  else if(a==='wr-view'){S.rep.preview=!S.rep.preview;render()}});
+function wrSave(k,v){const key=wrKey();S.wrDraft[key+'|'+k]=v;clearTimeout(_wrT[k]);_wrT[k]=setTimeout(()=>{const cur=wrDoc(key);write('reports/'+key,{...cur,notes:{...(cur.notes||{}),[k]:v},updatedAt:new Date().toISOString()}).catch(()=>{})},900)}
+document.addEventListener('input',e=>{const t=e.target;if(t.dataset&&t.dataset.wrnote!=null)wrSave(t.dataset.wrnote,t.value)});
+document.addEventListener('change',e=>{const t=e.target;if(t.dataset&&t.dataset.wbst!=null){wrSave(t.dataset.wbst,t.value);render()}});
+const _wrRender=render;
+render=function(){const a=document.activeElement;const k=a&&a.dataset?a.dataset.wrnote:null;const ss=k!=null?[a.selectionStart,a.selectionEnd]:null;_wrRender();
+  if(k!=null){const n=document.querySelector(`[data-wrnote="${k}"]`);if(n&&n!==a){n.focus();try{n.setSelectionRange(ss[0],ss[1])}catch(_){}}}};
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="wr-"],[data-act^="wb-"]');if(!el)return;const a=el.dataset.act;const short=S.rep.mode!=='chitiet';
+  if(a==='wb-mode'){S.rep.mode=el.dataset.v;render();return}
+  if(a==='wb-reset'){wrSave(el.dataset.k,'');render();return}
+  if(a==='wr-prev'||a==='wr-next'){S.rep.date=addDays(S.rep.date,a==='wr-prev'?-7:7);render();return}
+  if(a==='wr-view'){S.rep.preview=!S.rep.preview;render();return}
+  const d=wrBuild();
+  if(a==='wr-copy')copyText(short?wbText(d):wrText(d));
+  else if(a==='wr-html')saveFile(`Bao-cao-tuan-${d.wk}_HCNS${short?'_ban-ngan':''}_${d.r[0]}.html`,`<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>${esc(wrTitle(d))}</title><style>${short?WB_CSS:WR_CSS}</style></head><body>${short?wbHtml(d,false):wrHtml(d,false)}</body></html>`);
+  else if(a==='wr-docx'){el.disabled=true;el.textContent='Đang tạo file…';(short?wbDocx(d):wrDocx(d)).finally(()=>{render()})}});
 const _vReport0=vReport;
-vReport=function(){if(S.rep.type!=='tuan')return _vReport0();const d=wrBuild();wrDoc(wrKey());const pv=!!S.rep.preview;
-  return head('Báo cáo tổng hợp',`Báo cáo tuần gửi lãnh đạo theo 5 đầu mục chuẩn · số liệu tự lấy từ DSNS, hồ sơ tuyển dụng, nhật ký và việc giao · ô ghi chú dưới mỗi mục được lưu theo tuần và in kèm báo cáo`,
-    `<div class="seg">${[['tuan','Tuần'],['thang','Tháng'],['quy','Quý']].map(([k,l])=>`<button data-act="rep-type" data-v="${k}" aria-pressed="${S.rep.type===k}">${l}</button>`).join('')}</div><button class="btn sm" data-act="wr-prev" aria-label="Tuần trước">‹</button><input type="date" id="repDate" value="${S.rep.date}"><button class="btn sm" data-act="wr-next" aria-label="Tuần sau">›</button><button class="btn" data-act="wr-view">${pv?'Sửa ghi chú':'Xem bản in'}</button><button class="btn" data-act="wr-copy">Sao chép</button>${S.dl?`<button class="btn" data-act="wr-html">Tải .html</button><button class="btn pri" data-act="wr-docx">Tải file Word</button>`:''}`)+
-  `<div class="rep wr${pv?' wr-pv':''}" id="repBody">${wrHtml(d,!pv)}</div>`};
+vReport=function(){if(S.rep.type!=='tuan')return _vReport0();const d=wrBuild();wrDoc(wrKey());const pv=!!S.rep.preview,short=S.rep.mode!=='chitiet';
+  return head('Báo cáo tổng hợp',short?'Bản ngắn 1 trang để báo cáo lãnh đạo: số liệu tự điền, sửa trực tiếp từng mục, chọn mức độ cho mỗi mục · lưu theo tuần':'Bản chi tiết theo 5 đầu mục chuẩn · ô ghi chú dưới mỗi mục được lưu theo tuần và in kèm báo cáo',
+    `<div class="seg">${[['tuan','Tuần'],['thang','Tháng'],['quy','Quý']].map(([k,l])=>`<button data-act="rep-type" data-v="${k}" aria-pressed="${S.rep.type===k}">${l}</button>`).join('')}</div><div class="seg">${[['ngan','Bản ngắn'],['chitiet','Bản chi tiết']].map(([k,l])=>`<button data-act="wb-mode" data-v="${k}" aria-pressed="${(short?'ngan':'chitiet')===k}">${l}</button>`).join('')}</div><button class="btn sm" data-act="wr-prev" aria-label="Tuần trước">‹</button><input type="date" id="repDate" value="${S.rep.date}"><button class="btn sm" data-act="wr-next" aria-label="Tuần sau">›</button><button class="btn" data-act="wr-view">${pv?'Chỉnh sửa':'Xem bản in'}</button><button class="btn" data-act="wr-copy">Sao chép</button>${S.dl?`<button class="btn" data-act="wr-html">Tải .html</button><button class="btn pri" data-act="wr-docx">Tải file Word</button>`:''}`)+
+  (short?`<div class="rep wb${pv?' wb-pv':''}" id="repBody">${wbHtml(d,!pv)}</div>`:`<div class="rep wr${pv?' wr-pv':''}" id="repBody">${wrHtml(d,!pv)}</div>`)};
 
 init();
 </script>
