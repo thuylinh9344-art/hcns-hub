@@ -1644,7 +1644,7 @@ const wrPct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 function wrClean(t){let s=String(t||'').split('\n')[0].trim();if(/UP\d{6}/i.test(s)||/^(\p{Lu}\p{Ll}*\s+){2,}\p{Lu}\p{Ll}*\s*(-|,|$)/u.test(s))return '';s=s.replace(/\s+cho\s*:?\s*(\p{Lu}\p{Ll}*\s+){1,}\p{Lu}\p{Ll}*.*$/u,'').replace(/[:;,\s]+$/,'').replace(/\s+cho$/i,'');return s}
 const wrNT=t=>{const s=String(t||'');if(/[a-zà-ỹ]{4,}/i.test(s.replace(/đkkd|dkkd|nt|và/gi,'')))return [];return [...new Set((s.match(/\b\d{1,3}[A-Z]?(?:\.0)?\b/g)||[]).map(x=>x.replace(/\.0$/,'')))]};
 /* Chỉ tiêu tuyển dụng của cả team theo tháng (Linh chốt 29/10/2026); chỉ tiêu từng người vẫn dùng để tính KPI cá nhân */
-const TEAM_TGT={'2026-10':60,'2026-11':50,'2026-12':40};
+const TEAM_TGT={'2026-10':50,'2026-11':40,'2026-12':35};
 const teamTgt=m=>{const c=(S.config.teamTgt||{})[m];return c!=null&&c!==''?+c:(TEAM_TGT[m]??null)};
 const wrIsLegal=e=>/^05\./.test(String(e.code||''))||/pháp lý/i.test(String(e.area||''));
 const wrIsRecTask=t=>/tuyển dụng|chỉ tiêu tuyển/i.test((t.title||'')+' '+(t.module||''));
