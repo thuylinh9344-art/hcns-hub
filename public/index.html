@@ -1531,7 +1531,7 @@ function vRecKpi(m){
     <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
     <td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
     <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
-  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr></tbody></table></div>
+  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
   <div class="row mt">${S.canWrite?`<button class="btn" data-act="rk-eff">Ghi số tuyển vào bảng Hiệu suất ${fmtM(m)}</button>`:''}<span class="note">Bôi đỏ khi tổng dưới 300/500.</span></div>
   <details class="mt"><summary class="note">Cách tính</summary><ul class="note">
     <li>Thực tuyển: người nhận việc trong tháng theo DSNS và đang làm; ai nghỉ việc thì tự trừ ra khi cập nhật DSNS, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người tuyển vị trí quản lý; khối văn phòng và kho gán cho người phụ trách khối văn phòng. QLKV quy đổi 1 người.</li>
@@ -1642,6 +1642,9 @@ const wrPct=(a,b)=>b?Math.round(a/b*100)+'%':'—';
 /* Bỏ tên người trong nội dung báo cáo (chỉ giữ việc + số lượng) */
 function wrClean(t){let s=String(t||'').split('\n')[0].trim();if(/UP\d{6}/i.test(s)||/^(\p{Lu}\p{Ll}*\s+){2,}\p{Lu}\p{Ll}*\s*(-|,|$)/u.test(s))return '';s=s.replace(/\s+cho\s*:?\s*(\p{Lu}\p{Ll}*\s+){1,}\p{Lu}\p{Ll}*.*$/u,'').replace(/[:;,\s]+$/,'').replace(/\s+cho$/i,'');return s}
 const wrNT=t=>{const s=String(t||'');if(/[a-zà-ỹ]{4,}/i.test(s.replace(/đkkd|dkkd|nt|và/gi,'')))return [];return [...new Set((s.match(/\b\d{1,3}[A-Z]?(?:\.0)?\b/g)||[]).map(x=>x.replace(/\.0$/,'')))]};
+/* Chỉ tiêu tuyển dụng của cả team theo tháng (Linh chốt 29/10/2026); chỉ tiêu từng người vẫn dùng để tính KPI cá nhân */
+const TEAM_TGT={'2026-10':60,'2026-11':50,'2026-12':40};
+const teamTgt=m=>{const c=(S.config.teamTgt||{})[m];return c!=null&&c!==''?+c:(TEAM_TGT[m]??null)};
 const wrIsLegal=e=>/^05\./.test(String(e.code||''))||/pháp lý/i.test(String(e.area||''));
 const wrIsRecTask=t=>/tuyển dụng|chỉ tiêu tuyển/i.test((t.title||'')+' '+(t.module||''));
 const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.title||'').trim());
@@ -1683,13 +1686,13 @@ function wrBuild(){
       const wOf=sid=>wk.filter(x=>rkHireOwner(x,M)===sid).length;
       const day=+ref.slice(8,10),dim=+me.slice(8,10),exp=day/dim;
       const rs=[...rows].sort((a,b)=>b.real/Math.max(b.tgt,1)-a.real/Math.max(a.tgt,1));
-      const tot=rs.reduce((t,x)=>({tgt:t.tgt+x.tgt,real:t.real+x.real,w:t.w+wOf(x.s.id),cv:t.cv+x.CV,v1:t.v1+x.v1,st:t.st+x.stale}),{tgt:0,real:0,w:0,cv:0,v1:0,st:0});
+      const tot=rs.reduce((t,x)=>({tgt:t.tgt+x.tgt,real:t.real+x.real,w:t.w+wOf(x.s.id),cv:t.cv+x.CV,v1:t.v1+x.v1,st:t.st+x.stale}),{tgt:0,real:0,w:0,cv:0,v1:0,st:0});tot.ind=tot.tgt;{const tt=teamTgt(m);if(tt)tot.tgt=tt}
       parts.push({table:{cols:['Phụ trách','Địa bàn','Chỉ tiêu','Đã tuyển','% đạt','Trong tuần','Hồ sơ nhận','Đã PV vòng 1','Hồ sơ treo'],
         rows:rs.map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.tgt),nf(x.real),wrPct(x.real,x.tgt),nf(wOf(x.s.id)),nf(x.CV),nf(x.v1),x.stale?nf(x.stale):'']),
-        foot:['Tổng cộng','',nf(tot.tgt),nf(tot.real),wrPct(tot.real,tot.tgt),nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):''],flag:rs.map(x=>x.tgt&&x.real/x.tgt<exp*.6)}});
+        foot:[tot.ind!==tot.tgt?'Tổng cộng (chỉ tiêu team)':'Tổng cộng',tot.ind!==tot.tgt?`chỉ tiêu cá nhân cộng lại ${nf(tot.ind)}`:'',nf(tot.tgt),nf(tot.real),wrPct(tot.real,tot.tgt),nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):''],flag:rs.map(x=>x.tgt&&x.real/x.tgt<exp*.6)}});
       const c=rs.reduce((t,x)=>{for(const k in x.cnt)t[k]=(t[k]||0)+x.cnt[k];return t},{});
       const slow=rs.filter(x=>x.tgt&&x.real/x.tgt<exp*.6);
-      const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
+      const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người so với chỉ tiêu team (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
       if(slow.length)L.push(`Chậm so với tiến độ: ${slow.map(x=>`${wrShort(x.s.name)} (${x.real}/${x.tgt})`).join(', ')}.`);
       if(tot.st)L.push(`${tot.st} hồ sơ đang treo quá hạn xử lý (mới tạo quá 7 ngày hoặc phỏng vấn quá hạn).`);
       parts.push({lines:L});X.rec={tot,exp,rs,slow};
