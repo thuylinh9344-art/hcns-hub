@@ -1983,7 +1983,7 @@ const WD_CSS=`*{box-sizing:border-box}body{margin:0;background:#f3f4f1;font-fami
 .wd-head{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:3px solid #1f8a4c;padding-bottom:7px}
 .wd-org,.wd-by{font-size:8pt;color:#52514e;line-height:1.45}.wd-org b,.wd-by b{color:#0b0b0b;font-size:9.5pt}.wd-by{text-align:right}
 .wd-ttl{text-align:center}.wd-ttl h1{margin:0;font-size:18pt;color:#1f8a4c;letter-spacing:.02em}.wd-ttl p{margin:2px 0 0;font-size:8.5pt;color:#52514e}
-.wb-tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin:8px 0}
+.wb-tiles{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:6px;margin:8px 0}
 .wb-tiles div{border:1px solid #e6e5e0;border-top:3px solid #b9b8b2;border-radius:6px;padding:5px 7px;background:#fcfcfb}
 .wb-tiles .ok{border-top-color:#1f8a4c}.wb-tiles .warn{border-top-color:#c98500}.wb-tiles .bad{border-top-color:#c8372d}
 .wb-tiles span,.wb-tiles small{display:block;font-size:7.5pt;color:#52514e}.wb-tiles b{display:block;font-size:15pt;margin:1px 0}
@@ -2005,6 +2005,9 @@ svg text{font-family:Arial,Helvetica,sans-serif}
 function wdFile(d){return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Báo cáo tuần ${d.wk} – Phòng HCNS</title><style>${WD_CSS}${WD_TICK_CSS}</style></head><body><div class="tool"><button onclick="window.print()">In / Lưu PDF</button></div><div class="page">${wdHtml(d)}</div></body></html>`}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act="wd-html"]');if(!el)return;const d=wrBuild();saveFile(`Bao-cao-tuan-${d.wk}_HCNS_dashboard_${d.r[0]}.html`,wdFile(d))});
 
+
+/* Báo cáo tuần không hiển thị ô "Nhà thiếu NVBH" và "Việc giao quá hạn" (Linh chốt 30/10/2026) */
+const _wbBrief1=wbBrief;wbBrief=function(d){const B=_wbBrief1(d);B.tiles=(B.tiles||[]).filter(x=>!/^Nhà thiếu NVBH|^Việc giao quá hạn/.test(x[0]));return B};
 init();
 </script>
 </body>
