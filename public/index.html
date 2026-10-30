@@ -1588,11 +1588,11 @@ function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_k
   _kpRk={m,rec:S.rec,sys:S.sys,cfg:S.config,v};return v}
 const kpIsRec=e=>/^01\./.test(String(e.code||''))||/^tuyển dụng$/i.test(String(e.area||'').trim());
 function kpCats(m,sid){const code=kpCode(sid);const p=rkPlan(m)[code];const max=+S.config.kpiMax||1000;const td=p?Math.min(max,(()=>{const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');return tdp?tdp[1]:p[1]})()):0;
-  if(!td)return null; /* không có phần tuyển dụng: KPI tính đúng theo nhật ký công việc */
   const es=(logDoc(m,sid)?.entries||[]).filter(e=>!isVoidLog(e));const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
   const ov=((S.config.kpiPct||{})[m]||{})[code]||{};const cats=[];
   if(td){const r=kpRk(m)[sid];const got=r?r.kpi:0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
-  const rest=max-td;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
+  const BC=50;cats.push({k:'Báo cáo',pts:BC,pct:1,src:'Tự cộng',note:'Tự cộng 50 điểm cho mục báo cáo',man:'',use:1,got:BC,fixed:true});
+  const rest=max-td-BC;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
   cats.push({k,pts:rest,pct,src:'Điểm nhật ký công việc ngày, không tính các dòng tuyển dụng (mã 01.xx)',note:`${nf(r1(other))} điểm nhật ký${recLog?` · bỏ ${nf(r1(recLog))} điểm báo cáo tuyển dụng`:''}`,man:man??'',use,got:Math.round(Math.min(rest,rest*use))});
   return cats}
 const _kpiLog=kpiOf;
@@ -1607,7 +1607,7 @@ function kpDetail(s,m,k){if(!k.cats)return '';const dis=S.canWrite?'':'disabled'
     <td class="r">${c.fixed?'<span class="mini">—</span>':`<input class="num" type="number" min="0" max="100" id="kpm-${code}-${i}" data-kpm="${code}" data-k="${esc(c.k)}" value="${esc(c.man)}" placeholder="tự tính" style="width:72px;text-align:right" ${dis}>`}</td>
     <td class="r num"><b>${nf(c.got)}</b></td></tr>`).join('')}
   <tr><td><b>Cộng</b></td><td class="r num"><b>${nf(k.plan)}</b></td><td colspan="3" class="mini">Trừ lỗi ${nf(k.pen||0)} · KPI = ${nf(k.val)}</td><td class="r num"><b>${nf(k.raw)}</b></td></tr></tbody></table></div>
-  <p class="note">KPI = điểm KPI tuyển dụng + điểm công việc khác trong quỹ còn lại (${nf(k.plan)} − điểm tuyển dụng), lấy từ nhật ký ngày; các dòng báo cáo việc tuyển dụng không được cộng thêm. Điểm tuyển dụng phân bổ sửa ở bảng KPI tuyển dụng.</p></div>`}
+  <p class="note">KPI = điểm KPI tuyển dụng + 50 điểm báo cáo (tự cộng) + điểm công việc khác trong quỹ còn lại (${nf(k.plan)} − điểm tuyển dụng − 50), lấy từ nhật ký ngày; các dòng báo cáo việc tuyển dụng không được cộng thêm. Điểm tuyển dụng phân bổ sửa ở bảng KPI tuyển dụng.</p></div>`}
 async function kpSave(m,code,mut){const all=JSON.parse(JSON.stringify(kpPlanAll(m)));all[code]=all[code]||[];mut(all[code]);all[code]=all[code].filter(x=>x[1]>0||x[0]==='Tuyển dụng');
   const rp=JSON.parse(JSON.stringify(S.config.recPlan||{}));const td=all[code].find(x=>x[0]==='Tuyển dụng');if(td){const cur=rkPlan(m);rp[m]=rp[m]||JSON.parse(JSON.stringify(cur));if(rp[m][code])rp[m][code][1]=td[1]}
   await write('config/main',{...S.config,kpiPlan:{...(S.config.kpiPlan||{}),[m]:all},recPlan:rp})}
@@ -1664,6 +1664,8 @@ const TEAM_TGT={'2026-10':50,'2026-11':40,'2026-12':35};
 const teamTgt=m=>{const c=(S.config.teamTgt||{})[m];return c!=null&&c!==''?+c:(TEAM_TGT[m]??null)};
 /* % hoàn thành KPI cá nhân trong tháng (KPI 1.000 điểm: tuyển dụng + công việc khác theo nhật ký) */
 const wrKpis=m=>activeStaff().map(s=>({s,n:wrShort(s.name),k:kpiOf(m,s.id)})).filter(x=>x.k.has).map(x=>({n:x.n,id:x.s.id,pct:Math.round(x.k.pct),grade:x.k.grade})).sort((a,b)=>b.pct-a.pct);
+/* 5 nhà thuốc đang hoạt động thiếu nhân sự nhiều nhất (theo định biên NVBH; bỏ nhà chưa có nhân sự = chưa khai trương) */
+const wrTop5=()=>S.shops.filter(x=>x.type==='nt').map(x=>({x,s:shopStaff(x.code)})).filter(o=>o.s.short>0&&o.s.n>0).sort((a,b)=>b.s.short-a.s.short||(a.s.cht-b.s.cht)||a.s.n-b.s.n).slice(0,5).map(o=>`${o.x.code.replace(/^SHOP0*/,'NT ')} (${o.x.area||'—'}) thiếu ${o.s.short}${o.s.cht?'':', chưa có CHT'}`);
 const wrIsLegal=e=>/^05\./.test(String(e.code||''))||/pháp lý/i.test(String(e.area||''));
 const wrIsRecTask=t=>/tuyển dụng|chỉ tiêu tuyển/i.test((t.title||'')+' '+(t.module||''));
 const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.title||'').trim());
@@ -1692,7 +1694,7 @@ function wrBuild(){
         `Nghỉ việc ${T.quits.length} người, trong đó ${T.early} người nghỉ khi chưa đủ 90 ngày (${wrPct(T.early,T.quits.length)} số nghỉ). Tỷ lệ nghỉ việc tháng: ${avg?String(r1(T.quits.length/avg*100)).replace('.',','):0}%.`,
         `Đang báo nghỉ việc: ${bn} người${away?`; nghỉ thai sản / không lương: ${away} người (đã tính trong hiện hữu)`:''}.`];
       {const tv=ttsRows();const tn=tv.filter(x=>inR(x.start,[ma,ref])),ton=tv.filter(x=>x.status!=='Nghỉ việc');if(tv.length)L.push(`Học việc (sheet TTS): ${tn.length} người bắt đầu trong tháng, ${tn.filter(x=>x.status!=='Nghỉ việc').length} người đang học (đã tính vào thực tuyển); toàn hệ thống đang có ${ton.length} người học việc.`)}
-      if(nt.length)L.push(`Nhà thuốc thiếu NVBH theo định biên: ${shortN} nhà, thiếu ${gap} NVBH; ${noCht} nhà chưa có CHT.`);
+      if(nt.length){const t5=wrTop5();if(t5.length)L.push(`5 nhà thuốc thiếu nhân sự nhiều nhất: ${t5.join('; ')}.`)}
       if(red.prov.length||red.shops.length||red.kho.length)L.push(`Cảnh báo nghỉ dưới 90 ngày quý ${['I','II','III','IV'][red.q-1]}: ${[red.prov.length?'tỉnh '+red.prov.map(p=>p.area).join(', '):'',red.kho.length?red.kho.map(k=>`${k.name} (${k.r90}%)`).join(', '):'',red.shops.length?'nhà thuốc '+red.shops.map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', '):''].filter(Boolean).join('; ')}.`);
       parts.push({lines:L});X.hc={T,G,bn,shortN,gap,noCht,red,rate:avg?r1(T.quits.length/avg*100):0,nt:nt.length};
       sum.push(['Nhân sự hiện hữu',nf(T.cur),`${T.cur-T.start>=0?'+':''}${T.cur-T.start} so với đầu tháng`],['Tuyển mới / nghỉ việc tháng',`${T.hires.length} / ${T.quits.length}`,`${T.early} người nghỉ < 90 ngày`]);
@@ -1714,7 +1716,6 @@ function wrBuild(){
       const c=rs.reduce((t,x)=>{for(const k in x.cnt)t[k]=(t[k]||0)+x.cnt[k];return t},{});
       const slow=rs.filter(x=>x.tgt&&x.real/x.tgt<exp*.6);
       const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người so với chỉ tiêu team (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
-      {const kk=wrKpis(m);if(kk.length)L.push(`% hoàn thành KPI cá nhân ${fmtM(m)}: ${kk.map(k=>`${k.n} ${k.pct}%`).join(', ')}.`)}
       if(tot.st)L.push(`${tot.st} hồ sơ đang treo quá hạn xử lý (mới tạo quá 7 ngày hoặc phỏng vấn quá hạn).`);
       parts.push({lines:L});X.rec={tot,exp,rs,slow};
       sum.push(['Tuyển dụng tháng',`${tot.real}/${tot.tgt}`,`đạt ${wrPct(tot.real,tot.tgt)} · tiến độ thời gian ${Math.round(exp*100)}%`]);
@@ -1811,7 +1812,7 @@ function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0
     S1.push(`Lũy kế tháng: tuyển mới ${T.hires.length}, nghỉ việc ${T.quits.length} (tỷ lệ ${String(hc.rate).replace('.',',')}%), trong đó ${T.early} người nghỉ trước 90 ngày.`);
     const rd=hc.red;const rl=wbL([rd.prov.length?rd.prov.map(p=>p.area).join(', '):'',rd.kho.map(k=>`${k.name} (${k.r90}%)`).join(', '),rd.shops.length?rd.shops.map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', '):'']).join('; ');
     if(rl)S1.push(`Báo đỏ nghỉ sớm quý ${['I','II','III','IV'][rd.q-1]}: ${rl}.`);
-    if(hc.nt)S1.push(`Thiếu ${hc.gap} NVBH tại ${hc.shortN} nhà thuốc; ${hc.bn} người đang báo nghỉ.`);
+    if(hc.nt){const t5=wrTop5();if(t5.length)S1.push(`5 nhà thuốc thiếu nhân sự nhiều nhất: ${t5.join('; ')}.`)}
     st1=rl?'bad':(T.quits.length&&T.early/T.quits.length>.4)||hc.shortN?'warn':'ok';
     tiles.push(['Nhân sự hiện hữu',nf(T.cur),`${dl>=0?'+':''}${dl} so với đầu tháng`,'']);
     tiles.push(['Nghỉ việc tháng',nf(T.quits.length),`${T.early} người nghỉ < 90 ngày`,T.quits.length&&T.early/T.quits.length>.4?'bad':'']);
@@ -1819,7 +1820,7 @@ function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0
   else S1.push('Chưa có dữ liệu DSNS.');
   if(rc){const t=rc.tot,p=t.tgt?t.real/t.tgt:0;
     S2.push(`Đạt ${t.real}/${t.tgt} người (${wrPct(t.real,t.tgt)}) – tiến độ thời gian ${Math.round(rc.exp*100)}%; trong tuần tuyển thêm ${t.w}.`);
-    {const kk=wrKpis(X.m);if(kk.length)S2.push(`% hoàn thành KPI cá nhân ${fmtM(X.m)}: ${kk.map(k=>`${k.n} ${k.pct}%`).join(', ')}.`)}
+
     if(t.st)S2.push(`${t.st} hồ sơ treo quá hạn xử lý – yêu cầu xử lý dứt điểm trong tuần.`);
     st2=p>=rc.exp?'ok':p>=rc.exp*.8?'warn':'bad';tiles.splice(1,0,['Tuyển dụng tháng',`${t.real}/${t.tgt}`,`đạt ${wrPct(t.real,t.tgt)} · tiến độ ${Math.round(rc.exp*100)}%`,st2])}
   else S2.push('Chưa có kế hoạch tuyển dụng của tháng.');
@@ -1832,7 +1833,7 @@ function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0
   tiles.push(['Việc giao quá hạn',nf(w.late.length+(w.hdLate||0)),w.hdLate?`gồm ${w.hdLate} việc HĐLĐ`:'việc chưa xong quá hạn',(w.late.length+(w.hdLate||0))>3?'bad':(w.late.length+(w.hdLate||0))?'warn':'ok']);
   (X.legal||[]).slice(0,4).forEach(l=>S4.push(l));if(!S4.length)S4.push('Không phát sinh.');st4=(X.legal||[]).some(l=>/đang thực hiện/.test(l))?'warn':'ok';
   const pl=X.plan||{L1:[],L2:[],L3:[]};[...pl.L1,...pl.L2,...pl.L3].slice(0,6).forEach(l=>S5.push(l));if(!S5.length)S5.push('Tiếp tục các công việc theo kế hoạch tháng.');
-  return {tiles,secs:[{k:'b1',sk:'st1',n:'1',h:'Biến động nhân sự',sub:`tháng ${+X.m.slice(5,7)}, đến ${fmtD(d.ref)}`,auto:S1,st:st1},{k:'b2',sk:'st2',n:'2',h:'Tuyển dụng',sub:`lũy kế tháng ${+X.m.slice(5,7)}`,auto:S2,st:st2},{k:'b3',sk:'st3',n:'3',h:'Công việc thường quy',sub:'trong tuần',auto:S3,st:st3},{k:'b4',sk:'st4',n:'4',h:'Hồ sơ pháp lý / giấy tờ',sub:'ĐKKD, hồ sơ DSCM…',auto:S4,st:st4},{k:'b5',n:'5',h:'Kế hoạch tuần tới',sub:`${fmtD(X.nr[0])} – ${fmtD(X.nr[1])}`,auto:S5}]}}
+  return {tiles,secs:[{k:'b1',sk:'st1',n:'1',h:'Biến động nhân sự',sub:`tháng ${+X.m.slice(5,7)}, đến ${fmtD(d.ref)}`,auto:S1,st:st1},{k:'b2',sk:'st2',n:'2',h:'Tuyển dụng',sub:`lũy kế tháng ${+X.m.slice(5,7)}`,auto:S2,st:st2},{k:'b3',sk:'st3',n:'3',h:'Công việc thường quy',sub:'trong tuần',auto:S3,st:st3},{k:'b4',sk:'st4',n:'4',h:'Hồ sơ pháp lý / giấy tờ',sub:'ĐKKD, hồ sơ DSCM…',auto:S4,st:st4},{k:'bk',n:'5',h:'KPI cá nhân',sub:`% hoàn thành ${fmtM(X.m)}`,auto:(()=>{const kk=wrKpis(X.m);return kk.length?[kk.map(k=>`${k.n} ${k.pct}%`).join(' · '),'KPI 1.000 điểm = tuyển dụng + công việc theo nhật ký + 50 điểm báo cáo (tự cộng).']:['Chưa có dữ liệu KPI.']})()},{k:'b5',n:'6',h:'Kế hoạch tuần tới',sub:`${fmtD(X.nr[0])} – ${fmtD(X.nr[1])}`,auto:S5}]}}
 let wbLines=s=>{const v=wrNote(s.k);return v?v.split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean):s.auto};
 let wbSt=s=>s.sk?(wrNote(s.sk)||s.st):'';
 function wbHtml(d,edit){const B=wbBrief(d);const by=wrNote('by')||S.who||'';const adv=wrNote('adv');
@@ -1968,14 +1969,11 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   return `<header class="wd-head"><div class="wd-org">CÔNG TY CỔ PHẦN UPHARMA<br><b>PHÒNG HÀNH CHÍNH – NHÂN SỰ</b></div><div class="wd-ttl"><h1>BÁO CÁO TUẦN ${d.wk}</h1><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])} · số liệu đến ${fmtDY(lk?lk.ref:d.ref)}</p></div><div class="wd-by">Người báo cáo<br><b>${esc(by)}</b></div></header>
   <div class="wb-tiles">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join('')}</div>
   <div class="wd-grid">
-    ${C.rec?`<section class="wd-card"><h3><i>2</i>Tuyển dụng tháng ${+d.X.m.slice(5,7)}${sec('b2').sk?` <span class="wb-pill ${wbSt(sec('b2'))}">${WB_ST[wbSt(sec('b2'))][0]}</span>`:''}</h3>${wdHero(C.rec)}${C.kpi&&C.kpi.length?`<p class="wd-sub">% hoàn thành KPI cá nhân ${fmtM(d.X.m)}</p>${wdKpiSvg(C.kpi)}`:''}</section>`:''}
-    ${C.flow?`<section class="wd-card"><h3><i>1</i>Biến động nhân sự tháng ${+d.X.m.slice(5,7)}${sec('b1').sk?` <span class="wb-pill ${wbSt(sec('b1'))}">${WB_ST[wbSt(sec('b1'))][0]}</span>`:''}</h3>${wdFlowSvg(C.flow)}</section>`:''}
+    ${card(sec('b1'))}
+    ${C.rec?card(sec('b2'),wdHero(C.rec)):card(sec('b2'))}
   </div>
-  <div class="wd-grid">
-    ${card(sec('b1'),'')}
-    ${C.short&&C.short.length?`<section class="wd-card"><h3>NVBH còn thiếu theo tỉnh <small>8 tỉnh thiếu nhiều nhất</small></h3>${wdShortSvg(C.short)}</section>`:card(sec('b2'))}
-  </div>
-  <div class="wd-grid wd-3">${card(sec('b3'))}<section class="wd-card"><h3><i>4</i>${esc(sec('b4').h)}${sec('b4').sk?` <span class="wb-pill ${wbSt(sec('b4'))}">${WB_ST[wbSt(sec('b4'))][0]}</span>`:''}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[])}</section>${card(sec('b5'))}</div>
+  <div class="wd-grid">${card(sec('b3'))}<section class="wd-card"><h3><i>4</i>${esc(sec('b4').h)}${sec('b4').sk?` <span class="wb-pill ${wbSt(sec('b4'))}">${WB_ST[wbSt(sec('b4'))][0]}</span>`:''}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[])}</section></div>
+  <div class="wd-grid">${C.kpi&&C.kpi.length?`<section class="wd-card"><h3><i>5</i>KPI cá nhân <small>% hoàn thành ${fmtM(d.X.m)} · đã gồm 50 điểm báo cáo</small></h3>${wdKpiSvg(C.kpi)}</section>`:card(sec('bk'))}${card(sec('b5'))}</div>
   ${wrNote('adv')?`<section class="wd-card wd-adv"><h3><i>!</i>Đề xuất – kiến nghị</h3><ul>${wrNote('adv').split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('')}</ul></section>`:''}
   <footer class="wd-foot">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} (gồm học việc sheet TTS) · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS${lk?' · bản đã chốt':''}</footer>`}
 /* Hồ sơ pháp lý dạng tick xanh: việc trong tuần + lũy kế tháng theo từng nhà thuốc */
