@@ -1973,7 +1973,7 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
     ${C.rec?card(sec('b2'),wdHero(C.rec)):card(sec('b2'))}
   </div>
   <div class="wd-grid">${card(sec('b3'))}<section class="wd-card"><h3><i>4</i>${esc(sec('b4').h)}${sec('b4').sk?` <span class="wb-pill ${wbSt(sec('b4'))}">${WB_ST[wbSt(sec('b4'))][0]}</span>`:''}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[])}</section></div>
-  <div class="wd-grid">${C.kpi&&C.kpi.length?`<section class="wd-card"><h3><i>5</i>KPI cá nhân <small>% hoàn thành ${fmtM(d.X.m)} · đã gồm 50 điểm báo cáo</small></h3>${wdKpiSvg(C.kpi)}</section>`:card(sec('bk'))}${card(sec('b5'))}</div>
+  <div class="wd-grid wd-1">${card(sec('b5'))}</div>
   ${wrNote('adv')?`<section class="wd-card wd-adv"><h3><i>!</i>Đề xuất – kiến nghị</h3><ul>${wrNote('adv').split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('')}</ul></section>`:''}
   <footer class="wd-foot">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} (gồm học việc sheet TTS) · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS${lk?' · bản đã chốt':''}</footer>`}
 /* Hồ sơ pháp lý dạng tick xanh: việc trong tuần + lũy kế tháng theo từng nhà thuốc */
@@ -1994,7 +1994,7 @@ const WD_CSS=`*{box-sizing:border-box}body{margin:0;background:#f3f4f1;font-fami
 .wb-tiles div{border:1px solid #e6e5e0;border-top:3px solid #b9b8b2;border-radius:6px;padding:5px 7px;background:#fcfcfb}
 .wb-tiles .ok{border-top-color:#1f8a4c}.wb-tiles .warn{border-top-color:#c98500}.wb-tiles .bad{border-top-color:#c8372d}
 .wb-tiles span,.wb-tiles small{display:block;font-size:7.5pt;color:#52514e}.wb-tiles b{display:block;font-size:15pt;margin:1px 0}
-.wd-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}.wd-3{grid-template-columns:1fr 1fr 1fr}
+.wd-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:7px}.wd-1{grid-template-columns:1fr}.wd-3{grid-template-columns:1fr 1fr 1fr}
 .wd-card{border:1px solid #e6e5e0;border-radius:7px;padding:7px 9px;break-inside:avoid;page-break-inside:avoid}
 .wd-card h3{margin:0 0 5px;font-size:10pt;display:flex;align-items:center;gap:6px;flex-wrap:wrap}.wd-card h3 small{font-weight:400;color:#8a8984;font-size:8pt}
 .wd-card h3 i{font-style:normal;width:17px;height:17px;border-radius:50%;background:#1f8a4c;color:#fff;font-size:8.5pt;display:inline-flex;align-items:center;justify-content:center}
@@ -2014,7 +2014,8 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act="wd-h
 
 
 /* Báo cáo tuần không hiển thị ô "Nhà thiếu NVBH" và "Việc giao quá hạn" (Linh chốt 30/10/2026) */
-const _wbBrief1=wbBrief;wbBrief=function(d){const B=_wbBrief1(d);B.tiles=(B.tiles||[]).filter(x=>!/^Nhà thiếu NVBH|^Việc giao quá hạn/.test(x[0]));return B};
+const _wbBrief1=wbBrief;wbBrief=function(d){const B=_wbBrief1(d);B.tiles=(B.tiles||[]).filter(x=>!/^Nhà thiếu NVBH|^Việc giao quá hạn/.test(x[0]));
+  /* Ẩn mục KPI cá nhân khỏi báo cáo tuần (Linh chốt 30/10/2026) */B.secs=B.secs.filter(s=>s.k!=='bk');B.secs.forEach((s,i)=>s.n=String(i+1));return B};
 init();
 </script>
 </body>
