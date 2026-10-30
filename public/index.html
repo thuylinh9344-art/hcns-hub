@@ -1937,12 +1937,12 @@ function wdRecSvg(R){const W=460,rh=26,L=70,Rm=60,H=R.people.length*rh+24;const 
   const y=H-8;s+=`<rect x="${L}" y="${y-8}" width="12" height="8" rx="2" fill="${WD_C.blue}"/>${wdT(L+16,y,'đạt chỉ tiêu riêng',{fs:10})}<rect x="${L+120}" y="${y-8}" width="12" height="8" rx="2" fill="#9cc0ec"/>${wdT(L+136,y,'chưa đạt',{fs:10})}<line x1="${L+200}" x2="${L+200}" y1="${y-10}" y2="${y+1}" stroke="${WD_C.ink}" stroke-width="2"/>${wdT(L+206,y,'chỉ tiêu riêng',{fs:10})}`;
   return s+'</svg>'}
 /* Biến động quân số tháng: đầu tháng → +tuyển mới → −nghỉ việc → hiện hữu */
-function wdFlowSvg(F){const W=460,H=190,B=150,T=22;const lo=Math.min(F.start,F.cur)-Math.max(F.hires,F.quits)*1.6,hi=Math.max(F.start+F.hires,F.cur)*1.01;const sy=v=>B-(B-T)*(v-lo)/(hi-lo);
+function wdFlowSvg(F){const W=460,H=250,B=212,T=24;const lo=Math.min(F.start,F.cur)-Math.max(F.hires,F.quits)*1.6,hi=Math.max(F.start+F.hires,F.cur)*1.01;const sy=v=>B-(B-T)*(v-lo)/(hi-lo);
   const cols=[['Đầu tháng',lo,F.start,WD_C.gray,F.start],['Tuyển mới',F.start,F.start+F.hires,WD_C.aqua,'+'+F.hires],['Nghỉ việc',F.start+F.hires-F.quits,F.start+F.hires,WD_C.orange,'−'+F.quits],['Hiện hữu',lo,F.cur,WD_C.blue,F.cur]];
   const bw=70,gap=(W-40-bw*4)/3;let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Biến động quân số trong tháng"><line x1="20" x2="${W-20}" y1="${B}" y2="${B}" stroke="${WD_C.grid}"/>`;
   cols.forEach(([n,a,b,c,lab],i)=>{const x=20+i*(bw+gap),y1=sy(b),y0=sy(a);s+=`<g><title>${n}: ${lab}</title><rect x="${x}" y="${y1}" width="${bw}" height="${Math.max(2,y0-y1)}" rx="4" fill="${c}"/>${wdT(x+bw/2,y1-6,lab,{a:'middle',c:WD_C.ink,b:true,fs:12})}${wdT(x+bw/2,B+16,n,{a:'middle'})}</g>`;
     if(i<3){const nx=x+bw,ny=sy(i===0?F.start:i===1?F.start+F.hires:F.cur);s+=`<line x1="${nx}" x2="${nx+gap}" y1="${ny}" y2="${ny}" stroke="${WD_C.ink3}" stroke-dasharray="3 3"/>`}});
-  return s+wdT(20,H-4,'Trục dọc cắt bớt phần dưới để thấy rõ phần tăng / giảm',{fs:9,c:WD_C.ink3})+'</svg>'}
+  return s+'</svg>'}
 /* Nghỉ việc tháng: thanh 100% chia nghỉ trước 90 ngày / sau 90 ngày */
 function wdQuitSvg(F){const W=460,H=74,L=10,R=W-10,q=Math.max(1,F.quits),e=F.early,x=L+(R-L)*e/q;
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Cơ cấu nghỉ việc trong tháng"><g><title>Nghỉ trước 90 ngày: ${e}</title><rect x="${L}" y="14" width="${Math.max(2,x-L-1)}" height="22" rx="4" fill="${WD_C.orange}"/></g><g><title>Nghỉ sau 90 ngày: ${F.quits-e}</title><rect x="${x+1}" y="14" width="${Math.max(2,R-x-1)}" height="22" rx="4" fill="${WD_C.gray}"/></g>
@@ -1960,7 +1960,7 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   <div class="wb-tiles">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join('')}</div>
   <div class="wd-grid">
     ${C.rec?`<section class="wd-card"><h3><i>2</i>Tuyển dụng tháng ${+d.X.m.slice(5,7)}${sec('b2').sk?` <span class="wb-pill ${wbSt(sec('b2'))}">${WB_ST[wbSt(sec('b2'))][0]}</span>`:''}</h3>${wdHero(C.rec)}${wdRecSvg(C.rec)}</section>`:''}
-    ${C.flow?`<section class="wd-card"><h3><i>1</i>Biến động nhân sự tháng ${+d.X.m.slice(5,7)}${sec('b1').sk?` <span class="wb-pill ${wbSt(sec('b1'))}">${WB_ST[wbSt(sec('b1'))][0]}</span>`:''}</h3>${wdFlowSvg(C.flow)}${wdQuitSvg(C.flow)}</section>`:''}
+    ${C.flow?`<section class="wd-card"><h3><i>1</i>Biến động nhân sự tháng ${+d.X.m.slice(5,7)}${sec('b1').sk?` <span class="wb-pill ${wbSt(sec('b1'))}">${WB_ST[wbSt(sec('b1'))][0]}</span>`:''}</h3>${wdFlowSvg(C.flow)}</section>`:''}
   </div>
   <div class="wd-grid">
     ${card(sec('b1'),'')}
