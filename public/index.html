@@ -1662,6 +1662,8 @@ const wrNT=t=>{const s=String(t||'');if(/[a-zà-ỹ]{4,}/i.test(s.replace(/đkkd
 /* Chỉ tiêu tuyển dụng của cả team theo tháng (Linh chốt 29/10/2026); chỉ tiêu từng người vẫn dùng để tính KPI cá nhân */
 const TEAM_TGT={'2026-10':50,'2026-11':40,'2026-12':35};
 const teamTgt=m=>{const c=(S.config.teamTgt||{})[m];return c!=null&&c!==''?+c:(TEAM_TGT[m]??null)};
+/* % hoàn thành KPI cá nhân trong tháng (KPI 1.000 điểm: tuyển dụng + công việc khác theo nhật ký) */
+const wrKpis=m=>activeStaff().map(s=>({s,n:wrShort(s.name),k:kpiOf(m,s.id)})).filter(x=>x.k.has).map(x=>({n:x.n,id:x.s.id,pct:Math.round(x.k.pct),grade:x.k.grade})).sort((a,b)=>b.pct-a.pct);
 const wrIsLegal=e=>/^05\./.test(String(e.code||''))||/pháp lý/i.test(String(e.area||''));
 const wrIsRecTask=t=>/tuyển dụng|chỉ tiêu tuyển/i.test((t.title||'')+' '+(t.module||''));
 const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.title||'').trim());
@@ -1705,13 +1707,14 @@ function wrBuild(){
       const day=+ref.slice(8,10),dim=+me.slice(8,10),exp=day/dim;
       const rs=[...rows].sort((a,b)=>b.real/Math.max(b.tgt,1)-a.real/Math.max(a.tgt,1));
       const tot=rs.reduce((t,x)=>({tgt:t.tgt+x.tgt,real:t.real+x.real,w:t.w+wOf(x.s.id),cv:t.cv+x.CV,v1:t.v1+x.v1,st:t.st+x.stale}),{tgt:0,real:0,w:0,cv:0,v1:0,st:0});tot.ind=tot.tgt;{const tt=teamTgt(m);if(tt)tot.tgt=tt}
-      parts.push({table:{cols:['Phụ trách','Địa bàn','Chỉ tiêu','Đã tuyển','% đạt','Trong tuần','Hồ sơ nhận','Đã PV vòng 1','Hồ sơ treo'],
-        rows:rs.map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.tgt),nf(x.real),wrPct(x.real,x.tgt),nf(wOf(x.s.id)),nf(x.CV),nf(x.v1),x.stale?nf(x.stale):'']),
-        foot:[tot.ind!==tot.tgt?'Tổng cộng (chỉ tiêu team)':'Tổng cộng',tot.ind!==tot.tgt?`chỉ tiêu cá nhân cộng lại ${nf(tot.ind)}`:'',nf(tot.tgt),nf(tot.real),wrPct(tot.real,tot.tgt),nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):''],flag:rs.map(x=>x.tgt&&x.real/x.tgt<exp*.6)}});
+      const KP={};wrKpis(m).forEach(k=>KP[k.id]=k);
+      parts.push({table:{cols:['Phụ trách','Địa bàn','Đã tuyển','Trong tuần','Hồ sơ nhận','Đã PV vòng 1','Hồ sơ treo','KPI tháng'],
+        rows:[...rs].sort((a,b)=>(KP[b.s.id]?.pct??-1)-(KP[a.s.id]?.pct??-1)).map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.real),nf(wOf(x.s.id)),nf(x.CV),nf(x.v1),x.stale?nf(x.stale):'',KP[x.s.id]?KP[x.s.id].pct+'%':'—']),
+        foot:[`Tổng cộng (chỉ tiêu team ${nf(tot.tgt)})`,'',`${nf(tot.real)} · ${wrPct(tot.real,tot.tgt)}`,nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):'','']}});
       const c=rs.reduce((t,x)=>{for(const k in x.cnt)t[k]=(t[k]||0)+x.cnt[k];return t},{});
       const slow=rs.filter(x=>x.tgt&&x.real/x.tgt<exp*.6);
       const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người so với chỉ tiêu team (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
-      if(slow.length)L.push(`Chậm so với tiến độ: ${slow.map(x=>`${wrShort(x.s.name)} (${x.real}/${x.tgt})`).join(', ')}.`);
+      {const kk=wrKpis(m);if(kk.length)L.push(`% hoàn thành KPI cá nhân ${fmtM(m)}: ${kk.map(k=>`${k.n} ${k.pct}%`).join(', ')}.`)}
       if(tot.st)L.push(`${tot.st} hồ sơ đang treo quá hạn xử lý (mới tạo quá 7 ngày hoặc phỏng vấn quá hạn).`);
       parts.push({lines:L});X.rec={tot,exp,rs,slow};
       sum.push(['Tuyển dụng tháng',`${tot.real}/${tot.tgt}`,`đạt ${wrPct(tot.real,tot.tgt)} · tiến độ thời gian ${Math.round(exp*100)}%`]);
@@ -1746,7 +1749,7 @@ function wrBuild(){
   /* ---------- V. Kế hoạch tuần tới ---------- */
   {const parts=[];let rows=[];try{rows=rkData(m).rows}catch(_){}
     const L1=[];const left=rows.filter(x=>x.tgt>x.real).sort((a,b)=>(b.tgt-b.real)-(a.tgt-a.real));
-    if(nr[0]<=me&&left.length){const tt=teamTgt(m),done=rows.reduce((a,x)=>a+x.real,0);L1.push(tt?`Chỉ tiêu team tháng ${+m.slice(5,7)}: ${done>=tt?`đã đạt ${done}/${tt}, tiếp tục tuyển`:`còn ${tt-done} người (${done}/${tt})`}; cá nhân còn thiếu so với chỉ tiêu riêng: ${left.map(x=>`${wrShort(x.s.name)} ${x.tgt-x.real}`).join(', ')}.`:`Hoàn thành chỉ tiêu tháng ${+m.slice(5,7)}: còn ${left.reduce((a,x)=>a+x.tgt-x.real,0)} người – ${left.map(x=>`${wrShort(x.s.name)} ${x.tgt-x.real}`).join(', ')}.`)}
+    if(nr[0]<=me&&rows.length){const tt=teamTgt(m)||rows.reduce((a,x)=>a+x.tgt,0),done=rows.reduce((a,x)=>a+x.real,0);L1.push(`Chỉ tiêu team tháng ${+m.slice(5,7)}: ${done>=tt?`đã đạt ${done}/${tt}, tiếp tục tuyển`:`còn ${tt-done} người (${done}/${tt})`}.`)}
     if(ymOf(nr[1])!==m)L1.push(`Chốt kết quả tuyển dụng tháng ${+m.slice(5,7)}, triển khai chỉ tiêu tháng ${+nr[1].slice(5,7)}.`);
     const red=hasSys?wrRedQ():{shops:[]};if(red.shops.length)L1.push(`Ưu tiên tuyển / điều chuyển cho nhà báo đỏ: ${red.shops.slice(0,10).map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', ')}.`);
     parts.push({sub:'1. Tuyển dụng',lines:L1.length?L1:['Tiếp tục tuyển theo kế hoạch tháng.']});
@@ -1816,8 +1819,7 @@ function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0
   else S1.push('Chưa có dữ liệu DSNS.');
   if(rc){const t=rc.tot,p=t.tgt?t.real/t.tgt:0;
     S2.push(`Đạt ${t.real}/${t.tgt} người (${wrPct(t.real,t.tgt)}) – tiến độ thời gian ${Math.round(rc.exp*100)}%; trong tuần tuyển thêm ${t.w}.`);
-    const good=rc.rs.filter(x=>x.tgt&&x.real>=x.tgt);if(good.length)S2.push(`Đạt / vượt chỉ tiêu: ${good.map(x=>`${wrShort(x.s.name)} ${x.real}/${x.tgt}`).join(', ')}.`);
-    const lag=rc.rs.filter(x=>x.tgt&&x.real/x.tgt<rc.exp*.8);if(lag.length)S2.push(`Chậm tiến độ: ${lag.map(x=>`${wrShort(x.s.name)} ${x.real}/${x.tgt}`).join(', ')}.`);
+    {const kk=wrKpis(X.m);if(kk.length)S2.push(`% hoàn thành KPI cá nhân ${fmtM(X.m)}: ${kk.map(k=>`${k.n} ${k.pct}%`).join(', ')}.`)}
     if(t.st)S2.push(`${t.st} hồ sơ treo quá hạn xử lý – yêu cầu xử lý dứt điểm trong tuần.`);
     st2=p>=rc.exp?'ok':p>=rc.exp*.8?'warn':'bad';tiles.splice(1,0,['Tuyển dụng tháng',`${t.real}/${t.tgt}`,`đạt ${wrPct(t.real,t.tgt)} · tiến độ ${Math.round(rc.exp*100)}%`,st2])}
   else S2.push('Chưa có kế hoạch tuyển dụng của tháng.');
@@ -1926,7 +1928,8 @@ function wdData(d){const lk=wkLock();if(lk&&lk.charts)return lk.charts;const X=d
     const by={};S.shops.filter(x=>x.type==='nt').forEach(x=>{const s=shopStaff(x.code);if(s.short>0){const a=x.area||'Khác';(by[a]??={a,gap:0,n:0});by[a].gap+=s.short;by[a].n++}});
     o.short=Object.values(by).sort((a,b)=>b.gap-a.gap||b.n-a.n).slice(0,8)}
   o.legal=X.legalG||[];
-  if(rc){o.rec={real:rc.tot.real,tgt:rc.tot.tgt,exp:rc.exp,w:rc.tot.w,people:rc.rs.map(x=>({n:wrShort(x.s.name),real:x.real,tgt:x.tgt})).sort((a,b)=>b.real-a.real)}}
+  if(rc){o.rec={real:rc.tot.real,tgt:rc.tot.tgt,exp:rc.exp,w:rc.tot.w}}
+  o.kpi=wrKpis(X.m).map(k=>({n:k.n,pct:k.pct,grade:k.grade}));
   return o}
 const WD_C={blue:'#2a78d6',orange:'#eb6834',aqua:'#1baf7a',gray:'#b9b8b2',ink:'#0b0b0b',ink2:'#52514e',ink3:'#8a8984',grid:'#e6e5e0',ok:'#1f8a4c',warn:'#c98500',bad:'#c8372d'};
 const wdT=(x,y,s,o={})=>`<text x="${x}" y="${y}" font-size="${o.fs||11}" fill="${o.c||WD_C.ink2}" text-anchor="${o.a||'start'}"${o.b?' font-weight="700"':''}>${esc(String(s))}</text>`;
@@ -1935,6 +1938,12 @@ function wdRecSvg(R){const W=460,rh=26,L=70,Rm=60,H=R.people.length*rh+24;const 
   let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Thực tuyển so với chỉ tiêu từng người">`;
   R.people.forEach((p,i)=>{const y=i*rh+6,ok=p.real>=p.tgt;s+=`<g><title>${esc(p.n)}: ${p.real}/${p.tgt} người</title>${wdT(L-8,y+13,p.n,{a:'end',c:WD_C.ink})}<rect x="${L}" y="${y+3}" width="${Math.max(2,sx(p.real)-L)}" height="14" rx="3" fill="${ok?WD_C.blue:'#9cc0ec'}"/><line x1="${sx(p.tgt)}" x2="${sx(p.tgt)}" y1="${y}" y2="${y+20}" stroke="${WD_C.ink}" stroke-width="2"/>${wdT(Math.max(sx(p.real),sx(p.tgt))+6,y+14,`${p.real}/${p.tgt}`,{c:WD_C.ink,b:ok})}</g>`});
   const y=H-8;s+=`<rect x="${L}" y="${y-8}" width="12" height="8" rx="2" fill="${WD_C.blue}"/>${wdT(L+16,y,'đạt chỉ tiêu riêng',{fs:10})}<rect x="${L+120}" y="${y-8}" width="12" height="8" rx="2" fill="#9cc0ec"/>${wdT(L+136,y,'chưa đạt',{fs:10})}<line x1="${L+200}" x2="${L+200}" y1="${y-10}" y2="${y+1}" stroke="${WD_C.ink}" stroke-width="2"/>${wdT(L+206,y,'chỉ tiêu riêng',{fs:10})}`;
+  return s+'</svg>'}
+/* % hoàn thành KPI cá nhân: thanh ngang, vạch 100% */
+function wdKpiSvg(K){const W=460,rh=24,L=70,Rm=56,H=K.length*rh+8;const mx=Math.max(100,...K.map(k=>k.pct));const sx=v=>L+(W-L-Rm)*v/mx;
+  let s=`<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Phần trăm hoàn thành KPI cá nhân">`;
+  K.forEach((k,i)=>{const y=i*rh+4,c=k.pct>=+S.config.gradeB?WD_C.blue:k.pct>=+S.config.gradeC?'#6aa1e3':'#a9c8ef';s+=`<g><title>${esc(k.n)}: ${k.pct}% KPI</title>${wdT(L-8,y+13,k.n,{a:'end',c:WD_C.ink})}<rect x="${L}" y="${y+3}" width="${Math.max(2,sx(k.pct)-L)}" height="14" rx="3" fill="${c}"/>${wdT(sx(k.pct)+6,y+14,k.pct+'%',{c:WD_C.ink,b:true})}</g>`});
+  s+=`<line x1="${sx(100)}" x2="${sx(100)}" y1="0" y2="${H-2}" stroke="${WD_C.ink3}" stroke-dasharray="3 3"/>${wdT(sx(100),H,'100%',{a:'middle',fs:9,c:WD_C.ink3})}`;
   return s+'</svg>'}
 /* Biến động quân số tháng: đầu tháng → +tuyển mới → −nghỉ việc → hiện hữu */
 function wdFlowSvg(F){const W=460,H=250,B=212,T=24;const lo=Math.min(F.start,F.cur)-Math.max(F.hires,F.quits)*1.6,hi=Math.max(F.start+F.hires,F.cur)*1.01;const sy=v=>B-(B-T)*(v-lo)/(hi-lo);
@@ -1959,7 +1968,7 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   return `<header class="wd-head"><div class="wd-org">CÔNG TY CỔ PHẦN UPHARMA<br><b>PHÒNG HÀNH CHÍNH – NHÂN SỰ</b></div><div class="wd-ttl"><h1>BÁO CÁO TUẦN ${d.wk}</h1><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])} · số liệu đến ${fmtDY(lk?lk.ref:d.ref)}</p></div><div class="wd-by">Người báo cáo<br><b>${esc(by)}</b></div></header>
   <div class="wb-tiles">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join('')}</div>
   <div class="wd-grid">
-    ${C.rec?`<section class="wd-card"><h3><i>2</i>Tuyển dụng tháng ${+d.X.m.slice(5,7)}${sec('b2').sk?` <span class="wb-pill ${wbSt(sec('b2'))}">${WB_ST[wbSt(sec('b2'))][0]}</span>`:''}</h3>${wdHero(C.rec)}${wdRecSvg(C.rec)}</section>`:''}
+    ${C.rec?`<section class="wd-card"><h3><i>2</i>Tuyển dụng tháng ${+d.X.m.slice(5,7)}${sec('b2').sk?` <span class="wb-pill ${wbSt(sec('b2'))}">${WB_ST[wbSt(sec('b2'))][0]}</span>`:''}</h3>${wdHero(C.rec)}${C.kpi&&C.kpi.length?`<p class="wd-sub">% hoàn thành KPI cá nhân ${fmtM(d.X.m)}</p>${wdKpiSvg(C.kpi)}`:''}</section>`:''}
     ${C.flow?`<section class="wd-card"><h3><i>1</i>Biến động nhân sự tháng ${+d.X.m.slice(5,7)}${sec('b1').sk?` <span class="wb-pill ${wbSt(sec('b1'))}">${WB_ST[wbSt(sec('b1'))][0]}</span>`:''}</h3>${wdFlowSvg(C.flow)}</section>`:''}
   </div>
   <div class="wd-grid">
@@ -1997,7 +2006,7 @@ const WD_CSS=`*{box-sizing:border-box}body{margin:0;background:#f3f4f1;font-fami
 .wd-hero b{font-size:20pt}.wd-hero b small{font-size:11pt;color:#52514e}.wd-hero span{display:block;font-size:8.5pt;color:#52514e;margin:1px 0 4px}.wd-hero strong.ok{color:#17703c}.wd-hero strong.warn{color:#7a5600}.wd-hero strong.bad{color:#a52a21}
 .wd-bar{position:relative;height:8px;background:#eeede8;border-radius:4px;margin-bottom:6px}.wd-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;background:#1f8a4c}.wd-bar i.warn{background:#c98500}.wd-bar i.bad{background:#c8372d}.wd-bar em{position:absolute;top:-3px;width:2px;height:14px;background:#0b0b0b}
 svg text{font-family:Arial,Helvetica,sans-serif}
-.wd-foot{font-size:7.5pt;color:#8a8984;font-style:italic;border-top:1px solid #e6e5e0;padding-top:4px}
+.wd-sub{margin:2px 0 2px;font-size:8.5pt;font-weight:700;color:#52514e}.wd-foot{font-size:7.5pt;color:#8a8984;font-style:italic;border-top:1px solid #e6e5e0;padding-top:4px}
 .tool{position:fixed;top:12px;right:16px;display:flex;gap:8px}.tool button{font:600 13px Arial;padding:8px 14px;border-radius:8px;border:1px solid #1f8a4c;background:#1f8a4c;color:#fff;cursor:pointer}
 @page{size:A4 portrait;margin:0}
 @media print{body{background:#fff}.page{margin:0;box-shadow:none;width:210mm;min-height:auto}.tool{display:none}}
