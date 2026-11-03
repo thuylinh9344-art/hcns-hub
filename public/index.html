@@ -2052,14 +2052,14 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-act="sf-clear"]
 
 /* ===================== Điều chuyển nhân sự cho nhà thuốc sắp mở (sửa trực tiếp trên web) =====================
    Dữ liệu: collection "dcshop" (mỗi nhà mới 1 bản ghi) và "dcmove" (mỗi người đề xuất điều 1 bản ghi; chỉ lưu Mã NV, họ tên lấy từ DSNS khi hiển thị).
-   Nguyên tắc: nhà cũ giữ tối thiểu 1 CHT + 2 NVBH (chưa có CHT: 3 NVBH); nhà sắp mở định biên 2 NVBH; PA A ≤ 30 km, PA B > 30 km theo chính sách điều động. */
+   Nguyên tắc: nhà cũ giữ tối thiểu 1 CHT + 2 NVBH (chưa có CHT: 3 NVBH); nhà sắp mở định biên 2 NVBH; PA A < 20 km (nội bộ), PA B ≥ 20 km theo chính sách điều động. */
 S.dcShops={};S.dcMoves={};S.dcF={prov:'',mgr:'',st:'',q:''};S.dcOpen={};S.dcSub=false;
 (function dcSub(){const go=()=>{if(S.dcSub||!S.db)return;S.dcSub=true;
   S.db.collection('dcshop').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcShops=o;if(S.view==='dieu-chuyen')render()},()=>{});
   S.db.collection('dcmove').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcMoves=o;if(S.view==='dieu-chuyen')render()},()=>{})};
   const t=setInterval(()=>{if(S.db){go();clearInterval(t)}},400)})();
 const DC_ST=[['de-xuat','Đề xuất'],['qlkv-ok','QLKV đồng ý'],['da-qd','Đã ra quyết định'],['da-di','Đã đi làm'],['huy','Hủy / thay người']];
-const DC_PA=[['A','A · ≤ 30 km'],['B','B · > 30 km'],['?','Chưa rõ']];
+const DC_PA=[['A','A · < 20 km'],['B','B · ≥ 20 km'],['?','Chưa rõ']];
 /* Điều chuyển không xét học việc: chỉ tra DSNS U (không gồm sheet TTS); người trạng thái Học việc bị đánh dấu */
 const dcPerson=code=>{const c=String(code||'').trim().toUpperCase();if(!c)return null;return sysRows().find(r=>String(r.code).toUpperCase()===c)||null};
 const dcLearner=p=>!!p&&/học việc/i.test(p.status||'');
@@ -2091,7 +2091,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
     <div class="stat"><div class="k">NVBH đã có tại nhà mới</div><div class="v">${T.have}</div><div class="s">nhập tay khi nhà đã nhận người</div></div></div>
   <details class="panel dc-rule"><summary><b>Nguyên tắc điều chuyển</b> <span class="note">bấm để xem</span></summary><ul>
     <li>Nhà cũ giữ tối thiểu <b>1 CHT + 2 NVBH</b>; nhà chưa có CHT giữ <b>3 NVBH</b>. Vượt định biên thì điều đi hỗ trợ. Chỉ tính nhân sự chính thức và thử việc: <b>không xét học việc</b>, không tính người báo nghỉ, thai sản, không lương.</li>
-    <li>Nhà sắp mở định biên <b>2 NVBH</b>. Ưu tiên khoảng cách: <b>PA A</b> trong 30 km; <b>PA B</b> trên 30 km, áp chính sách điều động hiện hành.</li>
+    <li>Nhà sắp mở định biên <b>2 NVBH</b>. Ưu tiên khoảng cách: <b>PA A</b> điều chuyển nội bộ trong bán kính 20 km; <b>PA B</b> từ 20 km trở lên, áp dụng chính sách điều động.</li>
     <li>Nhà chưa có CHT nhưng có từ 3 chính thức: giữ đủ 3 chính thức (mầm CHT), ưu tiên điều người thử việc.</li>
     <li>Người đi hưởng chính sách điều động; chỉ tiêu số lượng/chất lượng nhân sự trong KPI tháng và Thưởng chất lượng nhân sự quý của CHT, QLC2, QLC3 tính cả người đã điều. QLKV xác nhận khoảng cách trước khi ra quyết định.</li></ul></details>
   <div class="row" style="flex-wrap:wrap;gap:8px;margin:12px 0"><select id="dcProv"><option value="">Tất cả tỉnh</option>${opt(provs.map(p=>[p,p]),f.prov)}</select><select id="dcMgr"><option value="">Tất cả QLKV</option>${opt(mgrs.map(p=>[p,p]),f.mgr)}</select>
