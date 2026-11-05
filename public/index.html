@@ -284,7 +284,7 @@ table.recbad tbody td{background:color-mix(in srgb,var(--bad-soft) 55%,var(--sur
 <script src="hub-runtime.js"></script>
 <script>
 /* ===================== Hằng số & trạng thái ===================== */
-const VIEWS=[['tong-quan','Tổng quan'],['bao-cao-tuan','Báo cáo tuần'],['ca-nhan','Nhật ký cá nhân'],['bien-ban','Biên bản họp'],['kpi','KPI & hiệu suất'],['phan-cong','Phân công & hạng D'],['he-thong','Nhân sự hệ thống'],['dieu-chuyen','Điều chuyển nhà mới'],['nghi-viec','Nghỉ việc theo tỉnh'],['bc-nhan-su','Báo cáo nhân sự'],['tuyen-dung','Hồ sơ tuyển dụng'],['okr','OKR phòng'],['okr-ca-nhan','OKR cá nhân'],['bao-cao','Báo cáo'],['cau-hinh','Nhân sự & danh mục']];
+const VIEWS=[['tong-quan','Tổng quan'],['bao-cao-tuan','Báo cáo tuần'],['ca-nhan','Nhật ký cá nhân'],['kpi','KPI & hiệu suất'],['phan-cong','Phân công & hạng D'],['he-thong','Nhân sự hệ thống'],['dieu-chuyen','Điều chuyển nhà mới'],['nghi-viec','Nghỉ việc theo tỉnh'],['bc-nhan-su','Báo cáo nhân sự'],['tuyen-dung','Hồ sơ tuyển dụng'],['okr','OKR phòng'],['okr-ca-nhan','OKR cá nhân'],['bao-cao','Báo cáo'],['cau-hinh','Nhân sự & danh mục']];
 const STATUS=[['todo','Cần làm'],['doing','Đang làm'],['review','Chờ duyệt'],['done','Hoàn thành']];
 const PRIO={cao:'Cao',tb:'Trung bình',thap:'Thấp'};
 const LOG_ST=['Hoàn thành','Đang thực hiện','Chậm tiến độ','Tạm dừng / Hủy'];
@@ -417,7 +417,7 @@ window.addEventListener('hashchange',()=>{readHash();render()});
 function render(){
   const ae=document.activeElement;const fid=ae&&ae.id&&!$('#dlg').contains(ae)?ae.id:null;let sel=null;try{sel=fid?[ae.selectionStart,ae.selectionEnd]:null}catch(_){}
   const over=S.tasks.filter(overdue).length;
-  $('#nav').innerHTML=VIEWS.map(([k,l])=>`<a href="#${k}" ${S.view===k?'aria-current="page"':''}>${l}${k==='bien-ban'&&S.tasks.filter(t=>t.meetingId&&overdue(t)).length?`<span class="cnt">${S.tasks.filter(t=>t.meetingId&&overdue(t)).length}</span>`:''}${k==='tuyen-dung'&&recStaleN()?`<span class="cnt">${recStaleN()}</span>`:''}${k==='nghi-viec'&&nvRedN()?`<span class="cnt">${nvRedN()}</span>`:''}${k==='cht'&&chtLateN()?`<span class="cnt">${chtLateN()}</span>`:''}${k==='okr-ca-nhan'&&opWaitN()?`<span class="cnt">${opWaitN()}</span>`:''}</a>`).join('');
+  $('#nav').innerHTML=VIEWS.map(([k,l])=>`<a href="#${k}" ${S.view===k?'aria-current="page"':''}>${l}${k==='ca-nhan'&&S.role!=='staff'&&S.tasks.filter(t=>t.meetingId&&overdue(t)).length?`<span class="cnt">${S.tasks.filter(t=>t.meetingId&&overdue(t)).length}</span>`:''}${k==='tuyen-dung'&&recStaleN()?`<span class="cnt">${recStaleN()}</span>`:''}${k==='nghi-viec'&&nvRedN()?`<span class="cnt">${nvRedN()}</span>`:''}${k==='cht'&&chtLateN()?`<span class="cnt">${chtLateN()}</span>`:''}${k==='okr-ca-nhan'&&opWaitN()?`<span class="cnt">${opWaitN()}</span>`:''}</a>`).join('');
   $('#sideFoot').textContent=S.dbState==='ok'?(S.canWrite?'Dữ liệu dùng chung, cập nhật trực tiếp':'Chế độ chỉ xem'):S.dbState==='wait'?'Đang kết nối dữ liệu…':'Chưa kết nối được dữ liệu';
   const m=$('#main');
   if(S.dbState==='none'||S.dbState==='err'){m.innerHTML=window.HUB_STANDALONE?`<div class="empty">Tài khoản ${esc(window.HUB_USER_EMAIL||'')} chưa đọc được dữ liệu Bàn điều hành${window.HUB_LAST_ERROR&&window.HUB_LAST_ERROR.code?' (mã lỗi: '+esc(window.HUB_LAST_ERROR.code)+')':''}. Nếu mã lỗi là permission-denied: kiểm tra email này đã có trong Firestore Rules và rules đã Publish, đợi 1 phút rồi tải lại trang.</div>`:`<div class="empty">Trang chưa kết nối được kho dữ liệu dùng chung. Hãy mở trang khi đã đăng nhập claude.ai, rồi tải lại.</div>`;return}
@@ -482,7 +482,7 @@ function vMe(){
   `<div class="chips">${st.map(x=>`<button class="chip" data-act="me" data-id="${x.id}" aria-pressed="${x.id===s.id}">${esc(x.name)}${(x.status||'active')!=='active'?' (nghỉ)':''}</button>`).join('')}</div>
   <div class="stats">
     <div class="stat"><div class="k">KPI tháng</div><div class="v">${k.has?nf(k.val):'—'}</div><div class="s">/ ${nf(k.max)} · ${k.has?'loại '+k.grade:'chưa có nhật ký'}</div></div>
-    <div class="stat ${k.over?'ok':''}"><div class="k">Điểm thực đạt</div><div class="v">${nf(k.raw)}</div><div class="s">${k.over?'vượt trần, tính tối đa '+nf(k.max):k.pen?'trừ lỗi '+nf(k.pen):'trước trần 1.000'}</div></div>
+    <div class="stat ${k.over?'ok':''}"><div class="k">Điểm thực đạt</div><div class="v">${nf(k.raw)}</div><div class="s">${k.over?'vượt trần, tính tối đa '+nf(k.max):k.pen?'trừ lỗi '+nf(k.pen):'trước trần '+nf(k.max)}</div></div>
     <div class="stat"><div class="k">Ngày báo cáo</div><div class="v">${k.days}</div><div class="s">${k.n} dòng · ${k.codes} mã việc</div></div>
     <div class="stat ${k.noQty?'warn':''}"><div class="k">Cần bổ sung</div><div class="v">${k.noQty}</div><div class="s">dòng xong chưa nhập SL</div></div>
     <div class="stat"><div class="k">Hiệu suất</div><div class="v">${e.has?nf(e.score):'—'}</div><div class="s">${e.has?'hạng '+e.rank+(s.dCurrent?' · hiện hữu '+esc(s.dCurrent):''):'chưa có phân công'}</div></div>
@@ -511,7 +511,7 @@ function vMe(){
     </div>
     <div class="stack">
       <div class="panel"><h2>Điểm theo mảng</h2>${ap.length?ap.map(([a,p])=>`<div class="load" style="grid-template-columns:120px minmax(0,1fr) 60px"><span class="nm">${esc(a)}</span><div class="bar"><i style="width:${p/apMax*100}%"></i></div><span class="num r note">${nf(r1(p))}</span></div>`).join(''):'<p class="note">Chưa có điểm.</p>'}</div>
-      <div class="panel"><h2>Việc được giao <small>${myTasks.length} đang mở</small></h2>${myTasks.length?`<ul class="dl">${myTasks.slice(0,8).map(taskLine).join('')}</ul>`:'<p class="note">Không có việc đang mở.</p>'}<button class="btn sm mt" data-act="new-task" data-owner="${s.id}">+ Giao việc</button></div>
+      ${mtMyPanel(s)}
       <div class="panel"><h2>Nhà thuốc phụ trách ${fmtM(m)} <small>${myShops.length}</small></h2>${myShops.length?Object.entries(byArea).map(([a,cs])=>`<p style="margin:0 0 6px"><b style="font-size:12.5px">${esc(a)} (${cs.length})</b><br><span class="mini">${cs.map(esc).join(', ')}</span></p>`).join(''):`<p class="note">Chưa được phân công nhà thuốc trong tháng này. <a href="#phan-cong">Phân công</a></p>`}</div>
     </div>
   </div>`;
@@ -2527,6 +2527,11 @@ const mtBox=(t,label)=>t?`<button type="button" class="mt-tick ${isDone(t)?'on':
 const mtDoneI=(mt,it)=>{const p=mtProg(mt,it);return p.n>0&&p.d===p.n};
 const mtCanTick=t=>S.canWrite&&(S.role!=='staff'||t.owner===S.me);
 function mtProg(mt,it){const ts=S.tasks.filter(t=>t.meetingId===mt.id&&t.id.startsWith('mt_'+mt.id.replace(/^mt_/,'')+'_'+it.id+'_'));return {n:ts.length,d:ts.filter(isDone).length}}
+function mtMyPanel(s){const m=S.month;const mine=S.tasks.filter(t=>t.owner===s.id);const open=mine.filter(t=>!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));
+  const done=mine.filter(t=>isDone(t)&&(!t.doneAt||ymOf(t.doneAt)===m)).sort((a,b)=>String(b.doneAt||'').localeCompare(String(a.doneAt||'')));const adm=S.role!=='staff'&&S.canWrite;
+  const row=t=>{const d=mtDays(t.due);const dn=isDone(t);return `<div class="mt-ri ${dn?'ok':overdue(t)?'bad':d!=null&&d<=3?'warn':''}">${mtBox(t,'')}<span style="flex:1;${dn?'text-decoration:line-through;opacity:.7':''}">${esc(t.title)}${!dn&&t.note?`<div class="mini" style="white-space:pre-line">${esc(t.note.split('\nTheo biên bản')[0])}</div>`:''}</span><span class="num mini">${t.due?fmtD(t.due):'—'}${!dn&&overdue(t)?' · quá hạn':!dn&&d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`};
+  return `<div class="panel"><h2>Việc cần làm <small>theo biên bản họp tuần · ${open.length} chưa xong</small></h2>${open.length||done.length?open.map(row).join('')+(done.length?`<div class="mini" style="margin:8px 0 2px">Đã xong ${fmtM(m)}</div>`+done.map(row).join(''):''):'<p class="note">Chưa có việc nào.</p>'}
+    <p class="mini" style="margin:8px 0 0">Tích ✓ khi hoàn thành.</p>${adm?`<div class="row" style="gap:6px;margin-top:8px"><label class="btn sm" style="cursor:pointer">Nhập biên bản họp (.json)<input type="file" accept=".json,application/json" id="mtImport" hidden></label><button class="btn sm" data-act="mt-remind">Sao chép tin nhắc việc</button></div>`:''}</div>`}
 function vMeet(){
   const mt=mtCur();const list=mtSorted();const dis=S.canWrite?'':'disabled';
   const sel=list.length?`<select id="mtSel" aria-label="Chọn biên bản">${list.map(x=>`<option value="${esc(x.id)}" ${mt&&x.id===mt.id?'selected':''}>Họp ${fmtDY(x.date)}</option>`).join('')}</select>`:'';
@@ -2574,7 +2579,7 @@ function mtItemDlg(mt,it){const isNew=!it;it=it||{id:Math.random().toString(36).
     <label class="full">Mục tiêu chung<input name="goal" value="${esc(it.goal||'')}"></label>
     <div class="full" style="grid-column:1/-1"><b style="font-size:13px">Chi tiết công việc từng người</b><div id="mtDRows" style="margin-top:6px">${(it.details||[]).map(drow).join('')}</div><button type="button" class="btn sm" data-act="mt-add-d">+ Thêm dòng</button></div>
   </div>`,`<div>${!isNew?`<button type="button" class="btn danger" data-act="mt-del-item" data-id="${esc(it.id)}">Xóa nội dung</button>`:''}</div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="mt-save-item" data-id="${esc(it.id)}">Lưu</button></div>`)}
-function mtAdjDlg(mt,a){const isNew=!a;a=a||{staffId:'',pts:'',reason:'',month:ymOf(mt.date)};
+function mtAdjDlg(mt,a){const isNew=!a;a=a||{staffId:S.role!=='staff'?S.me:'',pts:'',reason:'',month:mt?ymOf(mt.date):S.month,date:TODAY};
   openDlg(isNew?'Thêm điểm cộng / trừ KPI':'Sửa điểm cộng / trừ KPI',`<div class="form">
     <label>Nhân viên<select name="sid" required><option value="">— Chọn —</option>${activeStaff().map(s=>`<option value="${esc(s.id)}" ${a.staffId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
     <label>Điểm (trừ ghi số âm, VD -30)<input type="number" step="any" name="pts" required value="${esc(a.pts)}"></label>
@@ -2591,7 +2596,7 @@ document.addEventListener('click',async e=>{const el=e.target.closest('[data-act
   if(a==='mt-tick'){const t=S.tasks.find(x=>x.id===id);if(!t)return;if(!mtCanTick(t)){toast(S.role==='staff'?'Chỉ tích được việc của mình':'Bạn chỉ có quyền xem');return}
     const done=!isDone(t);const body={...clean(t),status:done?'done':'doing',progress:done?100:0,doneAt:done?TODAY:null};t.status=body.status;t.progress=body.progress;t.doneAt=body.doneAt;render();
     write('tasks/'+t.id,body).then(()=>toast(done?'Đã tích hoàn thành':'Đã bỏ tích')).catch(()=>{});return}
-  if(!needWrite())return;const mt=mtCur();
+  if(!needWrite()||S.role==='staff')return;const mt=mtCur();
   if(a==='mt-new'){mtHeadDlg(null);return}
   if(a==='mt-edit-head'){mtHeadDlg(mt);return}
   if(a==='mt-save-head'){e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())return;const fd=Object.fromEntries(new FormData(f));
@@ -2609,10 +2614,10 @@ document.addEventListener('click',async e=>{const el=e.target.closest('[data-act
     const i=items.findIndex(x=>x.id===id);if(i>=0)items[i]=it;else items.push(it);mtSave({...mt,items}).then(()=>toast('Đã lưu, đã cập nhật nhắc việc'));closeDlg();return}
   if(a==='mt-del-item'){e.preventDefault();if(mtArmed!==a+id){mtArmed=a+id;el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(mtArmed===a+id)mtArmed=null},4000);return}
     mtSave({...mt,items:(mt.items||[]).filter(x=>x.id!==id)}).then(()=>toast('Đã xóa nội dung'));closeDlg();return}
-  if(a==='mt-adj-add'){mtAdjDlg(mt,null);return}
+  if(a==='mt-adj-add'){mtAdjDlg(null,null);return}
   if(a==='mt-adj-edit'){mtAdjDlg(mt,S.kadj.find(x=>x.id===id));return}
   if(a==='mt-adj-save'){e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())return;const fd=Object.fromEntries(new FormData(f));if(!(+fd.pts)){toast('Nhập số điểm khác 0');return}
-    const kid=id||('k_'+mt.id.replace(/^mt_/,'')+'_'+Math.random().toString(36).slice(2,7));write('kadj/'+kid,{staffId:fd.sid,pts:+fd.pts,reason:fd.reason.trim(),month:fd.month,meetingId:mt.id,date:mt.date,updatedAt:new Date().toISOString()}).then(()=>toast('Đã cập nhật KPI'));closeDlg();return}
+    const old=id?S.kadj.find(x=>x.id===id):null;const kid=id||('k_'+TODAY+'_'+Math.random().toString(36).slice(2,7));write('kadj/'+kid,{staffId:fd.sid,pts:+fd.pts,reason:fd.reason.trim(),month:fd.month,meetingId:old?old.meetingId||'':'',date:old?old.date||TODAY:TODAY,updatedAt:new Date().toISOString()}).then(()=>toast('Đã cập nhật KPI'));closeDlg();return}
   if(a==='mt-adj-del'){e.preventDefault();del('kadj/'+id);toast('Đã xóa');closeDlg();return}
 });
 document.addEventListener('change',async e=>{const t=e.target;
@@ -2641,9 +2646,11 @@ kbRows=function(m){const c=kbCfg();return _kbRowsMt(m).map(r=>{const a=kadjSum(m
 /* Nhật ký cá nhân: hiện điểm cộng/trừ theo biên bản + việc sắp đến hạn */
 const _vMeMt=vMe;
 vMe=function(){const h=_vMeMt();const sid=S.me,m=S.month;const xs=kadjOf(m,sid);const ts=S.tasks.filter(t=>t.owner===sid&&t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));
-  if(!xs.length&&!ts.length)return h;
-  const box=`<div class="grid2" style="margin-bottom:14px">${ts.length?`<div class="panel"><h2>Việc từ biên bản họp <small>${ts.length} việc chưa xong</small></h2>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}">${mtBox(t,'')}<span style="flex:1">${esc(t.title)}${t.note?`<div class="mini" style="white-space:pre-line">${esc(t.note.split('\nTheo biên bản')[0])}</div>`:''}</span><span class="num">${t.due?fmtDY(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}<p class="mini" style="margin:6px 0 0">Tích ✓ khi hoàn thành.</p></div>`:'<div></div>'}
+  
+  const box0=`<div class="grid2" style="margin-bottom:14px">${ts.length?`<div class="panel"><h2>Việc từ biên bản họp <small>${ts.length} việc chưa xong</small></h2>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}">${mtBox(t,'')}<span style="flex:1">${esc(t.title)}${t.note?`<div class="mini" style="white-space:pre-line">${esc(t.note.split('\nTheo biên bản')[0])}</div>`:''}</span><span class="num">${t.due?fmtDY(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}<p class="mini" style="margin:6px 0 0">Tích ✓ khi hoàn thành.</p></div>`:'<div></div>'}
     ${xs.length?`<div class="panel"><h2>Điểm cộng / trừ KPI ${fmtM(m)} <small>theo biên bản họp, đã tính vào KPI tháng</small></h2>${xs.map(a=>`<div class="mt-ri ${+a.pts<0?'bad':'ok'}"><span>${esc(a.reason)} <span class="mini">· họp ${fmtD(a.date)}</span></span><b class="num">${+a.pts>0?'+':''}${nf(a.pts)}đ</b></div>`).join('')}</div>`:''}</div>`;
+  const adm=S.role!=='staff'&&S.canWrite;if(!xs.length&&!adm)return h;
+  const box=`<div class="panel" style="margin-bottom:14px"><h2>Điểm cộng / trừ KPI ${fmtM(m)} <small>theo biên bản họp, đã tính vào KPI tháng</small>${adm?` <button class="btn sm" data-act="mt-adj-add">+ Thêm</button>`:''}</h2>${xs.length?xs.map(a=>`<div class="mt-ri ${+a.pts<0?'bad':'ok'}"><span style="flex:1">${esc(a.reason)} <span class="mini">${a.date?'· họp '+fmtD(a.date):''}</span></span><b class="num">${+a.pts>0?'+':''}${nf(a.pts)}đ</b>${adm?`<button class="btn sm ghost" data-act="mt-adj-edit" data-id="${esc(a.id)}">Sửa</button>`:''}</div>`).join(''):'<p class="note">Chưa có điểm cộng/trừ tháng này.</p>'}</div>`;
   const i=h.indexOf('<div class="stats">');return i>=0?h.slice(0,i)+box+h.slice(i):box+h};
 
 /* Dọn 1 lần: xóa toàn bộ việc giao cũ (mục Công việc đã bỏ), chỉ giữ việc sinh từ biên bản họp */
