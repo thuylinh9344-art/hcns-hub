@@ -50,6 +50,9 @@ service cloud.firestore {
     match /hcns_hub/main/tasks/{id} {
       allow read: if hubStaff() && resource.data.owner == mySid();
     }
+    match /hcns_hub/main/kadj/{id} {
+      allow read: if hubStaff() && resource.data.staffId == mySid();
+    }
     match /hcns_hub/main/okrp/{id} {
       allow read: if hubStaff() && resource.data.staffId == mySid();
       // Tự lập OKR: chỉ được để Nháp hoặc Gửi duyệt, không tự duyệt.

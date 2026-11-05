@@ -251,6 +251,15 @@ tr.recalert td{background:var(--bad-soft)} tr.recalert td:first-child{box-shadow
 table.recbad tbody td{background:color-mix(in srgb,var(--bad-soft) 55%,var(--surface))}
 @media (max-width:860px){.lf{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.lf .w2{grid-column:1/-1}}
 .op-krrow{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px}.op-src{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:6px}.op-src select{min-width:0}@media (max-width:620px){.op-src{grid-template-columns:1fr}}
+.mt-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.mt-item{display:grid;grid-template-columns:200px 150px minmax(0,1fr) 150px;gap:14px;align-items:start}.mt-item.late{border-color:var(--bad)}
+.mt-l b{display:block;margin-top:6px;font-size:15px}.mt-p{display:flex;flex-wrap:wrap;gap:4px}.chip.sm{font-size:12px;padding:2px 8px}
+.mt-d p{margin:0 0 6px;font-size:13px}.mt-row{display:grid;grid-template-columns:90px 120px minmax(0,1fr);gap:8px;font-size:13px;padding:3px 0}.mt-row .pill{justify-self:start}
+.mt-r{display:grid;gap:6px;justify-items:end;text-align:right}.mt-r b{font-size:18px}
+.mt-rem{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}.mt-ri{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:5px 8px;border-radius:6px;background:var(--bg);margin-top:4px}
+.mt-ri.bad{background:#fde8e6}.mt-ri.warn{background:#fff3e0}.mt-ri.ok{background:#e7f4ec}
+.mt-drow{display:grid;grid-template-columns:130px 130px minmax(0,1fr) 34px;gap:6px;margin-bottom:6px}
+@media (max-width:900px){.mt-item{grid-template-columns:1fr}.mt-r{justify-items:start;text-align:left}.mt-drow{grid-template-columns:1fr 1fr}.mt-drow [data-dt]{grid-column:1/-1}}
 </style>
 </head>
 <body>
@@ -271,7 +280,7 @@ table.recbad tbody td{background:color-mix(in srgb,var(--bad-soft) 55%,var(--sur
 <script src="hub-runtime.js"></script>
 <script>
 /* ===================== Hằng số & trạng thái ===================== */
-const VIEWS=[['tong-quan','Tổng quan'],['bao-cao-tuan','Báo cáo tuần'],['ca-nhan','Nhật ký cá nhân'],['cong-viec','Công việc'],['kpi','KPI & hiệu suất'],['phan-cong','Phân công & hạng D'],['he-thong','Nhân sự hệ thống'],['dieu-chuyen','Điều chuyển nhà mới'],['nghi-viec','Nghỉ việc theo tỉnh'],['bc-nhan-su','Báo cáo nhân sự'],['tuyen-dung','Hồ sơ tuyển dụng'],['okr','OKR phòng'],['okr-ca-nhan','OKR cá nhân'],['bao-cao','Báo cáo'],['cau-hinh','Nhân sự & danh mục']];
+const VIEWS=[['tong-quan','Tổng quan'],['bao-cao-tuan','Báo cáo tuần'],['ca-nhan','Nhật ký cá nhân'],['bien-ban','Biên bản họp'],['kpi','KPI & hiệu suất'],['phan-cong','Phân công & hạng D'],['he-thong','Nhân sự hệ thống'],['dieu-chuyen','Điều chuyển nhà mới'],['nghi-viec','Nghỉ việc theo tỉnh'],['bc-nhan-su','Báo cáo nhân sự'],['tuyen-dung','Hồ sơ tuyển dụng'],['okr','OKR phòng'],['okr-ca-nhan','OKR cá nhân'],['bao-cao','Báo cáo'],['cau-hinh','Nhân sự & danh mục']];
 const STATUS=[['todo','Cần làm'],['doing','Đang làm'],['review','Chờ duyệt'],['done','Hoàn thành']];
 const PRIO={cao:'Cao',tb:'Trung bình',thap:'Thấp'};
 const LOG_ST=['Hoàn thành','Đang thực hiện','Chậm tiến độ','Tạm dừng / Hủy'];
@@ -388,11 +397,13 @@ async function init(){
   db.doc('sys/dsns').onSnapshot(s=>{S.sys=s.exists?s.data():{};_sysCache=null;render()},()=>{});
   db.doc('rec/cv').onSnapshot(s=>{S.rec=s.exists?s.data():{};_recCache=null;render()},()=>{});
   db.doc('cht/meta').onSnapshot(s=>{S.chtMeta=s.exists?s.data():{};render()},()=>{});
+  db.collection('meetings').onSnapshot(snap=>{S.meetings=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
+  db.collection('kadj').onSnapshot(snap=>{S.kadj=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('okrp').onSnapshot(snap=>{S.okrp=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('members').onSnapshot(snap=>{S.members=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('chtplan').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.chtPlan=o;render();setTimeout(chtMigrate,800)},()=>{});
   window.claude.use('mcp').then(m=>{S.mcp=m;render()}).catch(()=>{});
-  const user=await window.claude.use('user');if(user){const c=await user.can('data.write');if(c===false){S.canWrite=false;render()}try{const me=user.me?await user.me():null;S.who=(me&&(me.name||me.email))||''}catch(_){}}
+  const user=await window.claude.use('user');if(user){const c=await user.can('data.write');if(c===false){S.canWrite=false;render()}try{const me=user.me?await user.me():null;S.who=(me&&(me.name||me.email))||'';const em=String((me&&me.email)||window.HUB_USER_EMAIL||'').toLowerCase();S.isLinh=em?em==='thuylinh9344@gmail.com':(!window.HUB_STANDALONE&&!!(user.isOwner&&await user.isOwner()));render()}catch(_){}}
   S.dl=await window.claude.use('downloads');render();
 }
 function readHash(){const h=location.hash.replace('#','');if(VIEWS.some(v=>v[0]===h))S.view=h}
@@ -402,12 +413,12 @@ window.addEventListener('hashchange',()=>{readHash();render()});
 function render(){
   const ae=document.activeElement;const fid=ae&&ae.id&&!$('#dlg').contains(ae)?ae.id:null;let sel=null;try{sel=fid?[ae.selectionStart,ae.selectionEnd]:null}catch(_){}
   const over=S.tasks.filter(overdue).length;
-  $('#nav').innerHTML=VIEWS.map(([k,l])=>`<a href="#${k}" ${S.view===k?'aria-current="page"':''}>${l}${k==='cong-viec'&&over?`<span class="cnt">${over}</span>`:''}${k==='tuyen-dung'&&recStaleN()?`<span class="cnt">${recStaleN()}</span>`:''}${k==='nghi-viec'&&nvRedN()?`<span class="cnt">${nvRedN()}</span>`:''}${k==='cht'&&chtLateN()?`<span class="cnt">${chtLateN()}</span>`:''}${k==='okr-ca-nhan'&&opWaitN()?`<span class="cnt">${opWaitN()}</span>`:''}</a>`).join('');
+  $('#nav').innerHTML=VIEWS.map(([k,l])=>`<a href="#${k}" ${S.view===k?'aria-current="page"':''}>${l}${k==='bien-ban'&&S.tasks.filter(t=>t.meetingId&&overdue(t)).length?`<span class="cnt">${S.tasks.filter(t=>t.meetingId&&overdue(t)).length}</span>`:''}${k==='tuyen-dung'&&recStaleN()?`<span class="cnt">${recStaleN()}</span>`:''}${k==='nghi-viec'&&nvRedN()?`<span class="cnt">${nvRedN()}</span>`:''}${k==='cht'&&chtLateN()?`<span class="cnt">${chtLateN()}</span>`:''}${k==='okr-ca-nhan'&&opWaitN()?`<span class="cnt">${opWaitN()}</span>`:''}</a>`).join('');
   $('#sideFoot').textContent=S.dbState==='ok'?(S.canWrite?'Dữ liệu dùng chung, cập nhật trực tiếp':'Chế độ chỉ xem'):S.dbState==='wait'?'Đang kết nối dữ liệu…':'Chưa kết nối được dữ liệu';
   const m=$('#main');
   if(S.dbState==='none'||S.dbState==='err'){m.innerHTML=window.HUB_STANDALONE?`<div class="empty">Tài khoản ${esc(window.HUB_USER_EMAIL||'')} chưa đọc được dữ liệu Bàn điều hành${window.HUB_LAST_ERROR&&window.HUB_LAST_ERROR.code?' (mã lỗi: '+esc(window.HUB_LAST_ERROR.code)+')':''}. Nếu mã lỗi là permission-denied: kiểm tra email này đã có trong Firestore Rules và rules đã Publish, đợi 1 phút rồi tải lại trang.</div>`:`<div class="empty">Trang chưa kết nối được kho dữ liệu dùng chung. Hãy mở trang khi đã đăng nhập claude.ai, rồi tải lại.</div>`;return}
   if(S.loaded.size<COLS.length){m.innerHTML=`<div class="empty">Đang tải dữ liệu phòng HCNS…</div>`;return}
-  const fn={'tong-quan':vOverview,'ca-nhan':vMe,'cong-viec':vTasks,'kpi':vKpi,'phan-cong':vAssign,'he-thong':vSys,'dieu-chuyen':vDc,'cht':vCht,'nghi-viec':vNv,'bc-nhan-su':vHr,'tuyen-dung':vRec,'okr':vOkr,'okr-ca-nhan':vOkrP,'bao-cao':vReport,'bao-cao-tuan':vWeekly,'cau-hinh':vConfig}[S.view];
+  const fn={'tong-quan':vOverview,'ca-nhan':vMe,'cong-viec':vTasks,'bien-ban':vMeet,'kpi':vKpi,'phan-cong':vAssign,'he-thong':vSys,'dieu-chuyen':vDc,'cht':vCht,'nghi-viec':vNv,'bc-nhan-su':vHr,'tuyen-dung':vRec,'okr':vOkr,'okr-ca-nhan':vOkrP,'bao-cao':vReport,'bao-cao-tuan':vWeekly,'cau-hinh':vConfig}[S.view];
   m.innerHTML=(S.canWrite?'':`<div class="banner">Bạn đang ở chế độ chỉ xem. Chủ trang có thể nâng quyền lên Contributor để bạn cập nhật.</div>`)+fn();
   if(fid){const el=document.getElementById(fid);if(el){el.focus();try{sel&&el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
 }
@@ -1562,7 +1573,7 @@ function vRecKpi(m){
     <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
     <td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
     <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
-  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${nf(Math.round(sum.real*100)/100)}</b></td><td colspan="6" class="mini">3 học việc tính = 1 NVBH · Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
+  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${nf(Math.round(sum.real*100)/100)}</b></td><td colspan="6" class="mini">3 học việc tính = 1 NVBH · Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)&&S.isLinh?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
   <div class="row mt">${S.canWrite?`<button class="btn" data-act="rk-eff">Ghi số tuyển vào bảng Hiệu suất ${fmtM(m)}</button>`:''}<span class="note">Bôi đỏ khi tổng dưới 300/500.</span></div>
   <details class="mt"><summary class="note">Cách tính</summary><ul class="note">
     <li>Thực tuyển: người nhận việc trong tháng theo DSNS và đang làm; ai nghỉ việc thì tự trừ ra khi cập nhật DSNS, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người tuyển vị trí quản lý; khối văn phòng và kho gán cho người phụ trách khối văn phòng. QLKV quy đổi 1 người.</li>
@@ -2046,7 +2057,11 @@ const _wbBrief1=wbBrief;wbBrief=function(d){const B=_wbBrief1(d);B.tiles=(B.tile
    Lọc toàn bộ mục (thẻ số, việc cần xử lý, biến động, quân số…) theo tập nhà thuốc khớp bộ lọc. Khi đang lọc, nhân sự khối văn phòng – kho không tính. */
 S.sysF.prov=S.sysF.prov||'';S.sysF.mgr=S.sysF.mgr||'';S.sysF.own=S.sysF.own||'';
 const sfActive=()=>!!(S.sysF.prov||S.sysF.mgr||S.sysF.own);
-function sfShops(){const f=S.sysF,m=S.month;return S.shops.filter(x=>x.type==='nt'&&(!f.prov||(x.area||'Chưa xác định')===f.prov)&&(!f.mgr||(x.mgr||'')===f.mgr)&&(!f.own||shopOwner(x.code,m)===f.own))}
+const SF_HC='__hc';
+function sfShops(){const f=S.sysF,m=S.month;if(f.mgr===SF_HC)return [];return S.shops.filter(x=>x.type==='nt'&&(!f.prov||(x.area||'Chưa xác định')===f.prov)&&(!f.mgr||(x.mgr||'')===f.mgr)&&(!f.own||shopOwner(x.code,m)===f.own))}
+/* Hậu cần (kho, văn phòng – không gắn nhà thuốc): tính vào khi lọc theo tỉnh, hoặc chọn riêng "Khối Hậu cần" */
+const sfHcOn=()=>{const f=S.sysF;return f.mgr===SF_HC||(!f.mgr&&!f.own)};
+const sfHcRow=r=>{const f=S.sysF;if(r.shop)return false;if(!f.prov)return true;const p=normName(f.prov);return normName(r.area)===p||normName(r.dept).includes(p)||normName(r.block).includes(p)};
 function sfBar(){const f=S.sysF,m=S.month,nt=S.shops.filter(x=>x.type==='nt');
   const provs=[...new Set(nt.map(x=>x.area||'Chưa xác định'))].sort((a,b)=>a.localeCompare(b,'vi'));
   const mgrs=[...new Set(nt.map(x=>x.mgr).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
@@ -2055,14 +2070,14 @@ function sfBar(){const f=S.sysF,m=S.month,nt=S.shops.filter(x=>x.type==='nt');
   const n=sfActive()?sfShops().length:nt.length;
   return `<div class="panel sf-bar"><div class="row" style="flex-wrap:wrap;gap:8px;align-items:center"><b style="font-size:13px">Lọc theo</b>
     <select id="sfProv" aria-label="Lọc theo tỉnh"><option value="">Tất cả tỉnh</option>${provs.map(p=>opt(p,p,f.prov)).join('')}</select>
-    <select id="sfMgr" aria-label="Lọc theo quản lý khu vực"><option value="">Tất cả quản lý (QLKV)</option>${mgrs.map(p=>opt(p,p,f.mgr)).join('')}</select>
+    <select id="sfMgr" aria-label="Lọc theo quản lý khu vực"><option value="">Tất cả quản lý (QLKV)</option>${opt(SF_HC,'Khối Hậu cần (kho, văn phòng)',f.mgr)}${mgrs.map(p=>opt(p,p,f.mgr)).join('')}</select>
     <select id="sfOwn" aria-label="Lọc theo HCNS phụ trách"><option value="">Tất cả HCNS phụ trách</option>${owns.map(s=>opt(s.id,s.name,f.own)).join('')}</select>
-    ${sfActive()?`<button class="btn sm" data-act="sf-clear">Bỏ lọc</button>`:''}<span class="note">${sfActive()?`${n} nhà thuốc khớp bộ lọc · chỉ tính nhân sự nhà thuốc, không gồm văn phòng – kho`:`${n} nhà thuốc · chọn tỉnh, quản lý hoặc HCNS phụ trách để lọc toàn bộ mục bên dưới`}</span></div></div>`}
+    ${sfActive()?`<button class="btn sm" data-act="sf-clear">Bỏ lọc</button>`:''}<span class="note">${sfActive()?(f.mgr===SF_HC?`Khối Hậu cần${f.prov?' tại '+esc(f.prov):''} · nhân sự kho, văn phòng`:`${n} nhà thuốc khớp bộ lọc${sfHcOn()?' · có tính cả nhân sự Hậu cần (kho, văn phòng) của tỉnh':' · chỉ tính nhân sự nhà thuốc'}`):`${n} nhà thuốc · chọn tỉnh, quản lý hoặc HCNS phụ trách để lọc toàn bộ mục bên dưới`}</span></div></div>`}
 const _vSys0=vSys;
 vSys=function(){if(!sysRows().length)return _vSys0();const bar=sfBar();let html;
   if(!sfActive())html=_vSys0();
   else{const keepShops=S.shops,keepCache=_sysCache;const set=new Set(sfShops().map(x=>x.code));
-    try{const all=sysRows();_sysCache=all.filter(r=>r.shop&&set.has(r.shop));S.shops=keepShops.filter(x=>x.type!=='nt'||set.has(x.code));html=_vSys0()}
+    try{const all=sysRows();const hc=sfHcOn();_sysCache=all.filter(r=>(r.shop&&set.has(r.shop))||(hc&&sfHcRow(r)));S.shops=keepShops.filter(x=>x.type!=='nt'||set.has(x.code));html=_vSys0()}
     finally{S.shops=keepShops;_sysCache=keepCache}}
   const i=html.indexOf('<div class="stats">');return i>=0?html.slice(0,i)+bar+html.slice(i):html+bar};
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='sfProv'){S.sysF.prov=t.value;render()}else if(t.id==='sfMgr'){S.sysF.mgr=t.value;render()}else if(t.id==='sfOwn'){S.sysF.own=t.value;render()}});
@@ -2381,7 +2396,7 @@ async function initStaff(db,mem,email){
   const me0=[{id:mem.staffId,name:mem.name||email,status:'active'}];
   db.doc('staff/'+mem.staffId).onSnapshot(s=>{S.staff=s.exists?[{id:mem.staffId,...s.data()}]:me0;S.loaded.add('staff');render()},()=>{S.staff=me0;S.loaded.add('staff');render()});
   const mine=(c,f,k)=>db.collection(c).where(f,'==',mem.staffId).onSnapshot(snap=>{S[k||c]=snap.docs.map(d=>({id:d.id,...d.data()}));S.loaded.add(c);render()},()=>{S.loaded.add(c);render()});
-  mine('logs','staffId');mine('tasks','owner');mine('okrp','staffId');
+  mine('logs','staffId');mine('tasks','owner');mine('okrp','staffId');mine('kadj','staffId');
   db.collection('okrs').onSnapshot(snap=>{S.okrs=snap.docs.map(d=>({id:d.id,...d.data()}));S.loaded.add('okrs');render()},()=>{S.loaded.add('okrs');render()});
   db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render()},()=>{});
   db.doc('catalog/kpi').onSnapshot(s=>{S.catalog=s.exists?(s.data().items||[]):[];render()},()=>{});
@@ -2479,6 +2494,145 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act="kb-p
   f.srcdoc=html;f.onload=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(_){toast('Trình duyệt chặn in, hãy dùng "Tải bảng in (.html)"')}}});
 const _vKpiKb=vKpi;
 vKpi=function(){return _vKpiKb()+kbPanel(S.month)};
+
+/* ===================== Biên bản họp tuần P.TCHC → nhắc việc + điểm cộng/trừ KPI =====================
+   meetings/<mt_yyyy-mm-dd>: {date,title,note,items:[{id,area,topic,people:[staffId|'all'],goal,details:[{who,qty,text}],deadline,status}]}
+   Mỗi nội dung × người thực hiện sinh 1 việc ở tasks/mt_<họp>_<nội dung>_<người> (nhân viên thấy việc của mình, có nhắc hạn).
+   Điểm cộng/trừ KPI: kadj/<id> = {staffId,month,pts,reason,meetingId,date} → cộng thẳng vào KPI tháng (thời gian thực). */
+S.meetings=S.meetings||[];S.kadj=S.kadj||[];S.mtSel=S.mtSel||'';
+const MT_ST={doing:['warn','Đang thực hiện'],done:['ok','Hoàn thành'],late:['bad','Chậm tiến độ']};
+const MT_AREAS=[...OP_AREAS,'Khác'];
+const mtSorted=()=>[...S.meetings].sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+const mtCur=()=>{const l=mtSorted();return l.find(x=>x.id===S.mtSel)||l[0]||null};
+const kadjOf=(m,sid)=>S.kadj.filter(a=>a.staffId===sid&&a.month===m);
+const kadjSum=(m,sid)=>{const xs=kadjOf(m,sid);return {minus:xs.filter(a=>+a.pts<0).reduce((t,a)=>t-(+a.pts),0),plus:xs.filter(a=>+a.pts>0).reduce((t,a)=>t+(+a.pts),0),why:xs.map(a=>`${+a.pts>0?'+':''}${a.pts}đ ${a.reason}`)}};
+const mtWho=id=>id==='all'?'Toàn team':shortName(id);
+const mtDays=d=>d?diffDays(TODAY,d):null;
+function mtTasks(mt,it){const ppl=(it.people||[]).includes('all')?activeStaff().map(s=>s.id):(it.people||[]);
+  return ppl.map(sid=>{const own=(it.details||[]).filter(x=>x.who===sid);const all=(it.details||[]).filter(x=>x.who==='all');
+    const note=[it.goal?'Mục tiêu chung: '+it.goal:'',...own.map(x=>(x.qty?x.qty+' – ':'')+x.text),...all.map(x=>'Toàn team: '+x.text)].filter(Boolean).join('\n');
+    return ['mt_'+mt.id.replace(/^mt_/,'')+'_'+it.id+'_'+sid,{title:it.topic+(own[0]&&own[0].qty?` (${own[0].qty})`:''),owner:sid,module:it.area||'Khác',priority:it.deadline&&mtDays(it.deadline)<=7?'cao':'tb',
+      status:it.status==='done'?'done':'doing',start:mt.date,due:it.deadline||'',progress:it.status==='done'?100:0,note:note+`\nTheo biên bản họp ${fmtDY(mt.date)}.`,okrId:'',meetingId:mt.id,createdAt:new Date().toISOString()}]})}
+async function mtSync(mt,oldMt){const want=new Map();(mt.items||[]).forEach(it=>mtTasks(mt,it).forEach(([id,b])=>want.set(id,b)));
+  const had=S.tasks.filter(t=>t.meetingId===mt.id);for(const t of had)if(!want.has(t.id))await del('tasks/'+t.id);
+  for(const [id,b] of want){const o=S.tasks.find(t=>t.id===id);const body={...(o?clean(o):{}),...b,createdAt:o?.createdAt||b.createdAt};if(!o||JSON.stringify(clean(o))!==JSON.stringify(body))await write('tasks/'+id,body).catch(()=>{})}}
+function mtSave(mt){const body=clean(mt);body.updatedAt=new Date().toISOString();return write('meetings/'+mt.id,body).then(()=>mtSync(mt))}
+
+function vMeet(){
+  const mt=mtCur();const list=mtSorted();const dis=S.canWrite?'':'disabled';
+  const sel=list.length?`<select id="mtSel" aria-label="Chọn biên bản">${list.map(x=>`<option value="${esc(x.id)}" ${mt&&x.id===mt.id?'selected':''}>Họp ${fmtDY(x.date)}</option>`).join('')}</select>`:'';
+  const tools=sel+(S.canWrite?`<button class="btn" data-act="mt-new">+ Biên bản mới</button><label class="btn" style="cursor:pointer">Nhập biên bản (.json)<input type="file" accept=".json,application/json" id="mtImport" hidden></label>`:'')+`<button class="btn pri" data-act="mt-remind">Sao chép tin nhắc việc</button>`;
+  const open=S.tasks.filter(t=>t.meetingId&&!isDone(t));const late=open.filter(overdue);const soon=open.filter(t=>t.due&&!overdue(t)&&mtDays(t.due)<=(+S.config.remindDays||3));
+  let h=head('Biên bản họp P.TCHC','Họp tuần với nhân viên → tự tạo nhắc việc cho từng người và cộng/trừ điểm KPI tháng',tools);
+  h+=`<div class="stats"><div class="stat"><div class="k">Việc đang mở</div><div class="v">${open.length}</div><div class="s">từ các biên bản họp</div></div>
+    <div class="stat ${soon.length?'warn':''}"><div class="k">Sắp đến hạn</div><div class="v">${soon.length}</div><div class="s">trong ${S.config.remindDays||3} ngày tới</div></div>
+    <div class="stat ${late.length?'bad':''}"><div class="k">Quá hạn</div><div class="v">${late.length}</div><div class="s">việc chưa xong</div></div>
+    <div class="stat"><div class="k">Điểm KPI ${fmtM(S.month)}</div><div class="v">${(()=>{const xs=S.kadj.filter(a=>a.month===S.month);const t=xs.reduce((a,x)=>a+(+x.pts||0),0);return (t>0?'+':'')+nf(t)})()}</div><div class="s">${S.kadj.filter(a=>a.month===S.month).length} lần cộng/trừ</div></div></div>`;
+  if(!mt)return h+`<div class="empty">Chưa có biên bản họp. Bấm “+ Biên bản mới” hoặc “Nhập biên bản (.json)”.</div>`+mtRemindPanel();
+  const items=[...(mt.items||[])].sort((a,b)=>String(a.deadline||'9').localeCompare(String(b.deadline||'9')));
+  const near=items.filter(i=>i.status!=='done'&&i.deadline).map(i=>i.deadline).sort()[0];
+  h+=`<div class="panel mt-head"><div><b>Biên bản họp ${esc(mt.title||'P.TCHC')} · ${fmtDY(mt.date)}</b><div class="note">${(mt.items||[]).length} nội dung trao đổi${near?` · hạn gần nhất ${fmtDY(near)}`:''}${mt.note?' · '+esc(mt.note):''}</div></div>
+    ${S.canWrite?`<div class="row" style="gap:6px"><button class="btn sm" data-act="mt-edit-head">Sửa ngày / tiêu đề</button><button class="btn sm" data-act="mt-add">+ Nội dung</button><button class="btn sm danger" data-act="mt-del">Xóa biên bản</button></div>`:''}</div>`;
+  h+=`<div class="stack">${(mt.items||[]).map((it,i)=>{const st=MT_ST[it.status||'doing'];const dd=mtDays(it.deadline);const lateI=it.status!=='done'&&dd!=null&&dd<0;
+    return `<div class="panel mt-item ${lateI?'late':''}"><div class="mt-l"><span class="pill">${esc(it.area||'Khác')}</span><b>${i+1}. ${esc(it.topic)}</b></div>
+      <div class="mt-p">${(it.people||[]).map(p=>`<span class="chip sm">${esc(mtWho(p))}</span>`).join('')}</div>
+      <div class="mt-d">${it.goal?`<p><b>Mục tiêu chung:</b> ${esc(it.goal)}</p>`:''}${(it.details||[]).map(x=>`<div class="mt-row"><b>${esc(mtWho(x.who))}</b>${x.qty?`<span class="pill ok">${esc(x.qty)}</span>`:'<span></span>'}<span>${esc(x.text)}</span></div>`).join('')}</div>
+      <div class="mt-r"><div class="mini">Deadline</div><b class="num">${it.deadline?fmtDY(it.deadline):'—'}</b>
+        <select data-mtst="${esc(it.id)}" ${dis} aria-label="Trạng thái">${Object.entries(MT_ST).map(([k,[,l]])=>`<option value="${k}" ${(it.status||'doing')===k?'selected':''}>${l}</option>`).join('')}</select>
+        ${lateI?`<span class="pill bad">Quá hạn ${-dd} ngày</span>`:dd!=null&&it.status!=='done'&&dd<=3?`<span class="pill warn">Còn ${dd} ngày</span>`:''}
+        ${S.canWrite?`<button class="btn sm ghost" data-act="mt-edit" data-id="${esc(it.id)}">Sửa</button>`:''}</div></div>`}).join('')}</div>`;
+  const adj=S.kadj.filter(a=>a.meetingId===mt.id);
+  h+=`<div class="panel mt" style="margin-top:14px"><h2>Điểm cộng / trừ KPI theo biên bản này <small>cộng thẳng vào KPI tháng ${fmtM(ymOf(mt.date))} của từng người</small>${S.canWrite?` <button class="btn sm" data-act="mt-adj-add">+ Thêm</button>`:''}</h2>
+    ${adj.length?`<div class="tbl-wrap"><table><thead><tr><th>Nhân viên</th><th class="r">Điểm</th><th>Lý do</th><th>Tháng KPI</th><th></th></tr></thead><tbody>${adj.map(a=>`<tr class="${+a.pts<0?'recalert':''}"><td><b>${esc(staffName(a.staffId))}</b></td><td class="r num"><b>${+a.pts>0?'+':''}${nf(a.pts)}</b></td><td>${esc(a.reason)}</td><td>${fmtM(a.month)}</td><td>${S.canWrite?`<button class="btn sm ghost" data-act="mt-adj-edit" data-id="${esc(a.id)}">Sửa</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'<p class="note">Chưa có điểm cộng/trừ.</p>'}</div>`;
+  return h+mtRemindPanel();
+}
+function mtRemindPanel(){const open=S.tasks.filter(t=>t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));if(!open.length)return '';
+  const by={};open.forEach(t=>(by[t.owner]??=[]).push(t));
+  return `<div class="panel" style="margin-top:14px"><h2>Nhắc việc theo người <small>tất cả biên bản, việc chưa hoàn thành</small></h2><div class="mt-rem">${Object.entries(by).map(([sid,ts])=>`<div><b>${esc(staffName(sid))}</b>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}"><span>${esc(t.title)}</span><span class="num">${t.due?fmtD(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}</div>`).join('')}</div></div>`}
+function mtRemindText(){const open=S.tasks.filter(t=>t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));const by={};open.forEach(t=>(by[t.owner]??=[]).push(t));
+  return `NHẮC VIỆC THEO BIÊN BẢN HỌP P.TCHC · ${fmtDY(TODAY)}\n`+Object.entries(by).map(([sid,ts])=>`\n${staffName(sid)}:\n`+ts.map(t=>{const d=mtDays(t.due);return `- ${t.title}: hạn ${t.due?fmtDY(t.due):'—'}${overdue(t)?' (ĐÃ QUÁ HẠN)':d!=null&&d<=3?` (còn ${d} ngày)`:''}`}).join('\n')).join('\n')}
+
+/* ---------- Hộp thoại ---------- */
+function mtItemDlg(mt,it){const isNew=!it;it=it||{id:Math.random().toString(36).slice(2,8),area:'',topic:'',people:[],goal:'',details:[],deadline:'',status:'doing'};
+  const st=activeStaff();const chk=(id,l)=>`<label class="chip sm" style="cursor:pointer"><input type="checkbox" name="pp" value="${esc(id)}" ${(it.people||[]).includes(id)?'checked':''}> ${esc(l)}</label>`;
+  const drow=x=>`<div class="mt-drow"><select data-dw>${[['all','Toàn team'],...st.map(s=>[s.id,shortName(s.id)])].map(([v,l])=>`<option value="${esc(v)}" ${x.who===v?'selected':''}>${esc(l)}</option>`).join('')}</select><input data-dq value="${esc(x.qty||'')}" placeholder="SL, VD 16 nhân sự"><input data-dt value="${esc(x.text||'')}" placeholder="Chi tiết công việc"><button type="button" class="btn sm ghost" data-act="mt-rm-d">✕</button></div>`;
+  mtItemDlg._row=drow;
+  openDlg(isNew?'Thêm nội dung họp':'Sửa nội dung họp',`<div class="form">
+    <label>Mảng<select name="area" required><option value="">— Chọn —</option>${MT_AREAS.map(a=>`<option ${it.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
+    <label>Deadline<input type="date" name="deadline" value="${esc(it.deadline||'')}"></label>
+    <label class="full">Nội dung trao đổi<input name="topic" required value="${esc(it.topic)}" placeholder="VD: Tuyển dụng khối nhà thuốc & văn phòng"></label>
+    <div class="full" style="grid-column:1/-1"><b style="font-size:13px">Người thực hiện</b><div class="chips" style="margin-top:6px">${chk('all','Toàn team')}${st.map(s=>chk(s.id,shortName(s.id))).join('')}</div></div>
+    <label class="full">Mục tiêu chung<input name="goal" value="${esc(it.goal||'')}"></label>
+    <div class="full" style="grid-column:1/-1"><b style="font-size:13px">Chi tiết công việc từng người</b><div id="mtDRows" style="margin-top:6px">${(it.details||[]).map(drow).join('')}</div><button type="button" class="btn sm" data-act="mt-add-d">+ Thêm dòng</button></div>
+  </div>`,`<div>${!isNew?`<button type="button" class="btn danger" data-act="mt-del-item" data-id="${esc(it.id)}">Xóa nội dung</button>`:''}</div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="mt-save-item" data-id="${esc(it.id)}">Lưu</button></div>`)}
+function mtAdjDlg(mt,a){const isNew=!a;a=a||{staffId:'',pts:'',reason:'',month:ymOf(mt.date)};
+  openDlg(isNew?'Thêm điểm cộng / trừ KPI':'Sửa điểm cộng / trừ KPI',`<div class="form">
+    <label>Nhân viên<select name="sid" required><option value="">— Chọn —</option>${activeStaff().map(s=>`<option value="${esc(s.id)}" ${a.staffId===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
+    <label>Điểm (trừ ghi số âm, VD -30)<input type="number" step="any" name="pts" required value="${esc(a.pts)}"></label>
+    <label>Tháng KPI<input type="month" name="month" required value="${esc(a.month)}"></label>
+    <label class="full">Lý do<input name="reason" required value="${esc(a.reason)}"></label></div>`,
+  `<div>${!isNew?`<button type="button" class="btn danger" data-act="mt-adj-del" data-id="${esc(a.id)}">Xóa</button>`:''}</div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="mt-adj-save" data-id="${esc(a.id||'')}">Lưu</button></div>`)}
+function mtHeadDlg(mt){const isNew=!mt;mt=mt||{date:TODAY,title:'P.TCHC',note:''};
+  openDlg(isNew?'Biên bản họp mới':'Sửa biên bản',`<div class="form"><label>Ngày họp<input type="date" name="date" required value="${esc(mt.date)}"></label><label>Tiêu đề<input name="title" value="${esc(mt.title||'P.TCHC')}"></label><label class="full">Ghi chú<input name="note" value="${esc(mt.note||'')}"></label></div>`,
+  `<div></div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="mt-save-head" data-id="${isNew?'':esc(mt.id)}">Lưu</button></div>`)}
+
+let mtArmed=null;
+document.addEventListener('click',async e=>{const el=e.target.closest('[data-act^="mt-"]');if(!el)return;const a=el.dataset.act,id=el.dataset.id;
+  if(a==='mt-remind'){copyText(mtRemindText());return}
+  if(!needWrite())return;const mt=mtCur();
+  if(a==='mt-new'){mtHeadDlg(null);return}
+  if(a==='mt-edit-head'){mtHeadDlg(mt);return}
+  if(a==='mt-save-head'){e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())return;const fd=Object.fromEntries(new FormData(f));
+    if(!id){const nid='mt_'+fd.date;if(S.meetings.some(x=>x.id===nid)){toast('Đã có biên bản ngày này');return}S.mtSel=nid;write('meetings/'+nid,{date:fd.date,title:fd.title,note:fd.note,items:[],updatedAt:new Date().toISOString()}).then(()=>toast('Đã tạo biên bản'));}
+    else{const old=S.meetings.find(x=>x.id===id);mtSave({...old,title:fd.title,note:fd.note}).then(()=>toast('Đã lưu'))}closeDlg();return}
+  if(a==='mt-del'){if(mtArmed!==a){mtArmed=a;el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(mtArmed===a)mtArmed=null},4000);return}
+    for(const t of S.tasks.filter(t=>t.meetingId===mt.id))await del('tasks/'+t.id);for(const k of S.kadj.filter(k=>k.meetingId===mt.id))await del('kadj/'+k.id);await del('meetings/'+mt.id);S.mtSel='';toast('Đã xóa biên bản');return}
+  if(a==='mt-add'){mtItemDlg(mt,null);return}
+  if(a==='mt-edit'){mtItemDlg(mt,(mt.items||[]).find(x=>x.id===id));return}
+  if(a==='mt-add-d'){e.preventDefault();$('#mtDRows').insertAdjacentHTML('beforeend',mtItemDlg._row({who:'all'}));return}
+  if(a==='mt-rm-d'){e.preventDefault();el.closest('.mt-drow').remove();return}
+  if(a==='mt-save-item'){e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())return;const fd=new FormData(f);const people=fd.getAll('pp');if(!people.length){toast('Chọn người thực hiện');return}
+    const details=[...dlg.querySelectorAll('.mt-drow')].map(r=>({who:r.querySelector('[data-dw]').value,qty:r.querySelector('[data-dq]').value.trim(),text:r.querySelector('[data-dt]').value.trim()})).filter(x=>x.text||x.qty);
+    const items=[...(mt.items||[])];const old=items.find(x=>x.id===id);const it={id,area:fd.get('area'),topic:fd.get('topic').trim(),people,goal:fd.get('goal').trim(),details,deadline:fd.get('deadline')||'',status:old?old.status:'doing'};
+    const i=items.findIndex(x=>x.id===id);if(i>=0)items[i]=it;else items.push(it);mtSave({...mt,items}).then(()=>toast('Đã lưu, đã cập nhật nhắc việc'));closeDlg();return}
+  if(a==='mt-del-item'){e.preventDefault();if(mtArmed!==a+id){mtArmed=a+id;el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(mtArmed===a+id)mtArmed=null},4000);return}
+    mtSave({...mt,items:(mt.items||[]).filter(x=>x.id!==id)}).then(()=>toast('Đã xóa nội dung'));closeDlg();return}
+  if(a==='mt-adj-add'){mtAdjDlg(mt,null);return}
+  if(a==='mt-adj-edit'){mtAdjDlg(mt,S.kadj.find(x=>x.id===id));return}
+  if(a==='mt-adj-save'){e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())return;const fd=Object.fromEntries(new FormData(f));if(!(+fd.pts)){toast('Nhập số điểm khác 0');return}
+    const kid=id||('k_'+mt.id.replace(/^mt_/,'')+'_'+Math.random().toString(36).slice(2,7));write('kadj/'+kid,{staffId:fd.sid,pts:+fd.pts,reason:fd.reason.trim(),month:fd.month,meetingId:mt.id,date:mt.date,updatedAt:new Date().toISOString()}).then(()=>toast('Đã cập nhật KPI'));closeDlg();return}
+  if(a==='mt-adj-del'){e.preventDefault();del('kadj/'+id);toast('Đã xóa');closeDlg();return}
+});
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='mtSel'){S.mtSel=t.value;render();return}
+  if(t.dataset&&t.dataset.mtst){if(!needWrite())return;const mt=mtCur();const items=(mt.items||[]).map(x=>x.id===t.dataset.mtst?{...x,status:t.value}:x);mtSave({...mt,items}).then(()=>toast('Đã cập nhật trạng thái'));return}
+  if(t.id==='mtImport'&&t.files&&t.files[0]){if(!needWrite())return;try{const j=JSON.parse((await t.files[0].text()).replace(/^﻿/,''));await mtImport(j)}catch(err){toast('File biên bản không hợp lệ: '+(err&&err.message||''))}t.value=''}});
+/* Nhập biên bản từ file JSON (Claude đọc ảnh biên bản và xuất file này). Người thực hiện ghi bằng Mã NV hoặc "all". */
+async function mtImport(j){const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).toUpperCase()]=s.id});const map=c=>c==='all'?'all':byCode[String(c).toUpperCase()]||null;
+  const ms=j.meetings||[j];let n=0,miss=new Set();
+  for(const m of ms){const id='mt_'+m.date;const items=(m.items||[]).map((it,i)=>({id:it.id||('i'+(i+1)),area:it.area||'Khác',topic:it.topic,goal:it.goal||'',deadline:it.deadline||'',status:it.status||'doing',
+      people:(it.people||[]).map(c=>{const v=map(c);if(!v)miss.add(c);return v}).filter(Boolean),details:(it.details||[]).map(x=>({who:map(x.who)||'all',qty:x.qty||'',text:x.text||''}))}));
+    const mt={id,date:m.date,title:m.title||'P.TCHC',note:m.note||'',items};await write('meetings/'+id,{...clean(mt),updatedAt:new Date().toISOString()});await mtSync(mt);
+    for(const [i,a] of (m.kpi||[]).entries()){const sid=map(a.who);if(!sid){miss.add(a.who);continue}await write('kadj/k_'+m.date+'_'+(i+1),{staffId:sid,pts:+a.pts,reason:a.reason||'',month:a.month||ymOf(m.date),meetingId:id,date:m.date,updatedAt:new Date().toISOString()})}
+    S.mtSel=id;n++}
+  toast(`Đã nhập ${n} biên bản`+(miss.size?` · không khớp mã NV: ${[...miss].join(', ')}`:''))}
+
+/* ---------- KPI: cộng/trừ theo biên bản họp vào KPI tháng ---------- */
+const _kpiMt=kpiOf;
+kpiOf=function(m,sid){const k=_kpiMt(m,sid);const a=kadjSum(m,sid);if(!a.minus&&!a.plus)return k;const val=Math.max(0,r1(k.val-a.minus+a.plus));
+  return {...k,has:true,val,mtMinus:a.minus,mtPlus:a.plus,mtWhy:a.why,pct:r1(val/k.max*100),grade:gradeOf(val/k.max*100)}};
+/* Bảng xét thưởng: điểm trừ/cộng mặc định gồm cả biên bản họp */
+const _kbRowsMt=kbRows;
+kbRows=function(m){const c=kbCfg();return _kbRowsMt(m).map(r=>{const a=kadjSum(m,r.s.id);if(!a.minus&&!a.plus)return r;const o=r.o;
+  const minus=o.minus!=null&&o.minus!==''?+o.minus:r.minus+a.minus;const plus=o.plus!=null&&o.plus!==''?+o.plus:a.plus;const xet=r.st==='CT'&&r.f!=null;
+  const v=xet?r.f-minus+plus:null;const g=xet?kbGrade(v,c):'';const note=o.note!=null?o.note:[r.note,...a.why].filter(Boolean).join('\n');return {...r,minus,plus,v,g,amt:xet?(c[g]||0):0,note}})};
+/* Nhật ký cá nhân: hiện điểm cộng/trừ theo biên bản + việc sắp đến hạn */
+const _vMeMt=vMe;
+vMe=function(){const h=_vMeMt();const sid=S.me,m=S.month;const xs=kadjOf(m,sid);const ts=S.tasks.filter(t=>t.owner===sid&&t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));
+  if(!xs.length&&!ts.length)return h;
+  const box=`<div class="grid2" style="margin-bottom:14px">${ts.length?`<div class="panel"><h2>Việc từ biên bản họp <small>${ts.length} việc chưa xong</small></h2>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}"><span>${esc(t.title)}</span><span class="num">${t.due?fmtDY(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}</div>`:'<div></div>'}
+    ${xs.length?`<div class="panel"><h2>Điểm cộng / trừ KPI ${fmtM(m)} <small>theo biên bản họp, đã tính vào KPI tháng</small></h2>${xs.map(a=>`<div class="mt-ri ${+a.pts<0?'bad':'ok'}"><span>${esc(a.reason)} <span class="mini">· họp ${fmtD(a.date)}</span></span><b class="num">${+a.pts>0?'+':''}${nf(a.pts)}đ</b></div>`).join('')}</div>`:''}</div>`;
+  const i=h.indexOf('<div class="stats">');return i>=0?h.slice(0,i)+box+h.slice(i):box+h};
 
 function opWaitN(){opRkSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
 init();
