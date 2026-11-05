@@ -2157,6 +2157,7 @@ function confirmDel(el){if(el.dataset.sure){return true}el.dataset.sure='1';el.t
    Tài khoản: members/<email> = {staffId,name,role:'staff'} → người đăng nhập bằng email đó chỉ thấy OKR cá nhân + nhật ký của chính mình. */
 S.okrp=S.okrp||[];S.members=S.members||[];S.role=S.role||'admin';S.opQ=S.opQ||qOf(TODAY);S.opSid=S.opSid||'';S.opWeek=S.opWeek||'';S.ciDraft=S.ciDraft||{};
 const OP_ST={draft:['','Nháp'],submitted:['warn','Chờ duyệt'],returned:['bad','Cần sửa'],approved:['ok','Đã duyệt']};
+const OP_AREAS=['Tuyển dụng','C&B','BHXH','HCNS phụ trách khu vực','Hành chính','Hồ sơ pháp lý/giấy tờ','Admin','Công đoàn'];
 const OP_CONF=[['ok','Đúng tiến độ'],['warn','Có rủi ro'],['bad','Chậm tiến độ']];
 const opId=(q,sid)=>q+'_'+sid;
 const opDoc=(q,sid)=>S.okrp.find(o=>o.id===opId(q,sid));
@@ -2224,11 +2225,11 @@ function opPerson(sid,tools){
     :`<div class="panel"><h2>Duyệt OKR</h2><textarea id="opRevNote" rows="2" placeholder="Nhận xét (bắt buộc nếu trả lại)" style="width:100%"></textarea><div class="row" style="margin-top:8px;gap:8px"><button class="btn pri" data-act="op-approve">Duyệt</button><button class="btn" data-act="op-return">Trả lại để sửa</button></div></div>`;
   if(doc.status==='approved')bar=`<div class="wk-state ok">OKR đã duyệt${doc.review&&doc.review.at?' ngày '+fmtDY(doc.review.at.slice(0,10)):''}${doc.review&&doc.review.note?' · '+esc(doc.review.note):''}${!staff&&S.canWrite?` <button class="btn sm" data-act="op-reopen">Mở lại để sửa</button>`:''}</div>`;
   const objHtml=objs.length?objs.map((o,i)=>{const op=objPct(o);const link=deptOkr.find(x=>x.id===o.okrId);
-    return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b><div class="note">${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
+    return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b><div class="note">${o.area&&OP_AREAS.includes(o.area)?`<span class="pill">${esc(o.area)}</span> `:'<span class="pill bad">Chưa chọn mảng</span> '}${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
       <div class="bar"><i class="${op>=elapsed?'ok':op>=elapsed-20?'':'warn'}" style="width:${op}%"></i></div>
       ${(o.krs||[]).map((k,j)=>`<div class="kr"><span>KR${j+1}. ${esc(k.title)}</span><div class="bar"><i style="width:${krPct(k)}%"></i></div><div class="vals"><span class="num"><b>${nf(k.current||0)}</b> / ${nf(k.target)} ${esc(k.unit||'')}</span></div></div>`).join('')}
     </div>`}).join(''):`<div class="empty">${staff?'Chưa có mục tiêu. Bấm “+ Thêm mục tiêu” để lập OKR '+fmtQ(q)+'.':'Nhân viên chưa lập OKR '+fmtQ(q)+'.'}</div>`;
-  const editTools=ed?`<div class="row" style="gap:8px;margin-top:4px">${objs.length<5?`<button class="btn" data-act="op-new-obj">+ Thêm mục tiêu</button>`:''}${objs.length?`<button class="btn pri" data-act="op-submit">Gửi chị Linh duyệt</button>`:''}<span class="note">Tối đa 5 mục tiêu, mỗi mục tiêu 2–5 kết quả then chốt (KR) đo được bằng số.</span></div>`
+  const editTools=ed?`<div class="row" style="gap:8px;margin-top:4px">${objs.length<5?`<button class="btn" data-act="op-new-obj">+ Thêm mục tiêu</button>`:''}${objs.length?`<button class="btn pri" data-act="op-submit">Gửi chị Linh duyệt</button>`:''}<span class="note">Tối đa 5 mục tiêu, mỗi mục tiêu thuộc 1 mảng công việc chính và có 1–5 kết quả then chốt (KR) đo được bằng số.</span></div>`
     :(staff&&doc.status==='submitted'&&S.canWrite?`<div class="row" style="margin-top:4px"><button class="btn" data-act="op-withdraw">Rút lại để sửa</button></div>`:'');
   const sub=`${esc(s.name)} · ${fmtQ(q)} · <span class="pill ${st[0]}">${d?st[1]:'Chưa lập'}</span> · tiến độ ${p}% · thời gian quý đã qua ${elapsed}%`;
   return head(staff?'OKR cá nhân của tôi':'OKR cá nhân',sub,tools)+bar+`<div class="stack">${objHtml}${editTools}</div>`+(doc.status==='approved'?opCheckin(doc,staff):'');
@@ -2275,6 +2276,7 @@ function opObjDlg(doc,o){const isNew=!o;o=o||{id:opRid(),title:'',okrId:'',krs:[
   const row=k=>`<div class="modrow3" data-kid="${esc(k.id||opRid())}" data-cur="${esc(k.current??0)}"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt, VD: Tuyển đủ NVBH cho 10 nhà"><input data-kg class="num" type="number" step="any" min="0" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="rm-row" title="Bỏ">✕</button></div>`;
   opObjDlg._row=row;
   openDlg(isNew?'Thêm mục tiêu OKR cá nhân':'Sửa mục tiêu OKR cá nhân',`<div class="form">
+    <label class="full">Mảng công việc chính<select name="area" required><option value="">— Chọn mảng —</option>${OP_AREAS.map(a=>`<option ${o.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
     <label class="full">Mục tiêu (Objective)<input name="title" required value="${esc(o.title)}" placeholder="VD: Ổn định nhân sự các nhà thuốc khu vực phụ trách"></label>
     <label class="full">Gắn với OKR phòng<select name="okrId"><option value="">— Không gắn —</option>${dept.map(x=>`<option value="${esc(x.id)}" ${o.okrId===x.id?'selected':''}>${esc(x.objective)}</option>`).join('')}</select></label>
     <div class="full"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): nội dung · chỉ tiêu (số) · đơn vị</b><div id="opKrRows">${(o.krs||[]).map(row).join('')}</div><button type="button" class="btn sm" data-act="op-add-kr">+ Thêm KR</button></div>
@@ -2294,11 +2296,11 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="op-
     const old=(d.objectives||[]).find(o=>o.id===id);
     const krs=[...dlg.querySelectorAll('#opKrRows .modrow3')].map(r=>{const kid=r.dataset.kid;const ok=old&&(old.krs||[]).find(k=>k.id===kid);return {id:kid,title:r.querySelector('[data-kt]').value.trim(),target:+r.querySelector('[data-kg]').value||0,unit:r.querySelector('[data-ku]').value.trim(),current:ok?(+ok.current||0):0}}).filter(k=>k.title);
     if(!krs.length){toast('Cần ít nhất 1 KR');return}if(krs.some(k=>!(k.target>0))){toast('Mỗi KR cần chỉ tiêu là số lớn hơn 0');return}
-    const objs=[...(d.objectives||[])];const o={id,title:fd.title.trim(),okrId:fd.okrId||'',krs};const i=objs.findIndex(x=>x.id===id);if(i>=0)objs[i]=o;else objs.push(o);
+    const objs=[...(d.objectives||[])];if(!OP_AREAS.includes(fd.area)){toast('Chọn mảng công việc chính');return}const o={id,area:fd.area,title:fd.title.trim(),okrId:fd.okrId||'',krs};const i=objs.findIndex(x=>x.id===id);if(i>=0)objs[i]=o;else objs.push(o);
     opSave(d,{objectives:objs,status:d.status==='returned'?'returned':'draft'}).then(()=>toast('Đã lưu mục tiêu')).catch(()=>{});closeDlg();return}
   if(a==='op-del-obj'){e.preventDefault();if(opArmed!==id){opArmed=id;el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(opArmed===id)opArmed=null},4000);return}
     opSave(d,{objectives:(d.objectives||[]).filter(o=>o.id!==id)}).then(()=>toast('Đã xóa mục tiêu')).catch(()=>{});closeDlg();return}
-  if(a==='op-submit'){if(!(d.objectives||[]).length)return;opSave(d,{status:'submitted',submittedAt:new Date().toISOString()}).then(()=>toast('Đã gửi chị Linh duyệt')).catch(()=>{});return}
+  if(a==='op-submit'){if(!(d.objectives||[]).length)return;if((d.objectives||[]).some(o=>!OP_AREAS.includes(o.area))){toast('Mỗi mục tiêu cần chọn mảng công việc chính (bấm Sửa)');return}opSave(d,{status:'submitted',submittedAt:new Date().toISOString()}).then(()=>toast('Đã gửi chị Linh duyệt')).catch(()=>{});return}
   if(a==='op-withdraw'){opSave(d,{status:'draft'}).then(()=>toast('Đã rút lại, có thể sửa tiếp')).catch(()=>{});return}
   if(a==='op-approve'){const note=($('#opRevNote')||{}).value||'';opSave(d,{status:'approved',review:{at:new Date().toISOString(),note:note.trim()}}).then(()=>toast('Đã duyệt OKR')).catch(()=>{});return}
   if(a==='op-return'){const note=(($('#opRevNote')||{}).value||'').trim();if(!note){toast('Ghi nhận xét để nhân viên biết cần sửa gì');$('#opRevNote')?.focus();return}
