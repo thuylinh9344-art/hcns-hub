@@ -390,7 +390,7 @@ async function init(){
   const _role=await opRole(db);if(_role){S.db=db;S.dbState='ok';return initStaff(db,_role.m,_role.email)}
   S.db=db;S.dbState='ok';
   COLS.forEach(c=>db.collection(c).onSnapshot(snap=>{S[c]=snap.docs.map(d=>({id:d.id,...d.data()}));S.loaded.add(c);render()},()=>{S.dbState='err';render()}));
-  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};render();if(!(d.effVer>=3))setTimeout(()=>rkMigrate(d),2500);else if(!(d.areasVer>=2))setTimeout(()=>rkAreaMig(d),3500)},()=>{});
+  db.doc('config/main').onSnapshot(s=>{const d=s.exists?s.data():{};S.config={...DEFAULT_CFG,...d,eff:{...DEFAULT_CFG.eff,...(d.eff||{})},dCut:d.dCut||DEFAULT_CFG.dCut};S.cfgLoaded=true;render();if(!(d.effVer>=3))setTimeout(()=>rkMigrate(d),2500);else if(!(d.areasVer>=2))setTimeout(()=>rkAreaMig(d),3500)},()=>{});
   db.doc('catalog/kpi').onSnapshot(s=>{S.catalog=s.exists?(s.data().items||[]):[];render()},()=>{});
   db.doc('catalog/hs').onSnapshot(s=>{S.hsRef=s.exists?(s.data().tiers||{}):{};render()},()=>{});
   db.doc('assign/shops').onSnapshot(s=>{S.shops=s.exists?(s.data().list||[]):[];render()},()=>{});
@@ -726,7 +726,7 @@ function vSys(){
     <div class="panel"><h2>Việc HCNS cần xử lý <small>${al.length} trường hợp</small></h2>
       <div class="seg" style="margin-bottom:10px;flex-wrap:wrap">${SYS_TABS.map(([k2,l])=>`<button data-act="sys-tab" data-v="${k2}" aria-pressed="${S.sysTab===k2}">${l} (${sysAlerts(k2).length})</button>`).join('')}</div>
       ${al.length?`<div class="tbl-wrap" style="max-height:380px;overflow:auto"><table><thead><tr><th>Nhân sự</th><th>Nơi làm</th><th>Vị trí</th><th>Ngày</th><th>HCNS phụ trách</th></tr></thead><tbody>${al.map(a=>{const own=a.r.shop?shopOwner(a.r.shop,m):'';const dd=a.date?diffDays(TODAY,a.date):null;return `<tr><td><b>${esc(a.r.name)}</b><div class="mini num">${esc(a.r.code)}</div></td><td>${esc(sysPlace(a.r))}<div class="mini">${esc(a.r.area)}</div></td><td>${esc(a.r.pos)}</td><td class="num">${fmtD(a.date)} ${dd!=null?`<span class="pill ${dd<0?'bad':dd<=7?'warn':''}">${dd<0?'quá '+(-dd)+' ngày':dd===0?'hôm nay':'còn '+dd+' ngày'}</span>`:''}</td><td>${own?esc(staffName(own)):'<span class="note">—</span>'}</td></tr>`}).join('')}</tbody></table></div>
-      <div class="row mt"><button class="btn" data-act="sys-copy">Sao chép tin nhắc</button>${S.canWrite?`<span class="note">Giao việc cho</span><select id="sysAssign"><option value="">HCNS phụ trách nhà thuốc</option>${st.map(s=>`<option value="${s.id}" ${S.sysAssign===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select><button class="btn pri" data-act="sys-tasks">Tạo việc nhắc</button>`:''}</div>`:'<div class="empty">Không có trường hợp nào.</div>'}
+      <div class="row mt"><button class="btn" data-act="sys-copy">Sao chép tin nhắc</button></div>`:'<div class="empty">Không có trường hợp nào.</div>'}
     </div>
     <div class="panel"><h2>Biến động 12 tháng <span class="legend"><span style="--c:var(--ok)">Vào mới</span><span style="--c:var(--bad)">Nghỉ việc</span></span></h2>${moveChart(mv)}</div>
   </div>
@@ -1177,7 +1177,7 @@ function vRec(){
     <div class="tbl-wrap" style="max-height:420px;overflow:auto"><table class="recbad"><thead><tr><th>Người phụ trách</th><th>Mã hồ sơ</th><th>Vị trí</th><th>Địa bàn</th><th>Trạng thái</th><th>Ngày nộp</th><th>Hạn xử lý</th><th>Cảnh báo</th></tr></thead><tbody>
     ${stale.slice(0,300).map(x=>`<tr><td><b>${esc(shortName(x.o))}</b>${x.src?'':'<div class="mini">gán theo vùng</div>'}</td><td class="num">${esc(x.code)}</td><td>${esc(x.p)}</td><td>${esc(x.ar)}</td><td>${esc(x.st)}</td><td class="num">${fmtD(x.sub)}</td><td class="num">${fmtD(x.due)}</td><td><span class="pill bad">${esc(x.stale)} · ${x.over} ngày</span></td></tr>`).join('')}
     </tbody></table></div>${stale.length>300?`<p class="note">Hiển thị 300/${stale.length} hồ sơ quá hạn lâu nhất.</p>`:''}
-    <div class="row mt"><button class="btn" data-act="rec-copy">Sao chép tin nhắc</button>${S.canWrite?`<button class="btn pri" data-act="rec-tasks">Tạo việc nhắc cho từng người</button>`:''}</div>`:'<div class="empty">Không có hồ sơ treo. Tốt lắm!</div>'}
+    <div class="row mt"><button class="btn" data-act="rec-copy">Sao chép tin nhắc</button></div>`:'<div class="empty">Không có hồ sơ treo. Tốt lắm!</div>'}
   </div>
   <div class="panel mt"><h2>Bảng điểm người phụ trách <small>${f.mon==='3m'?'3 tháng gần nhất':f.mon?fmtM(f.mon):'từ '+fmtDY(R.from)} · ${f.grp===''?'mọi nhóm':REC_GRP[+f.grp]}</small></h2>
     <div class="tbl-wrap"><table><thead><tr><th>Người phụ trách</th><th class="r">Hồ sơ</th><th class="r">Có PV1</th><th class="r">Đúng hạn ≤3 ngày LV</th><th class="r">Nộp → PV1 (ngày LV)</th><th class="r">Đi làm thực tế</th><th class="r">Đạt TG tuyển</th><th class="r">Nộp → đi làm (ngày)</th><th class="r">Nghỉ ≤90 ngày</th><th class="r">Hồ sơ treo</th><th class="r">Điểm</th></tr></thead><tbody>
@@ -2634,7 +2634,10 @@ vMe=function(){const h=_vMeMt();const sid=S.me,m=S.month;const xs=kadjOf(m,sid);
     ${xs.length?`<div class="panel"><h2>Điểm cộng / trừ KPI ${fmtM(m)} <small>theo biên bản họp, đã tính vào KPI tháng</small></h2>${xs.map(a=>`<div class="mt-ri ${+a.pts<0?'bad':'ok'}"><span>${esc(a.reason)} <span class="mini">· họp ${fmtD(a.date)}</span></span><b class="num">${+a.pts>0?'+':''}${nf(a.pts)}đ</b></div>`).join('')}</div>`:''}</div>`;
   const i=h.indexOf('<div class="stats">');return i>=0?h.slice(0,i)+box+h.slice(i):box+h};
 
-function opWaitN(){opRkSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
+/* Dọn 1 lần: xóa toàn bộ việc giao cũ (mục Công việc đã bỏ), chỉ giữ việc sinh từ biên bản họp */
+let _tkClean=false;function tkClean(){if(_tkClean||!S.cfgLoaded||S.role==='staff'||!S.canWrite||!S.loaded.has('tasks')||+S.config.tasksClean>=1||!S.db)return;_tkClean=true;
+  setTimeout(async()=>{const old=S.tasks.filter(t=>!t.meetingId);for(const t of old)await del('tasks/'+t.id);await write('config/main',{...clean(S.config),tasksClean:1}).catch(()=>{});if(old.length)toast(`Đã xóa ${old.length} việc giao cũ`)},2500)}
+function opWaitN(){tkClean();opRkSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
 init();
 </script>
 </body>
