@@ -1604,13 +1604,13 @@ function kpCats(m,sid){const code=kpCode(sid);const p=rkPlan(m)[code];const max=
   const es=(logDoc(m,sid)?.entries||[]).filter(e=>!isVoidLog(e));const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
   const ov=((S.config.kpiPct||{})[m]||{})[code]||{};const cats=[];
   if(td){const r=kpRk(m)[sid];const got=r?r.kpi:0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
-  const BC=50;cats.push({k:'Báo cáo',pts:BC,pct:1,src:'Tự cộng',note:'Tự cộng 50 điểm cho mục báo cáo',man:'',use:1,got:BC,fixed:true});
-  const rest=max-td-BC;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
+  const BC=50;cats.push({k:'Báo cáo',pts:BC,pct:1,src:'Tự cộng ngoài thang 1000',note:'Tự cộng 50 điểm cho mục báo cáo (tối đa 1050)',man:'',use:1,got:BC,fixed:true});
+  const rest=max-td;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
   cats.push({k,pts:rest,pct,src:'Điểm nhật ký công việc ngày, không tính các dòng tuyển dụng (mã 01.xx)',note:`${nf(r1(other))} điểm nhật ký${recLog?` · bỏ ${nf(r1(recLog))} điểm báo cáo tuyển dụng`:''}`,man:man??'',use,got:Math.round(Math.min(rest,rest*use))});
   return cats}
 const _kpiLog=kpiOf;
 kpiOf=function(m,sid){const L=_kpiLog(m,sid);const cats=kpCats(m,sid);if(!cats)return {...L,log:true};
-  const plan=cats.reduce((a,c)=>a+c.pts,0),got=cats.reduce((a,c)=>a+c.got,0);const val=Math.max(0,Math.min(got,+S.config.kpiMax||1000)-L.pen);const max=Math.max(plan,1);
+  const plan=cats.reduce((a,c)=>a+c.pts,0),got=cats.reduce((a,c)=>a+c.got,0);const val=Math.max(0,Math.min(got,plan)-L.pen);const max=Math.max(plan,1);
   return {...L,has:true,cats,plan,logRaw:L.raw,raw:got,val:r1(val),max,pct:r1(val/max*100),grade:gradeOf(val/max*100),over:false,alloc:true}};
 function kpDetail(s,m,k){if(!k.cats)return '';const dis=S.canWrite?'':'disabled';const code=kpCode(s.id);
   return `<div style="padding:6px 0 12px"><b style="font-size:13px">KPI ${fmtM(m)}: ${nf(k.raw)}/${nf(k.plan)} điểm</b>
@@ -2410,6 +2410,75 @@ function opRkSync(){if(S.role==='staff'||!S.canWrite||!opHasSys()||Date.now()-_o
   setTimeout(()=>S.okrp.forEach(d=>{if(!(d.objectives||[]).some(o=>(o.krs||[]).some(k=>String(k.src||'').startsWith('rk-'))))return;const v=opRkCalc(d.staffId,d.quarter);const old=d.rkLive||{};
     if(['real','NVBH','CHT','QLKV','VP','kpi'].some(k=>(old[k]||0)!==v[k]))write('okrp/'+d.id,{...clean(d),rkLive:{...v,at:new Date().toISOString()}}).catch(()=>{})}),1500)}
 setInterval(opRkSync,10*60e3);
+/* ===================== Danh sách xét thưởng KPIs tháng (mẫu TCHC) =====================
+   Tổng chỉ tiêu đánh giá = KPI tháng trên web (thang 1000 + 50đ báo cáo = tối đa 1050), chưa trừ lỗi.
+   Đánh giá lại = Tổng chỉ tiêu − Điểm trừ + Điểm cộng. Xếp loại: A ≥ 1050, B ≥ 950, C ≥ 900, còn lại D.
+   Mức thưởng: A 990.000 · B 660.000 · C 330.000 · D 0. Thử việc (TV), thai sản (TS) không xét thưởng.
+   Phần sửa tay theo tháng lưu ở bonus/<yyyy-mm>: {rows:{staffId:{st,minus,plus,note,f}}, signer, approver}. */
+S.kbDocs={};
+const KB_DEF={tA:1050,tB:950,tC:900,A:990000,B:660000,C:330000,D:0,signer:'Lê Thùy Linh',approver:'Đặng Thị Thu Thủy'};
+const kbCfg=()=>({...KB_DEF,...(S.config.kpiBonus||{})});
+function kbDoc(m){if(!(m in S.kbDocs)){S.kbDocs[m]=null;if(S.db&&S.role!=='staff')S.db.doc('bonus/'+m).onSnapshot(s=>{S.kbDocs[m]=s.exists?s.data():{};if(S.view==='kpi')render()},()=>{S.kbDocs[m]={}})}return S.kbDocs[m]||{}}
+function kbSt(s){if((s.status||'active')==='leave')return 'TS';let r=null;try{const c=String(s.code||'').toUpperCase();r=c?sysRows().find(x=>String(x.code||'').toUpperCase()===c):null}catch(_){}
+  const t=String(r&&r.status||'');return /thai sản/i.test(t)?'TS':/thử việc/i.test(t)?'TV':'CT'}
+const kbGrade=(v,c)=>v==null?'':v>=c.tA?'A':v>=c.tB?'B':v>=c.tC?'C':'D';
+function kbRows(m){const c=kbCfg(),D=kbDoc(m),ov=D.rows||{};
+  return allStaff().filter(s=>(s.status||'active')!=='quit').sort((a,b)=>String(a.code||'').localeCompare(String(b.code||''))).map(s=>{const o=ov[s.id]||{};const k=kpiOf(m,s.id);
+    const st=o.st||kbSt(s);const auto=k.has?Math.round(Math.min(k.raw,k.max)):null;const f=o.f!=null&&o.f!==''?+o.f:auto;
+    const minus=o.minus!=null&&o.minus!==''?+o.minus:(+k.pen||0);const plus=+o.plus||0;const xet=st==='CT'&&f!=null;
+    const v=xet?f-minus+plus:null;const g=xet?kbGrade(v,c):'';const amt=xet?(c[g]||0):0;
+    const pn=(logDoc(m,s.id)||{}).penaltyNote||'';const note=o.note!=null?o.note:(st==='TV'?'Thử việc chưa xét':st==='TS'?'Nghỉ thai sản':pn);
+    return {s,st,auto,f,minus,plus,v,g,amt,note,o}})}
+/* Đọc số tiền bằng chữ */
+function kbWords(n){n=Math.round(+n||0);if(!n)return 'Không đồng./.';const ch=['không','một','hai','ba','bốn','năm','sáu','bảy','tám','chín'];
+  const three=(x,full)=>{const t=Math.floor(x/100),c=Math.floor(x%100/10),d=x%10;let r=[];if(full||t)r.push(ch[t]+' trăm');
+    if(c>1){r.push(ch[c]+' mươi');if(d===1)r.push('mốt');else if(d===5)r.push('lăm');else if(d===4)r.push('tư');else if(d)r.push(ch[d])}
+    else if(c===1){r.push('mười');if(d===5)r.push('lăm');else if(d)r.push(ch[d])}else if(d){if(full||t)r.push('lẻ');r.push(ch[d])}return r.join(' ')};
+  const u=['',' nghìn',' triệu',' tỷ'];const parts=[];let i=0;while(n>0){parts.unshift([n%1000,i]);n=Math.floor(n/1000);i++}
+  const out=parts.map(([x,k],j)=>x?three(x,j>0)+u[k]:'').filter(Boolean).join(' ');return out.charAt(0).toUpperCase()+out.slice(1)+' đồng./.'}
+const kbMoney=n=>Number(n||0).toLocaleString('en-US');
+function kbPanel(m){if(S.role==='staff')return '';const c=kbCfg(),rows=kbRows(m),dis=S.canWrite?'':'disabled';const tot=rows.reduce((a,r)=>a+r.amt,0);
+  const inp=(r,k,v,w,t='number')=>`<input ${t==='number'?'class="num" type="number" step="any"':''} id="kb-${k}-${esc(r.s.id)}" data-kb="${k}" data-id="${esc(r.s.id)}" value="${esc(v??'')}" style="width:${w}px${t==='number'?';text-align:right':''}" ${dis}>`;
+  return `<div class="panel mt" id="kbPanel"><h2>Danh sách xét thưởng KPIs ${fmtM(m)} <small>tổng chỉ tiêu lấy từ KPI tháng (tối đa 1050 = 1000 + 50đ báo cáo) · ô trống là để web tự tính</small></h2>
+  <div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap"><button class="btn pri" data-act="kb-print">In / Lưu PDF</button>${S.dl?`<button class="btn" data-act="kb-html">Tải bảng in (.html)</button>`:''}<span class="note">Xếp loại A ≥ ${c.tA} · B ≥ ${c.tB} · C ≥ ${c.tC} · thưởng ${kbMoney(c.A)} / ${kbMoney(c.B)} / ${kbMoney(c.C)} đ · TV, TS không xét</span></div>
+  <div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th><th>Tình trạng</th><th class="r">Tổng chỉ tiêu</th><th class="r">Điểm trừ</th><th class="r">Điểm cộng</th><th class="r">Đánh giá lại</th><th>Xếp loại</th><th class="r">Mức thưởng</th><th>Ghi chú</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td class="num">${esc(r.s.code||'')}</td><td><b>${esc(r.s.name)}</b></td>
+    <td><select data-kb="st" data-id="${esc(r.s.id)}" ${dis}>${['CT','TV','TS'].map(x=>`<option ${r.st===x?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td class="r">${inp(r,'f',r.o.f??'',70)}<div class="mini">web: ${r.auto==null?'chưa có':nf(r.auto)}</div></td>
+    <td class="r">${inp(r,'minus',r.o.minus??'',60)}${r.o.minus==null||r.o.minus===''?`<div class="mini">web: ${nf(r.minus)}</div>`:''}</td>
+    <td class="r">${inp(r,'plus',r.o.plus??'',60)}</td>
+    <td class="r num"><b>${r.v==null?'—':nf(r.v)}</b></td><td>${r.g?`<span class="grade ${r.g}">${r.g}</span>`:'—'}</td><td class="r num">${r.st==='CT'&&r.v!=null?kbMoney(r.amt):'—'}</td>
+    <td>${inp(r,"note",r.o.note??"",180,"text").replace('<input','<input placeholder="'+esc(r.note)+'"')}</td></tr>`).join('')}
+  <tr><td></td><td><b>TỔNG</b></td><td colspan="6"></td><td class="r num"><b>${kbMoney(tot)}</b></td><td class="mini">${esc(kbWords(tot))}</td></tr></tbody></table></div></div>`}
+function kbHtml(m){const c=kbCfg(),D=kbDoc(m),rows=kbRows(m);const tot=rows.reduce((a,r)=>a+r.amt,0);const [y,mm]=m.split('-');
+  const td=(v,cl='')=>`<td class="${cl}">${v??''}</td>`;
+  return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Danh sách xét thưởng KPIs tháng ${mm}/${y}</title><style>
+@page{size:A4 landscape;margin:12mm 10mm}*{box-sizing:border-box}body{font-family:"Times New Roman",serif;font-size:12pt;color:#000;margin:0;padding:16px}
+.co{font-weight:bold;font-size:11pt;line-height:1.5}h1{text-align:center;font-size:15pt;margin:10px 0 12px}
+table{border-collapse:collapse;width:100%}th,td{border:1px solid #000;padding:5px 6px;vertical-align:middle}th{font-weight:bold;text-align:center;font-size:11pt}
+td.c{text-align:center}td.r{text-align:right}td.note{white-space:pre-line;font-size:11pt}tr.tot td{font-weight:bold}
+.words{margin:10px 0 0 40px;font-style:italic;font-weight:bold}.sign{display:grid;grid-template-columns:1fr 1fr 1fr;margin-top:12px;text-align:center}
+.sign .d{grid-column:3;font-style:italic;margin-bottom:4px}.sign b{display:block;margin-bottom:70px}.tool{margin-bottom:10px}@media print{.tool{display:none}body{padding:0}}
+</style></head><body><div class="tool"><button onclick="window.print()">In / Lưu PDF</button></div>
+<div class="co">CÔNG TY CỔ PHẦN UPHARMA<br>Bộ phận: TCHC - UPHARMA</div>
+<h1>DANH SÁCH XÉT THƯỞNG KPIs THÁNG ${mm} NĂM ${y}</h1>
+<table><thead><tr><th style="width:4%">STT</th><th style="width:9%">Mã NV</th><th style="width:17%">Họ và tên</th><th style="width:7%">Tình trạng NV</th><th style="width:8%">Tổng chỉ tiêu đánh giá (%)</th><th style="width:7%">Điểm trừ</th><th style="width:7%">Điểm cộng</th><th style="width:8%">Đánh giá lại</th><th style="width:6%">Xếp loại</th><th style="width:9%">Mức thưởng</th><th>Ghi chú</th></tr></thead><tbody>
+${rows.map((r,i)=>{const xet=r.st==='CT'&&r.f!=null;return `<tr>${td(i+1,'c')}${td(esc(r.s.code||''),'c')}${td(esc(r.s.name),'c')}${td(r.st,'c')}${td(xet?r.f:'','c')}${td(xet&&r.minus?r.minus:'','c')}${td(xet&&r.plus?r.plus:'','c')}${td(xet?r.v:'','c')}${td(r.g,'c')}${td(xet?kbMoney(r.amt):'','r')}${td(esc(r.note),'note')}</tr>`}).join('')}
+<tr class="tot"><td></td><td></td><td class="c">TỔNG</td><td></td><td></td><td></td><td></td><td></td><td></td><td class="r">${kbMoney(tot)}</td><td></td></tr></tbody></table>
+<div class="words">Bằng chữ: ${esc(kbWords(tot))}</div>
+<div class="sign"><div class="d">Hà Nội, ngày &nbsp;&nbsp;&nbsp; tháng &nbsp;&nbsp;&nbsp; năm ${y}</div><div><b>Người lập biểu</b></div><div><b>Phòng TCHC</b>${esc(D.signer||c.signer)}</div><div><b>Phê duyệt</b>${esc(D.approver||c.approver)}</div></div>
+</body></html>`}
+function kbSave(m,sid,k,v){const D=kbDoc(m);const rows=JSON.parse(JSON.stringify(D.rows||{}));rows[sid]=rows[sid]||{};if(v===''||v==null)delete rows[sid][k];else rows[sid][k]=k==='note'||k==='st'?v:+v;
+  if(k==='st'&&v===kbSt(S.staff.find(x=>x.id===sid)||{}))delete rows[sid].st;
+  S.kbDocs[m]={...D,rows};return write('bonus/'+m,{...D,rows,month:m,updatedAt:new Date().toISOString()})}
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||!t.dataset.kb||S.role==='staff')return;if(!needWrite())return;kbSave(S.month,t.dataset.id,t.dataset.kb,t.value).then(()=>render()).catch(()=>{})});
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act="kb-print"],[data-act="kb-html"]');if(!el)return;const m=S.month,html=kbHtml(m);
+  if(el.dataset.act==='kb-html'){saveFile(`Danh-sach-xet-thuong-KPIs_T${m.slice(5,7)}-${m.slice(0,4)}.html`,html);return}
+  let f=document.getElementById('kbFrame');if(f)f.remove();f=document.createElement('iframe');f.id='kbFrame';f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(f);
+  f.srcdoc=html;f.onload=()=>{try{f.contentWindow.focus();f.contentWindow.print()}catch(_){toast('Trình duyệt chặn in, hãy dùng "Tải bảng in (.html)"')}}});
+const _vKpiKb=vKpi;
+vKpi=function(){return _vKpiKb()+kbPanel(S.month)};
+
 function opWaitN(){opRkSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
 init();
 </script>
