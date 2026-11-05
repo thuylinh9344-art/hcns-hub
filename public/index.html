@@ -260,6 +260,10 @@ table.recbad tbody td{background:color-mix(in srgb,var(--bad-soft) 55%,var(--sur
 .mt-ri.bad{background:#fde8e6}.mt-ri.warn{background:#fff3e0}.mt-ri.ok{background:#e7f4ec}
 .mt-drow{display:grid;grid-template-columns:130px 130px minmax(0,1fr) 34px;gap:6px;margin-bottom:6px}
 @media (max-width:900px){.mt-item{grid-template-columns:1fr}.mt-r{justify-items:start;text-align:left}.mt-drow{grid-template-columns:1fr 1fr}.mt-drow [data-dt]{grid-column:1/-1}}
+.mt-tick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 9px 2px 3px;font:inherit;font-size:12px;cursor:pointer;color:inherit}
+.mt-tick i{width:18px;height:18px;border-radius:50%;border:2px solid #b9c4bc;display:inline-flex;align-items:center;justify-content:center;font-style:normal;font-size:12px;font-weight:800;color:#fff;flex:none}
+.mt-tick.on{background:#e7f4ec;border-color:#9bd3ae}.mt-tick.on i{background:#1f8a4c;border-color:#1f8a4c}.mt-tick.on span{color:#17703c;text-decoration:line-through}
+.mt-ri .mt-tick{padding:2px;border:0;background:none}.mt-ri{align-items:center}
 </style>
 </head>
 <body>
@@ -2412,7 +2416,7 @@ const _vMeOp=vMe;
 vMe=function(){if(S.role!=='staff')return _vMeOp();const c=S.canWrite;S.canWrite=false;try{return `<div class="wk-state">Nhật ký đồng bộ từ sheet Báo cáo công việc, ở đây chỉ để xem. Cập nhật nhật ký trên sheet như thường lệ.</div>`+_vMeOp().replace(/<button[^>]*data-act="new-task"[^>]*>.*?<\/button>/g,'')}finally{S.canWrite=c}};
 /* Chế độ nhân viên: chỉ cho các thao tác OKR cá nhân, xem nhật ký, xuất CSV; chặn giao việc / sửa nhật ký. */
 document.addEventListener('click',e=>{if(S.role!=='staff')return;const el=e.target.closest('[data-act]');if(!el)return;const a=el.dataset.act;
-  if(a.startsWith('op-')||['close','rm-row','csv-log','me'].includes(a))return;e.preventDefault();e.stopImmediatePropagation()},true);
+  if(a.startsWith('op-')||['close','rm-row','csv-log','me','mt-tick'].includes(a))return;e.preventDefault();e.stopImmediatePropagation()},true);
 /* Báo cáo tuần: thêm bảng check-in OKR cá nhân của tuần đang xem (chỉ hiện trên web, không vào bản in). */
 const _vWeeklyOp=vWeekly;
 vWeekly=function(){const h=_vWeeklyOp();const w=weekRange(S.rep.date||TODAY)[0],q=qOf(w);const st=activeStaff();const rows=st.map(s=>({s,d:opDoc(q,s.id)})).filter(r=>r.d&&r.d.status==='approved');
@@ -2515,9 +2519,14 @@ function mtTasks(mt,it){const ppl=(it.people||[]).includes('all')?activeStaff().
       status:it.status==='done'?'done':'doing',start:mt.date,due:it.deadline||'',progress:it.status==='done'?100:0,note:note+`\nTheo biên bản họp ${fmtDY(mt.date)}.`,okrId:'',meetingId:mt.id,createdAt:new Date().toISOString()}]})}
 async function mtSync(mt,oldMt){const want=new Map();(mt.items||[]).forEach(it=>mtTasks(mt,it).forEach(([id,b])=>want.set(id,b)));
   const had=S.tasks.filter(t=>t.meetingId===mt.id);for(const t of had)if(!want.has(t.id))await del('tasks/'+t.id);
-  for(const [id,b] of want){const o=S.tasks.find(t=>t.id===id);const body={...(o?clean(o):{}),...b,createdAt:o?.createdAt||b.createdAt};if(!o||JSON.stringify(clean(o))!==JSON.stringify(body))await write('tasks/'+id,body).catch(()=>{})}}
+  for(const [id,b] of want){const o=S.tasks.find(t=>t.id===id);const body={...(o?clean(o):{}),...b,createdAt:o?.createdAt||b.createdAt};if(o){body.status=o.status;body.progress=o.progress;if(o.doneAt)body.doneAt=o.doneAt}if(!o||JSON.stringify(clean(o))!==JSON.stringify(body))await write('tasks/'+id,body).catch(()=>{})}}
 function mtSave(mt){const body=clean(mt);body.updatedAt=new Date().toISOString();return write('meetings/'+mt.id,body).then(()=>mtSync(mt))}
 
+const mtTk=(mt,it,sid)=>S.tasks.find(t=>t.id==='mt_'+mt.id.replace(/^mt_/,'')+'_'+it.id+'_'+sid);
+const mtBox=(t,label)=>t?`<button type="button" class="mt-tick ${isDone(t)?'on':''}" data-act="mt-tick" data-id="${esc(t.id)}" aria-pressed="${isDone(t)}" title="${isDone(t)?'Đã xong – bấm để bỏ tích':'Bấm khi hoàn thành'}"><i>${isDone(t)?'✓':''}</i>${label?`<span>${esc(label)}</span>`:''}</button>`:(label?`<span class="chip sm">${esc(label)}</span>`:'');
+const mtDoneI=(mt,it)=>{const p=mtProg(mt,it);return p.n>0&&p.d===p.n};
+const mtCanTick=t=>S.canWrite&&(S.role!=='staff'||t.owner===S.me);
+function mtProg(mt,it){const ts=S.tasks.filter(t=>t.meetingId===mt.id&&t.id.startsWith('mt_'+mt.id.replace(/^mt_/,'')+'_'+it.id+'_'));return {n:ts.length,d:ts.filter(isDone).length}}
 function vMeet(){
   const mt=mtCur();const list=mtSorted();const dis=S.canWrite?'':'disabled';
   const sel=list.length?`<select id="mtSel" aria-label="Chọn biên bản">${list.map(x=>`<option value="${esc(x.id)}" ${mt&&x.id===mt.id?'selected':''}>Họp ${fmtDY(x.date)}</option>`).join('')}</select>`:'';
@@ -2530,16 +2539,16 @@ function vMeet(){
     <div class="stat"><div class="k">Điểm KPI ${fmtM(S.month)}</div><div class="v">${(()=>{const xs=S.kadj.filter(a=>a.month===S.month);const t=xs.reduce((a,x)=>a+(+x.pts||0),0);return (t>0?'+':'')+nf(t)})()}</div><div class="s">${S.kadj.filter(a=>a.month===S.month).length} lần cộng/trừ</div></div></div>`;
   if(!mt)return h+`<div class="empty">Chưa có biên bản họp. Bấm “+ Biên bản mới” hoặc “Nhập biên bản (.json)”.</div>`+mtRemindPanel();
   const items=[...(mt.items||[])].sort((a,b)=>String(a.deadline||'9').localeCompare(String(b.deadline||'9')));
-  const near=items.filter(i=>i.status!=='done'&&i.deadline).map(i=>i.deadline).sort()[0];
+  const near=items.filter(i=>!mtDoneI(mt,i)&&i.deadline).map(i=>i.deadline).sort()[0];
   h+=`<div class="panel mt-head"><div><b>Biên bản họp ${esc(mt.title||'P.TCHC')} · ${fmtDY(mt.date)}</b><div class="note">${(mt.items||[]).length} nội dung trao đổi${near?` · hạn gần nhất ${fmtDY(near)}`:''}${mt.note?' · '+esc(mt.note):''}</div></div>
     ${S.canWrite?`<div class="row" style="gap:6px"><button class="btn sm" data-act="mt-edit-head">Sửa ngày / tiêu đề</button><button class="btn sm" data-act="mt-add">+ Nội dung</button><button class="btn sm danger" data-act="mt-del">Xóa biên bản</button></div>`:''}</div>`;
-  h+=`<div class="stack">${(mt.items||[]).map((it,i)=>{const st=MT_ST[it.status||'doing'];const dd=mtDays(it.deadline);const lateI=it.status!=='done'&&dd!=null&&dd<0;
+  h+=`<div class="stack">${(mt.items||[]).map((it,i)=>{const dd=mtDays(it.deadline);const lateI=!mtDoneI(mt,it)&&dd!=null&&dd<0;
     return `<div class="panel mt-item ${lateI?'late':''}"><div class="mt-l"><span class="pill">${esc(it.area||'Khác')}</span><b>${i+1}. ${esc(it.topic)}</b></div>
-      <div class="mt-p">${(it.people||[]).map(p=>`<span class="chip sm">${esc(mtWho(p))}</span>`).join('')}</div>
+      <div class="mt-p">${((it.people||[]).includes('all')?activeStaff().map(s=>s.id):(it.people||[])).map(p=>mtBox(mtTk(mt,it,p),shortName(p))).join('')}</div>
       <div class="mt-d">${it.goal?`<p><b>Mục tiêu chung:</b> ${esc(it.goal)}</p>`:''}${(it.details||[]).map(x=>`<div class="mt-row"><b>${esc(mtWho(x.who))}</b>${x.qty?`<span class="pill ok">${esc(x.qty)}</span>`:'<span></span>'}<span>${esc(x.text)}</span></div>`).join('')}</div>
       <div class="mt-r"><div class="mini">Deadline</div><b class="num">${it.deadline?fmtDY(it.deadline):'—'}</b>
-        <select data-mtst="${esc(it.id)}" ${dis} aria-label="Trạng thái">${Object.entries(MT_ST).map(([k,[,l]])=>`<option value="${k}" ${(it.status||'doing')===k?'selected':''}>${l}</option>`).join('')}</select>
-        ${lateI?`<span class="pill bad">Quá hạn ${-dd} ngày</span>`:dd!=null&&it.status!=='done'&&dd<=3?`<span class="pill warn">Còn ${dd} ngày</span>`:''}
+        ${(()=>{const p=mtProg(mt,it);return p.n&&p.d===p.n?'<span class="pill ok">✓ Hoàn thành</span>':`<span class="pill ${lateI?'bad':'warn'}">${p.d}/${p.n} người xong</span>`})()}
+        ${lateI?`<span class="pill bad">Quá hạn ${-dd} ngày</span>`:dd!=null&&!mtDoneI(mt,it)&&dd<=3?`<span class="pill warn">Còn ${dd} ngày</span>`:''}
         ${S.canWrite?`<button class="btn sm ghost" data-act="mt-edit" data-id="${esc(it.id)}">Sửa</button>`:''}</div></div>`}).join('')}</div>`;
   const adj=S.kadj.filter(a=>a.meetingId===mt.id);
   h+=`<div class="panel mt" style="margin-top:14px"><h2>Điểm cộng / trừ KPI theo biên bản này <small>cộng thẳng vào KPI tháng ${fmtM(ymOf(mt.date))} của từng người</small>${S.canWrite?` <button class="btn sm" data-act="mt-adj-add">+ Thêm</button>`:''}</h2>
@@ -2548,7 +2557,7 @@ function vMeet(){
 }
 function mtRemindPanel(){const open=S.tasks.filter(t=>t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));if(!open.length)return '';
   const by={};open.forEach(t=>(by[t.owner]??=[]).push(t));
-  return `<div class="panel" style="margin-top:14px"><h2>Nhắc việc theo người <small>tất cả biên bản, việc chưa hoàn thành</small></h2><div class="mt-rem">${Object.entries(by).map(([sid,ts])=>`<div><b>${esc(staffName(sid))}</b>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}"><span>${esc(t.title)}</span><span class="num">${t.due?fmtD(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}</div>`).join('')}</div></div>`}
+  return `<div class="panel" style="margin-top:14px"><h2>Nhắc việc theo người <small>việc chưa xong · tích ✓ khi hoàn thành (${S.tasks.filter(t=>t.meetingId&&isDone(t)).length} việc đã xong)</small></h2><div class="mt-rem">${Object.entries(by).map(([sid,ts])=>`<div><b>${esc(staffName(sid))}</b>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}">${mtBox(t,'')}<span style="flex:1">${esc(t.title)}</span><span class="num">${t.due?fmtD(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}</div>`).join('')}</div></div>`}
 function mtRemindText(){const open=S.tasks.filter(t=>t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));const by={};open.forEach(t=>(by[t.owner]??=[]).push(t));
   return `NHẮC VIỆC THEO BIÊN BẢN HỌP P.TCHC · ${fmtDY(TODAY)}\n`+Object.entries(by).map(([sid,ts])=>`\n${staffName(sid)}:\n`+ts.map(t=>{const d=mtDays(t.due);return `- ${t.title}: hạn ${t.due?fmtDY(t.due):'—'}${overdue(t)?' (ĐÃ QUÁ HẠN)':d!=null&&d<=3?` (còn ${d} ngày)`:''}`}).join('\n')).join('\n')}
 
@@ -2579,6 +2588,9 @@ function mtHeadDlg(mt){const isNew=!mt;mt=mt||{date:TODAY,title:'P.TCHC',note:''
 let mtArmed=null;
 document.addEventListener('click',async e=>{const el=e.target.closest('[data-act^="mt-"]');if(!el)return;const a=el.dataset.act,id=el.dataset.id;
   if(a==='mt-remind'){copyText(mtRemindText());return}
+  if(a==='mt-tick'){const t=S.tasks.find(x=>x.id===id);if(!t)return;if(!mtCanTick(t)){toast(S.role==='staff'?'Chỉ tích được việc của mình':'Bạn chỉ có quyền xem');return}
+    const done=!isDone(t);const body={...clean(t),status:done?'done':'doing',progress:done?100:0,doneAt:done?TODAY:null};t.status=body.status;t.progress=body.progress;t.doneAt=body.doneAt;render();
+    write('tasks/'+t.id,body).then(()=>toast(done?'Đã tích hoàn thành':'Đã bỏ tích')).catch(()=>{});return}
   if(!needWrite())return;const mt=mtCur();
   if(a==='mt-new'){mtHeadDlg(null);return}
   if(a==='mt-edit-head'){mtHeadDlg(mt);return}
@@ -2630,7 +2642,7 @@ kbRows=function(m){const c=kbCfg();return _kbRowsMt(m).map(r=>{const a=kadjSum(m
 const _vMeMt=vMe;
 vMe=function(){const h=_vMeMt();const sid=S.me,m=S.month;const xs=kadjOf(m,sid);const ts=S.tasks.filter(t=>t.owner===sid&&t.meetingId&&!isDone(t)).sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));
   if(!xs.length&&!ts.length)return h;
-  const box=`<div class="grid2" style="margin-bottom:14px">${ts.length?`<div class="panel"><h2>Việc từ biên bản họp <small>${ts.length} việc chưa xong</small></h2>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}"><span>${esc(t.title)}</span><span class="num">${t.due?fmtDY(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}</div>`:'<div></div>'}
+  const box=`<div class="grid2" style="margin-bottom:14px">${ts.length?`<div class="panel"><h2>Việc từ biên bản họp <small>${ts.length} việc chưa xong</small></h2>${ts.map(t=>{const d=mtDays(t.due);return `<div class="mt-ri ${overdue(t)?'bad':d!=null&&d<=3?'warn':''}">${mtBox(t,'')}<span style="flex:1">${esc(t.title)}${t.note?`<div class="mini" style="white-space:pre-line">${esc(t.note.split('\nTheo biên bản')[0])}</div>`:''}</span><span class="num">${t.due?fmtDY(t.due):'—'}${overdue(t)?' · quá hạn':d!=null&&d<=3?' · còn '+d+' ngày':''}</span></div>`}).join('')}<p class="mini" style="margin:6px 0 0">Tích ✓ khi hoàn thành.</p></div>`:'<div></div>'}
     ${xs.length?`<div class="panel"><h2>Điểm cộng / trừ KPI ${fmtM(m)} <small>theo biên bản họp, đã tính vào KPI tháng</small></h2>${xs.map(a=>`<div class="mt-ri ${+a.pts<0?'bad':'ok'}"><span>${esc(a.reason)} <span class="mini">· họp ${fmtD(a.date)}</span></span><b class="num">${+a.pts>0?'+':''}${nf(a.pts)}đ</b></div>`).join('')}</div>`:''}</div>`;
   const i=h.indexOf('<div class="stats">');return i>=0?h.slice(0,i)+box+h.slice(i):box+h};
 

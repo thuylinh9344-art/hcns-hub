@@ -49,6 +49,9 @@ service cloud.firestore {
     }
     match /hcns_hub/main/tasks/{id} {
       allow read: if hubStaff() && resource.data.owner == mySid();
+      // Nhân viên tự tích hoàn thành việc của mình (chỉ đổi trạng thái).
+      allow update: if hubStaff() && resource.data.owner == mySid()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'progress', 'doneAt']);
     }
     match /hcns_hub/main/kadj/{id} {
       allow read: if hubStaff() && resource.data.staffId == mySid();
