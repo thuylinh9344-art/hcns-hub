@@ -250,6 +250,7 @@ details.ref ul{margin:6px 0 0;padding-left:18px;font-size:12.5px;color:var(--mut
 tr.recalert td{background:var(--bad-soft)} tr.recalert td:first-child{box-shadow:inset 3px 0 0 var(--bad)}
 table.recbad tbody td{background:color-mix(in srgb,var(--bad-soft) 55%,var(--surface))}
 @media (max-width:860px){.lf{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.lf .w2{grid-column:1/-1}}
+.op-krrow{border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px}.op-src{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:6px}.op-src select{min-width:0}@media (max-width:620px){.op-src{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -1026,7 +1027,7 @@ function okrDlg(o){const isNew=!o;o=o||{quarter:S.okrQ,objective:'',owner:'',krs
     <label class="full">Mục tiêu (Objective)<input name="objective" required value="${esc(o.objective)}"></label>
     <label>Quý<input name="quarter" value="${esc(o.quarter)}" placeholder="2026-Q4" pattern="\\d{4}-Q[1-4]"></label>
     <label>Phụ trách chính<select name="owner"><option value="">Toàn phòng</option>${activeStaff().map(s=>`<option value="${s.id}" ${o.owner===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
-    <div class="full"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): tên · chỉ tiêu · đơn vị</b><div id="krRows">${(o.krs||[]).map(krRow).join('')}</div><button type="button" class="btn sm" data-act="add-kr">+ Thêm KR</button></div>
+    <div class="full" style="grid-column:1/-1"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): tên · chỉ tiêu · đơn vị</b><div id="krRows">${(o.krs||[]).map(krRow).join('')}</div><button type="button" class="btn sm" data-act="add-kr">+ Thêm KR</button></div>
   </div>`,`<div>${!isNew?delBtn('del-okr',o.id,'Xóa mục tiêu'):''}</div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="save-okr" data-id="${isNew?'':o.id}">Lưu</button></div>`)}
 const krRow=k=>`<div class="modrow3" data-cur="${esc(k.current??0)}"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt"><input data-kg class="num" type="number" step="any" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="rm-row" title="Bỏ">✕</button></div>`;
 
@@ -2158,6 +2159,26 @@ function confirmDel(el){if(el.dataset.sure){return true}el.dataset.sure='1';el.t
 S.okrp=S.okrp||[];S.members=S.members||[];S.role=S.role||'admin';S.opQ=S.opQ||qOf(TODAY);S.opSid=S.opSid||'';S.opWeek=S.opWeek||'';S.ciDraft=S.ciDraft||{};
 const OP_ST={draft:['','Nháp'],submitted:['warn','Chờ duyệt'],returned:['bad','Cần sửa'],approved:['ok','Đã duyệt']};
 const OP_AREAS=['Tuyển dụng','C&B','BHXH','HCNS phụ trách khu vực','Hành chính','Hồ sơ pháp lý/giấy tờ','Admin','Công đoàn'];
+const OP_PRE={'01':'Tuyển dụng','02':'C&B','03':'BHXH','04':'HCNS phụ trách khu vực','05':'Hồ sơ pháp lý/giấy tờ','06':'Admin','07':'Công đoàn','08':'Hành chính'};
+const OP_MEAS={qty:'SL hoàn thành',pts:'Điểm',n:'Số việc hoàn thành'};
+const OP_RK={'rk-real':'Thực tuyển (gồm học việc)','rk-NVBH':'Thực tuyển NVBH','rk-CHT':'Thực tuyển CHT','rk-QLKV':'Thực tuyển QLKV','rk-VP':'Thực tuyển văn phòng','rk-kpi':'Điểm KPI tuyển dụng (cộng các tháng)'};
+const OP_RK_AREA='Tuyển dụng';
+let _opRkC={};
+function opRkCalc(sid,q){const [a]=quarterRange(q);const ms=[a.slice(0,7),addDays(a,40).slice(0,7),addDays(a,70).slice(0,7)].filter(m=>m<=TODAY.slice(0,7));
+  const o={real:0,NVBH:0,CHT:0,QLKV:0,VP:0,kpi:0};
+  ms.forEach(m=>{if(!(_opRkC[m]&&_opRkC[m].sys===S.sys&&_opRkC[m].rec===S.rec&&_opRkC[m].cfg===S.config)){const v={};try{rkData(m).rows.forEach(r=>{v[r.s.id]=r})}catch(_){}_opRkC[m]={sys:S.sys,rec:S.rec,cfg:S.config,v}}
+    const r=_opRkC[m].v[sid];if(!r)return;o.real+=r.real;['NVBH','CHT','QLKV','VP'].forEach(g=>o[g]+=(r.cnt&&r.cnt[g])||0);o.kpi+=Math.round(r.kpi||0)});return o}
+const opHasSys=()=>{try{return S.role!=='staff'&&sysRows().length>0}catch(_){return false}};
+const opRkOf=d=>opHasSys()?opRkCalc(d.staffId,d.quarter):(d.rkLive||null);
+const opAreaOf=code=>OP_PRE[String(code||'').slice(0,2)]||((catBy(code)||{}).area)||'';
+const opCodes=area=>S.catalog.filter(c=>c.code&&opAreaOf(c.code)===area).sort((a,b)=>String(a.code).localeCompare(String(b.code)));
+const opDone=e=>/hoàn thành/i.test(String(e.status||''))&&!isVoidLog(e);
+function opEntries(sid,q){const [a,b]=quarterRange(q);const ms=new Set([a.slice(0,7),addDays(a,40).slice(0,7),addDays(a,70).slice(0,7)]);
+  return S.logs.filter(l=>l.staffId===sid&&ms.has(l.month)).flatMap(l=>(l.entries||[]).filter(e=>e.nod||!e.d||(e.d>=a&&e.d<=b)))}
+function opKrLive(k,E,rk){if(!k.src)return +k.current||0;if(k.src.startsWith('rk-')){if(!rk)return +k.current||0;const g=k.src.slice(3);return g==='real'?rk.real:g==='kpi'?rk.kpi:(rk[g]||0)}const xs=E.filter(e=>k.src==='all'?opAreaOf(e.code)===k.area:String(e.code)===k.src);
+  return Math.round((k.meas==='pts'?xs.reduce((t,e)=>t+entPts(e),0):k.meas==='n'?xs.filter(opDone).length:xs.filter(opDone).reduce((t,e)=>t+(+e.qty||0),0))*100)/100}
+function opLive(d){if(!d)return d;const E=opEntries(d.staffId,d.quarter);const rk=(d.objectives||[]).some(o=>(o.krs||[]).some(k=>String(k.src||'').startsWith('rk-')))?opRkOf(d):null;return {...d,objectives:(d.objectives||[]).map(o=>({...o,krs:(o.krs||[]).map(k=>k.src?{...k,current:opKrLive({...k,area:o.area},E,rk)}:k)}))}}
+const opSrcLbl=(k,area)=>!k.src?'nhập tay':k.src.startsWith('rk-')?'tự động · KPI tuyển dụng (DSNS + học việc) · '+(OP_RK[k.src]||''):k.src==='all'?`tự động · mọi mã việc mảng ${area} · ${OP_MEAS[k.meas||'pts']}`:`tự động · mã ${k.src} · ${OP_MEAS[k.meas||'qty']}`;
 const OP_CONF=[['ok','Đúng tiến độ'],['warn','Có rủi ro'],['bad','Chậm tiến độ']];
 const opId=(q,sid)=>q+'_'+sid;
 const opDoc=(q,sid)=>S.okrp.find(o=>o.id===opId(q,sid));
@@ -2192,10 +2213,10 @@ function opTeam(qSel){
     <div class="stat"><div class="k">Đã duyệt OKR</div><div class="v">${nAp}/${st.length}</div><div class="s">nhân viên</div></div>
     <div class="stat ${nWait?'warn':''}"><div class="k">Chờ chị duyệt</div><div class="v">${nWait}</div><div class="s">bản OKR</div></div>
     <div class="stat"><div class="k">Check-in tuần này</div><div class="v">${nCi}/${nAp||0}</div><div class="s">tuần ${opWkLbl(wk)}</div></div>
-    <div class="stat"><div class="k">Tiến độ TB</div><div class="v">${nAp?Math.round(rows.filter(r=>r.d&&r.d.status==='approved').reduce((a,r)=>a+opPct(r.d),0)/nAp)+'%':'—'}</div><div class="s">các OKR đã duyệt</div></div>
+    <div class="stat"><div class="k">Tiến độ TB</div><div class="v">${nAp?Math.round(rows.filter(r=>r.d&&r.d.status==='approved').reduce((a,r)=>a+opPct(opLive(r.d)),0)/nAp)+'%':'—'}</div><div class="s">các OKR đã duyệt</div></div>
   </div>
   <div class="tbl-wrap"><table><thead><tr><th>Nhân viên</th><th>Trạng thái</th><th class="r">Mục tiêu</th><th>Tiến độ</th><th>Check-in tuần này</th><th>Lần gần nhất</th><th></th></tr></thead><tbody>
-  ${rows.map(({s,d,last,ci})=>{const p=d?opPct(d):0;const stt=d?OP_ST[d.status||'draft']:['','Chưa lập'];const conf=ci&&OP_CONF.find(c=>c[0]===ci.conf);
+  ${rows.map(({s,d,last,ci})=>{const p=d?opPct(opLive(d)):0;const stt=d?OP_ST[d.status||'draft']:['','Chưa lập'];const conf=ci&&OP_CONF.find(c=>c[0]===ci.conf);
     return `<tr class="click" data-act="op-open" data-id="${esc(s.id)}"><td><b>${esc(s.name)}</b>${mem[s.id]?'':' <span class="mini">· chưa cấp tài khoản</span>'}</td><td><span class="pill ${stt[0]}">${stt[1]}</span></td><td class="r num">${d?(d.objectives||[]).length:0}</td>
       <td style="min-width:140px"><div class="row" style="gap:8px"><div class="bar" style="flex:1"><i class="${p>=70?'ok':p>=40?'':'warn'}" style="width:${p}%"></i></div><b class="num">${p}%</b></div></td>
       <td>${ci?`<span class="pill ${conf?conf[0]:'ok'}">✓ ${conf?conf[1]:'Đã gửi'}</span>`:d&&d.status==='approved'?'<span class="pill warn">Chưa gửi</span>':'<span class="mini">—</span>'}</td>
@@ -2215,7 +2236,7 @@ function opMembersPanel(st,mem){
 
 function opPerson(sid,tools){
   const staff=S.role==='staff',q=S.opQ;const s=S.staff.find(x=>x.id===sid)||{id:sid,name:staffName(sid)};
-  const d=opDoc(q,sid);const doc=d||opBlank(q,sid);const st=OP_ST[doc.status||'draft'];const ed=opEditable(d)&&S.canWrite;
+  const d=opDoc(q,sid);const doc=opLive(d)||opBlank(q,sid);const E=opEntries(sid,q);const st=OP_ST[doc.status||'draft'];const ed=opEditable(d)&&S.canWrite;
   const p=opPct(doc);const qr=quarterRange(q);const elapsed=Math.max(0,Math.min(100,Math.round(diffDays(qr[0],TODAY)/diffDays(qr[0],qr[1])*100)));
   const deptOkr=S.okrs.filter(o=>o.quarter===q);
   const objs=(doc.objectives||[]);
@@ -2227,7 +2248,8 @@ function opPerson(sid,tools){
   const objHtml=objs.length?objs.map((o,i)=>{const op=objPct(o);const link=deptOkr.find(x=>x.id===o.okrId);
     return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b><div class="note">${o.area&&OP_AREAS.includes(o.area)?`<span class="pill">${esc(o.area)}</span> `:'<span class="pill bad">Chưa chọn mảng</span> '}${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
       <div class="bar"><i class="${op>=elapsed?'ok':op>=elapsed-20?'':'warn'}" style="width:${op}%"></i></div>
-      ${(o.krs||[]).map((k,j)=>`<div class="kr"><span>KR${j+1}. ${esc(k.title)}</span><div class="bar"><i style="width:${krPct(k)}%"></i></div><div class="vals"><span class="num"><b>${nf(k.current||0)}</b> / ${nf(k.target)} ${esc(k.unit||'')}</span></div></div>`).join('')}
+      ${(()=>{if(o.area===OP_RK_AREA){const rk=d?opRkOf(d):null;return rk?`<div class="mini">KPI tuyển dụng ${fmtQ(q)} (theo quy ước KPI tuyển dụng, không tính nhật ký): thực tuyển ${rk.real} người · ${nf(rk.kpi)} điểm KPI</div>`:''}const xs=E.filter(e=>opAreaOf(e.code)===o.area);return o.area?`<div class="mini">Nhật ký ${fmtQ(q)} mảng ${esc(o.area)} (cập nhật trực tiếp): ${xs.filter(opDone).length} việc hoàn thành · ${nf(Math.round(xs.reduce((t,e)=>t+entPts(e),0)))} điểm</div>`:''})()}
+      ${(o.krs||[]).map((k,j)=>`<div class="kr"><span>KR${j+1}. ${esc(k.title)}<div class="mini">${esc(opSrcLbl(k,o.area))}</div></span><div class="bar"><i style="width:${krPct(k)}%"></i></div><div class="vals"><span class="num"><b>${nf(k.current||0)}</b> / ${nf(k.target)} ${esc(k.unit||'')}</span></div></div>`).join('')}
     </div>`}).join(''):`<div class="empty">${staff?'Chưa có mục tiêu. Bấm “+ Thêm mục tiêu” để lập OKR '+fmtQ(q)+'.':'Nhân viên chưa lập OKR '+fmtQ(q)+'.'}</div>`;
   const editTools=ed?`<div class="row" style="gap:8px;margin-top:4px">${objs.length<5?`<button class="btn" data-act="op-new-obj">+ Thêm mục tiêu</button>`:''}${objs.length?`<button class="btn pri" data-act="op-submit">Gửi chị Linh duyệt</button>`:''}<span class="note">Tối đa 5 mục tiêu, mỗi mục tiêu thuộc 1 mảng công việc chính và có 1–5 kết quả then chốt (KR) đo được bằng số.</span></div>`
     :(staff&&doc.status==='submitted'&&S.canWrite?`<div class="row" style="margin-top:4px"><button class="btn" data-act="op-withdraw">Rút lại để sửa</button></div>`:'');
@@ -2242,6 +2264,7 @@ function opCheckin(doc,staff){
   const dr=S.ciDraft[key]||(S.ciDraft[key]={krs:{...((ci&&ci.krs)||{})},conf:ci?ci.conf:'ok',done:ci?ci.done:'',issue:ci?ci.issue:'',next:ci?ci.next:'',fb:ci?ci.fb||'':''});
   const can=S.canWrite&&staff,dis=can?'':'disabled';
   const krIn=(doc.objectives||[]).map((o,i)=>(o.krs||[]).map((k,j)=>{const v=dr.krs[k.id]??(prev&&prev.krs&&prev.krs[k.id])??k.current??0;
+    if(k.src)return `<label>O${i+1}·KR${j+1}. ${esc(k.title)} <span class="mini">(chỉ tiêu ${nf(k.target)} ${esc(k.unit||'')}, tự động từ nhật ký)</span><input type="number" value="${esc(k.current)}" disabled></label>`;
     return `<label>O${i+1}·KR${j+1}. ${esc(k.title)} <span class="mini">(chỉ tiêu ${nf(k.target)} ${esc(k.unit||'')}, đạt lũy kế)</span><input type="number" step="any" id="ci-k-${esc(k.id)}" data-ci="kr" data-k="${esc(k.id)}" value="${esc(v)}" ${dis}></label>`}).join('')).join('');
   const hist=Object.keys(doc.checkins||{}).sort().reverse().map(k=>{const c=doc.checkins[k];const cf=OP_CONF.find(x=>x[0]===c.conf)||OP_CONF[0];
     return `<div class="panel" style="padding:12px 14px"><div class="row" style="justify-content:space-between"><b>Tuần ${opWkLbl(k)}</b><span class="pill ${cf[0]}">${cf[1]}</span></div>
@@ -2273,13 +2296,15 @@ function opCheckin(doc,staff){
 
 function opObjDlg(doc,o){const isNew=!o;o=o||{id:opRid(),title:'',okrId:'',krs:[{id:opRid(),title:'',target:'',unit:''},{id:opRid(),title:'',target:'',unit:''}]};
   const dept=S.okrs.filter(x=>x.quarter===doc.quarter);
-  const row=k=>`<div class="modrow3" data-kid="${esc(k.id||opRid())}" data-cur="${esc(k.current??0)}"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt, VD: Tuyển đủ NVBH cho 10 nhà"><input data-kg class="num" type="number" step="any" min="0" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="rm-row" title="Bỏ">✕</button></div>`;
+  const row=k=>`<div class="op-krrow" data-kid="${esc(k.id||opRid())}" data-cur="${esc(k.current??0)}"><div class="modrow3" style="margin-bottom:4px"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt, VD: Tuyển đủ NVBH cho 10 nhà"><input data-kg class="num" type="number" step="any" min="0" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="op-rm-kr" title="Bỏ">✕</button></div>
+    <div class="op-src"><select data-kc aria-label="Nguồn số liệu">${opSrcOpts(opObjDlg._area,k.src||'')}</select><select data-km aria-label="Cách đo" ${!k.src||String(k.src).startsWith('rk-')?'disabled':''}>${Object.entries(OP_MEAS).map(([v,l])=>`<option value="${v}" ${(k.meas||'qty')===v?'selected':''}>${l}</option>`).join('')}</select></div></div>`;
+  opObjDlg._area=o.area||'';
   opObjDlg._row=row;
   openDlg(isNew?'Thêm mục tiêu OKR cá nhân':'Sửa mục tiêu OKR cá nhân',`<div class="form">
     <label class="full">Mảng công việc chính<select name="area" required><option value="">— Chọn mảng —</option>${OP_AREAS.map(a=>`<option ${o.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
     <label class="full">Mục tiêu (Objective)<input name="title" required value="${esc(o.title)}" placeholder="VD: Ổn định nhân sự các nhà thuốc khu vực phụ trách"></label>
     <label class="full">Gắn với OKR phòng<select name="okrId"><option value="">— Không gắn —</option>${dept.map(x=>`<option value="${esc(x.id)}" ${o.okrId===x.id?'selected':''}>${esc(x.objective)}</option>`).join('')}</select></label>
-    <div class="full"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): nội dung · chỉ tiêu (số) · đơn vị</b><div id="opKrRows">${(o.krs||[]).map(row).join('')}</div><button type="button" class="btn sm" data-act="op-add-kr">+ Thêm KR</button></div>
+    <div class="full" style="grid-column:1/-1"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): nội dung · chỉ tiêu (số) · đơn vị · nguồn số liệu</b><div id="opKrRows">${(opObjDlg._area=o.area||'',(o.krs||[]).map(row).join(''))}</div><p class="mini" style="margin:4px 0 8px">Chọn mã việc để KR tự tính từ nhật ký công việc hằng tháng (cập nhật trực tiếp). Chọn "Nhập tay" nếu KR không có mã việc tương ứng.</p><button type="button" class="btn sm" data-act="op-add-kr">+ Thêm KR</button></div>
   </div>`,`<div>${!isNew?`<button type="button" class="btn danger" data-act="op-del-obj" data-id="${esc(o.id)}">Xóa mục tiêu</button>`:''}</div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="op-save-obj" data-id="${esc(o.id)}">Lưu</button></div>`)}
 
 const opCur=()=>{const sid=S.role==='staff'?S.me:S.opSid;return opDoc(S.opQ,sid)||opBlank(S.opQ,sid)};
@@ -2291,10 +2316,13 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="op-
   const d=opCur();
   if(a==='op-new-obj'){if(opEditable(opDoc(d.quarter,d.staffId)))opObjDlg(d,null);return}
   if(a==='op-edit-obj'){opObjDlg(d,(d.objectives||[]).find(o=>o.id===id));return}
+  if(a==='op-rm-kr'){e.preventDefault();el.closest('.op-krrow').remove();return}
   if(a==='op-add-kr'){e.preventDefault();if($('#opKrRows').children.length<5)$('#opKrRows').insertAdjacentHTML('beforeend',opObjDlg._row({}));else toast('Tối đa 5 KR');return}
   if(a==='op-save-obj'){e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())return;const fd=Object.fromEntries(new FormData(f));
     const old=(d.objectives||[]).find(o=>o.id===id);
-    const krs=[...dlg.querySelectorAll('#opKrRows .modrow3')].map(r=>{const kid=r.dataset.kid;const ok=old&&(old.krs||[]).find(k=>k.id===kid);return {id:kid,title:r.querySelector('[data-kt]').value.trim(),target:+r.querySelector('[data-kg]').value||0,unit:r.querySelector('[data-ku]').value.trim(),current:ok?(+ok.current||0):0}}).filter(k=>k.title);
+    const krs=[...dlg.querySelectorAll('#opKrRows .op-krrow')].map(r=>{const kid=r.dataset.kid;const ok=old&&(old.krs||[]).find(k=>k.id===kid);const src=r.querySelector('[data-kc]').value;return {id:kid,title:r.querySelector('[data-kt]').value.trim(),target:+r.querySelector('[data-kg]').value||0,unit:r.querySelector('[data-ku]').value.trim(),src,meas:src?r.querySelector('[data-km]').value:'',current:ok?(+ok.current||0):0}}).filter(k=>k.title);
+    if(krs.some(k=>k.src&&(fd.area===OP_RK_AREA?!k.src.startsWith('rk-'):(k.src.startsWith('rk-')||(k.src!=='all'&&opAreaOf(k.src)!==fd.area))))){toast('Nguồn số liệu của KR phải thuộc mảng đã chọn');return}
+    krs.forEach(k=>{if(k.src&&k.src.startsWith('rk-'))k.meas=''});
     if(!krs.length){toast('Cần ít nhất 1 KR');return}if(krs.some(k=>!(k.target>0))){toast('Mỗi KR cần chỉ tiêu là số lớn hơn 0');return}
     const objs=[...(d.objectives||[])];if(!OP_AREAS.includes(fd.area)){toast('Chọn mảng công việc chính');return}const o={id,area:fd.area,title:fd.title.trim(),okrId:fd.okrId||'',krs};const i=objs.findIndex(x=>x.id===id);if(i>=0)objs[i]=o;else objs.push(o);
     opSave(d,{objectives:objs,status:d.status==='returned'?'returned':'draft'}).then(()=>toast('Đã lưu mục tiêu')).catch(()=>{});closeDlg();return}
@@ -2309,10 +2337,10 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="op-
   if(a==='op-ci-save'||a==='op-fb-save'){const w=S.opWeek,key=opKey(d,w),dr=S.ciDraft[key];if(!dr)return;
     const cis={...(d.checkins||{})};const old=cis[w]||{};
     if(a==='op-fb-save'){if(!cis[w])return;cis[w]={...old,fb:(dr.fb||'').trim()};opSave(d,{checkins:cis}).then(()=>toast('Đã lưu nhận xét')).catch(()=>{});return}
-    const krs={};(d.objectives||[]).forEach(o=>(o.krs||[]).forEach(k=>{const el2=document.getElementById('ci-k-'+k.id);krs[k.id]=+(el2?el2.value:dr.krs[k.id]??k.current??0)||0}));
+    const L=opLive(d);const krs={};(L.objectives||[]).forEach(o=>(o.krs||[]).forEach(k=>{if(k.src){krs[k.id]=+k.current||0;return}const el2=document.getElementById('ci-k-'+k.id);krs[k.id]=+(el2?el2.value:dr.krs[k.id]??k.current??0)||0}));
     if(!(dr.done||'').trim()){toast('Ghi kết quả nổi bật trong tuần');$('#ci-done')?.focus();return}
     cis[w]={...old,at:new Date().toISOString(),krs,conf:dr.conf||'ok',done:(dr.done||'').trim(),issue:(dr.issue||'').trim(),next:(dr.next||'').trim()};
-    const latest=Object.keys(cis).sort().pop();const objs=(d.objectives||[]).map(o=>({...o,krs:(o.krs||[]).map(k=>({...k,current:latest===w?krs[k.id]:(cis[latest].krs||{})[k.id]??k.current}))}));
+    const latest=Object.keys(cis).sort().pop();const objs=(d.objectives||[]).map(o=>({...o,krs:(o.krs||[]).map(k=>k.src?k:({...k,current:latest===w?krs[k.id]:(cis[latest].krs||{})[k.id]??k.current}))}));
     opSave(d,{checkins:cis,objectives:objs}).then(()=>toast('Đã gửi check-in tuần '+opWkLbl(w))).catch(()=>{});return}
   if(a==='op-mem-save'){const inp=document.getElementById('opm-'+id);const em=((inp&&inp.value)||'').trim().toLowerCase();
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)){toast('Email chưa đúng định dạng');inp?.focus();return}
@@ -2321,6 +2349,11 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="op-
     write('members/'+em,{staffId:id,name:s?s.name:'',role:'staff',at:new Date().toISOString()}).then(()=>{olds.forEach(m=>del('members/'+m.id));toast('Đã cấp quyền cho '+em)}).catch(()=>{});return}
   if(a==='op-mem-del'){if(opArmed!==a+id){opArmed=a+id;el.textContent='Bấm lần nữa';setTimeout(()=>{if(opArmed===a+id)opArmed=null},4000);return}del('members/'+id);toast('Đã thu hồi quyền');return}
 });
+function opSrcOpts(area,cur){if(area===OP_RK_AREA)return `<option value="">Nhập tay</option>${Object.entries(OP_RK).map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('')}`;const cs=area?opCodes(area):[];return `<option value="">Nhập tay</option>${area?`<option value="all" ${cur==='all'?'selected':''}>Mọi mã việc mảng ${esc(area)}</option>`:''}${cs.map(c=>`<option value="${esc(c.code)}" ${cur===c.code?'selected':''}>${esc(c.code)} · ${esc(c.content)}</option>`).join('')}${cur&&cur!=='all'&&!cs.some(c=>c.code===cur)?`<option value="${esc(cur)}" selected>${esc(cur)}</option>`:''}`}
+document.addEventListener('change',e=>{const t=e.target;if(t.name!=='area'||!t.closest('#dlg')||!$('#opKrRows'))return;opObjDlg._area=t.value;
+  $('#opKrRows').querySelectorAll('[data-kc]').forEach(sel=>{const cur=sel.value;const rk=cur.startsWith('rk-');const ok=cur===''||(t.value===OP_RK_AREA?rk:(!rk&&(cur==='all'||opAreaOf(cur)===t.value)));sel.innerHTML=opSrcOpts(t.value,ok?cur:'')})});
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset||t.dataset.kc===undefined)return;const r=t.closest('.op-krrow');if(!r)return;const c=catBy(t.value);const u=r.querySelector('[data-ku]');const m=r.querySelector('[data-km]');
+  m.disabled=!t.value||String(t.value).startsWith('rk-');if(t.value==='all'&&m.value==='qty')m.value='pts';if(c&&!u.value&&m.value==='qty')u.value=c.unit||'';});
 document.addEventListener('input',e=>{const t=e.target;if(!t.dataset||!t.dataset.ci)return;const d=opCur();const dr=S.ciDraft[opKey(d,S.opWeek)];if(!dr)return;
   if(t.dataset.ci==='kr')dr.krs[t.dataset.k]=t.value;else dr[t.dataset.ci]=t.value});
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='opQ'){S.opQ=t.value;S.opWeek='';render()}else if(t.id==='opWeek'){S.opWeek=t.value;render()}else if(t.dataset&&t.dataset.ci==='conf'){const d=opCur();const dr=S.ciDraft[opKey(d,S.opWeek)];if(dr)dr.conf=t.value}});
@@ -2356,10 +2389,15 @@ const _vWeeklyOp=vWeekly;
 vWeekly=function(){const h=_vWeeklyOp();const w=weekRange(S.rep.date||TODAY)[0],q=qOf(w);const st=activeStaff();const rows=st.map(s=>({s,d:opDoc(q,s.id)})).filter(r=>r.d&&r.d.status==='approved');
   if(!rows.length)return h;
   return h+`<div class="panel" style="margin-top:14px"><h2>Check-in OKR cá nhân tuần ${opWkLbl(w)} <small>chỉ hiện trên web</small> <a class="btn sm ghost" href="#okr-ca-nhan">Chi tiết</a></h2><div class="tbl-wrap"><table><thead><tr><th>Nhân viên</th><th class="r">Tiến độ OKR</th><th>Đánh giá</th><th>Kết quả tuần</th><th>Kế hoạch tuần tới</th></tr></thead><tbody>
-  ${rows.map(({s,d})=>{const c=(d.checkins||{})[w];const cf=c&&(OP_CONF.find(x=>x[0]===c.conf)||OP_CONF[0]);return `<tr><td>${esc(s.name)}</td><td class="r num">${opPct(d)}%</td><td>${c?`<span class="pill ${cf[0]}">${cf[1]}</span>`:'<span class="pill warn">Chưa check-in</span>'}</td><td class="wrap">${c?esc(c.done):''}</td><td class="wrap">${c?esc(c.next):''}</td></tr>`}).join('')}
+  ${rows.map(({s,d})=>{const c=(d.checkins||{})[w];const cf=c&&(OP_CONF.find(x=>x[0]===c.conf)||OP_CONF[0]);return `<tr><td>${esc(s.name)}</td><td class="r num">${opPct(opLive(d))}%</td><td>${c?`<span class="pill ${cf[0]}">${cf[1]}</span>`:'<span class="pill warn">Chưa check-in</span>'}</td><td class="wrap">${c?esc(c.done):''}</td><td class="wrap">${c?esc(c.next):''}</td></tr>`}).join('')}
   </tbody></table></div></div>`};
 
-function opWaitN(){return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
+let _opSyncT=0;
+function opRkSync(){if(S.role==='staff'||!S.canWrite||!opHasSys()||Date.now()-_opSyncT<15000)return;_opSyncT=Date.now();
+  setTimeout(()=>S.okrp.forEach(d=>{if(!(d.objectives||[]).some(o=>(o.krs||[]).some(k=>String(k.src||'').startsWith('rk-'))))return;const v=opRkCalc(d.staffId,d.quarter);const old=d.rkLive||{};
+    if(['real','NVBH','CHT','QLKV','VP','kpi'].some(k=>(old[k]||0)!==v[k]))write('okrp/'+d.id,{...clean(d),rkLive:{...v,at:new Date().toISOString()}}).catch(()=>{})}),1500)}
+setInterval(opRkSync,10*60e3);
+function opWaitN(){opRkSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
 init();
 </script>
 </body>

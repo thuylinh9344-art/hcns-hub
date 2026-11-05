@@ -56,12 +56,15 @@ service cloud.firestore {
       allow create: if hubStaff()
         && request.resource.data.staffId == mySid()
         && id == request.resource.data.quarter + '_' + mySid()
-        && request.resource.data.status in ['draft', 'submitted'];
+        && request.resource.data.status in ['draft', 'submitted']
+        && !('rkLive' in request.resource.data);
       // Sửa/check-in: không đổi chủ, không tự duyệt, không sửa nhận xét duyệt.
       allow update: if hubStaff()
         && resource.data.staffId == mySid()
         && request.resource.data.staffId == mySid()
         && request.resource.data.quarter == resource.data.quarter
+        // Số liệu KPI tuyển dụng (rkLive) do web của quản trị tự cập nhật, nhân viên không sửa được.
+        && request.resource.data.get('rkLive', null) == resource.data.get('rkLive', null)
         && (request.resource.data.status in ['draft', 'submitted']
             || (request.resource.data.status == resource.data.status
                 && request.resource.data.get('review', null) == resource.data.get('review', null)));
