@@ -2187,11 +2187,11 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-
     saveFile('Phuong-an-dieu-chuyen-nha-moi_'+TODAY+'.csv',csv(rows))}});
 function confirmDel(el){if(el.dataset.sure){return true}el.dataset.sure='1';el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(el.isConnected){delete el.dataset.sure;el.textContent=el.dataset.act==='dc-del-shop'?'Xóa nhà này':'✕'}},2500);return false}
 
-/* ===================== OKR cá nhân: nhân viên tự lập OKR quý + check-in hằng tuần =====================
-   Dữ liệu: okrp/<quý>_<mã NV> = {staffId, quarter, status: draft|submitted|returned|approved, objectives:[{id,title,okrId,krs:[{id,title,target,unit,current}]}],
+/* ===================== OKR cá nhân: nhân viên tự lập OKR tháng + check-in hằng tuần =====================
+   Dữ liệu: okrp/<yyyy-mm>_<mã NV> (trường quarter giữ kỳ tháng) = {staffId, quarter, status: draft|submitted|returned|approved, objectives:[{id,title,okrId,krs:[{id,title,target,unit,current}]}],
             checkins:{<thứ 6 đầu tuần>:{at,krs:{krId:giá trị},conf,done,issue,next,fb}}, review:{at,note}, submittedAt, updatedAt}
    Tài khoản: members/<email> = {staffId,name,role:'staff'} → người đăng nhập bằng email đó chỉ thấy OKR cá nhân + nhật ký của chính mình. */
-S.okrp=S.okrp||[];S.members=S.members||[];S.role=S.role||'admin';S.opQ=S.opQ||qOf(TODAY);S.opSid=S.opSid||'';S.opWeek=S.opWeek||'';S.ciDraft=S.ciDraft||{};
+S.okrp=S.okrp||[];S.members=S.members||[];S.role=S.role||'admin';S.opQ=S.opQ||ymOf(TODAY);S.opSid=S.opSid||'';S.opWeek=S.opWeek||'';S.ciDraft=S.ciDraft||{};
 const OP_ST={draft:['','Nháp'],submitted:['warn','Chờ duyệt'],returned:['bad','Cần sửa'],approved:['ok','Đã duyệt']};
 const OP_AREAS=['Tuyển dụng','C&B','BHXH','HCNS phụ trách khu vực','Hành chính','Hồ sơ pháp lý/giấy tờ','Admin','Công đoàn'];
 const OP_PRE={'01':'Tuyển dụng','02':'C&B','03':'BHXH','04':'HCNS phụ trách khu vực','05':'Hồ sơ pháp lý/giấy tờ','06':'Admin','07':'Công đoàn','08':'Hành chính'};
@@ -2199,7 +2199,7 @@ const OP_MEAS={qty:'SL hoàn thành',pts:'Điểm',n:'Số việc hoàn thành'}
 const OP_RK={'rk-real':'Thực tuyển (3 học việc lên NVBH = 1)','rk-NVBH':'Thực tuyển NVBH','rk-CHT':'Thực tuyển CHT','rk-QLKV':'Thực tuyển QLKV','rk-VP':'Thực tuyển văn phòng','rk-kpi':'Điểm KPI tuyển dụng (cộng các tháng)'};
 const OP_RK_AREA='Tuyển dụng';
 let _opRkC={};
-function opRkCalc(sid,q){const [a]=quarterRange(q);const ms=[a.slice(0,7),addDays(a,40).slice(0,7),addDays(a,70).slice(0,7)].filter(m=>m<=TODAY.slice(0,7));
+function opRkCalc(sid,q){const [a]=monthRange(q);const ms=[a.slice(0,7)].filter(m=>m<=TODAY.slice(0,7));
   const o={real:0,NVBH:0,CHT:0,QLKV:0,VP:0,kpi:0};
   ms.forEach(m=>{if(!(_opRkC[m]&&_opRkC[m].sys===S.sys&&_opRkC[m].rec===S.rec&&_opRkC[m].cfg===S.config)){const v={};try{rkData(m).rows.forEach(r=>{v[r.s.id]=r})}catch(_){}_opRkC[m]={sys:S.sys,rec:S.rec,cfg:S.config,v}}
     const r=_opRkC[m].v[sid];if(!r)return;o.real+=r.real;['NVBH','CHT','QLKV','VP'].forEach(g=>o[g]+=(r.cnt&&r.cnt[g])||0);o.kpi+=Math.round(r.kpi||0)});Object.keys(o).forEach(k=>o[k]=Math.round(o[k]*100)/100);return o}
@@ -2208,7 +2208,7 @@ const opRkOf=d=>opHasSys()?opRkCalc(d.staffId,d.quarter):(d.rkLive||null);
 const opAreaOf=code=>OP_PRE[String(code||'').slice(0,2)]||((catBy(code)||{}).area)||'';
 const opCodes=area=>S.catalog.filter(c=>c.code&&opAreaOf(c.code)===area).sort((a,b)=>String(a.code).localeCompare(String(b.code)));
 const opDone=e=>/hoàn thành/i.test(String(e.status||''))&&!isVoidLog(e);
-function opEntries(sid,q){const [a,b]=quarterRange(q);const ms=new Set([a.slice(0,7),addDays(a,40).slice(0,7),addDays(a,70).slice(0,7)]);
+function opEntries(sid,q){const [a,b]=monthRange(q);const ms=new Set([a.slice(0,7)]);
   return S.logs.filter(l=>l.staffId===sid&&ms.has(l.month)).flatMap(l=>(l.entries||[]).filter(e=>e.nod||!e.d||(e.d>=a&&e.d<=b)))}
 function opKrLive(k,E,rk){if(!k.src)return +k.current||0;if(k.src.startsWith('rk-')){if(!rk)return +k.current||0;const g=k.src.slice(3);return g==='real'?rk.real:g==='kpi'?rk.kpi:(rk[g]||0)}const xs=E.filter(e=>k.src==='all'?opAreaOf(e.code)===k.area:String(e.code)===k.src);
   return Math.round((k.meas==='pts'?xs.reduce((t,e)=>t+entPts(e),0):k.meas==='n'?xs.filter(opDone).length:xs.filter(opDone).reduce((t,e)=>t+(+e.qty||0),0))*100)/100}
@@ -2221,7 +2221,7 @@ const opRid=()=>Math.random().toString(36).slice(2,9);
 const krPct=k=>+k.target>0?Math.min(Math.round((+k.current||0)/(+k.target)*100),100):0;
 const objPct=o=>{const ks=(o.krs||[]).filter(k=>+k.target>0);return ks.length?Math.round(ks.reduce((a,k)=>a+krPct(k),0)/ks.length):0};
 const opPct=d=>{const os=(d&&d.objectives)||[];return os.length?Math.round(os.reduce((a,o)=>a+objPct(o),0)/os.length):0};
-function opWeeks(q){const [a,b]=quarterRange(q);const out=[];let w=weekRange(a)[0];const end=TODAY<b?TODAY:b;while(w<=end){out.push(w);w=addDays(w,7)}return out.reverse()}
+function opWeeks(q){const [a,b]=monthRange(q);const out=[];let w=weekRange(a)[0];const end=TODAY<b?TODAY:b;while(w<=end){out.push(w);w=addDays(w,7)}return out.reverse()}
 const opWkLbl=w=>`${fmtD(w)}–${fmtD(addDays(w,6))}`;
 const opLastCi=d=>{const ks=Object.keys((d&&d.checkins)||{}).sort();return ks.length?ks[ks.length-1]:''};
 const opKey=(d,w)=>{const c=((d&&d.checkins)||{})[w];return d.id+'|'+w+'|'+(c&&c.at||'')};
@@ -2231,8 +2231,8 @@ const opBlank=(q,sid)=>({id:opId(q,sid),staffId:sid,quarter:q,status:'draft',obj
 
 function vOkrP(){if(S.role==='staff'&&!S._okW){S._okW=1;S.canWrite=true;try{return vOkrP()}finally{S.canWrite=false;S._okW=0}}
   const staff=S.role==='staff';
-  const qs=[...new Set([qOf(TODAY),S.opQ,...S.okrp.map(o=>o.quarter)])].sort().reverse();
-  const qSel=`<select id="opQ" aria-label="Chọn quý">${qs.map(q=>`<option value="${q}" ${q===S.opQ?'selected':''}>${fmtQ(q)}</option>`).join('')}</select>`;
+  const qs=[...new Set([ymOf(TODAY),ymOf(addDays(TODAY.slice(0,7)+'-01',32)),S.opQ,...S.okrp.map(o=>o.quarter).filter(x=>/^\d{4}-\d{2}$/.test(x))])].sort().reverse();
+  const qSel=`<select id="opQ" aria-label="Chọn tháng">${qs.map(q=>`<option value="${q}" ${q===S.opQ?'selected':''}>${fmtM(q)}</option>`).join('')}</select>`;
   if(staff)return opPerson(S.me,qSel);
   if(S.opSid)return opPerson(S.opSid,qSel+`<button class="btn" data-act="op-back">‹ Cả phòng</button>`);
   return opTeam(qSel);
@@ -2243,7 +2243,7 @@ function opTeam(qSel){
   const rows=st.map(s=>{const d=opDoc(q,s.id);const last=opLastCi(d);const ci=d&&d.checkins&&d.checkins[wk];return {s,d,last,ci}});
   const nAp=rows.filter(r=>r.d&&r.d.status==='approved').length,nWait=rows.filter(r=>r.d&&r.d.status==='submitted').length,nCi=rows.filter(r=>r.ci).length;
   const mem=Object.fromEntries(S.members.map(m=>[m.staffId,m]));
-  return head('OKR cá nhân',`${fmtQ(q)} · mỗi nhân viên tự lập OKR quý, chị duyệt, rồi check-in mỗi tuần (thứ 6 → thứ 5)`,qSel)+
+  return head('OKR cá nhân',`${fmtM(q)} · mỗi nhân viên tự lập OKR tháng, chị duyệt, rồi check-in mỗi tuần (thứ 6 → thứ 5)`,qSel)+
   `<div class="stats">
     <div class="stat"><div class="k">Đã duyệt OKR</div><div class="v">${nAp}/${st.length}</div><div class="s">nhân viên</div></div>
     <div class="stat ${nWait?'warn':''}"><div class="k">Chờ chị duyệt</div><div class="v">${nWait}</div><div class="s">bản OKR</div></div>
@@ -2272,8 +2272,8 @@ function opMembersPanel(st,mem){
 function opPerson(sid,tools){
   const staff=S.role==='staff',q=S.opQ;const s=S.staff.find(x=>x.id===sid)||{id:sid,name:staffName(sid)};
   const d=opDoc(q,sid);const doc=opLive(d)||opBlank(q,sid);const E=opEntries(sid,q);const st=OP_ST[doc.status||'draft'];const ed=opEditable(d)&&S.canWrite;
-  const p=opPct(doc);const qr=quarterRange(q);const elapsed=Math.max(0,Math.min(100,Math.round(diffDays(qr[0],TODAY)/diffDays(qr[0],qr[1])*100)));
-  const deptOkr=S.okrs.filter(o=>o.quarter===q);
+  const p=opPct(doc);const qr=monthRange(q);const elapsed=Math.max(0,Math.min(100,Math.round(diffDays(qr[0],TODAY)/diffDays(qr[0],qr[1])*100)));
+  const deptOkr=S.okrs.filter(o=>o.quarter===qOf(q+'-01'));
   const objs=(doc.objectives||[]);
   let bar='';
   if(doc.status==='returned'&&doc.review&&doc.review.note)bar=`<div class="wb-warn">Chị Linh trả lại để sửa: ${esc(doc.review.note)}</div>`;
@@ -2283,12 +2283,12 @@ function opPerson(sid,tools){
   const objHtml=objs.length?objs.map((o,i)=>{const op=objPct(o);const link=deptOkr.find(x=>x.id===o.okrId);
     return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b><div class="note">${o.area&&OP_AREAS.includes(o.area)?`<span class="pill">${esc(o.area)}</span> `:'<span class="pill bad">Chưa chọn mảng</span> '}${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
       <div class="bar"><i class="${op>=elapsed?'ok':op>=elapsed-20?'':'warn'}" style="width:${op}%"></i></div>
-      ${(()=>{if(o.area===OP_RK_AREA){const rk=d?opRkOf(d):null;return rk?`<div class="mini">KPI tuyển dụng ${fmtQ(q)} (theo quy ước KPI tuyển dụng, không tính nhật ký): thực tuyển ${nf(rk.real)} người (3 học việc lên NVBH = 1) · ${nf(rk.kpi)} điểm KPI</div>`:''}const xs=E.filter(e=>opAreaOf(e.code)===o.area);return o.area?`<div class="mini">Nhật ký ${fmtQ(q)} mảng ${esc(o.area)} (cập nhật trực tiếp): ${xs.filter(opDone).length} việc hoàn thành · ${nf(Math.round(xs.reduce((t,e)=>t+entPts(e),0)))} điểm</div>`:''})()}
+      ${(()=>{if(o.area===OP_RK_AREA){const rk=d?opRkOf(d):null;return rk?`<div class="mini">KPI tuyển dụng ${fmtM(q)} (theo quy ước KPI tuyển dụng, không tính nhật ký): thực tuyển ${nf(rk.real)} người (3 học việc lên NVBH = 1) · ${nf(rk.kpi)} điểm KPI</div>`:''}const xs=E.filter(e=>opAreaOf(e.code)===o.area);return o.area?`<div class="mini">Nhật ký ${fmtM(q)} mảng ${esc(o.area)} (cập nhật trực tiếp): ${xs.filter(opDone).length} việc hoàn thành · ${nf(Math.round(xs.reduce((t,e)=>t+entPts(e),0)))} điểm</div>`:''})()}
       ${(o.krs||[]).map((k,j)=>`<div class="kr"><span>KR${j+1}. ${esc(k.title)}<div class="mini">${esc(opSrcLbl(k,o.area))}</div></span><div class="bar"><i style="width:${krPct(k)}%"></i></div><div class="vals"><span class="num"><b>${nf(k.current||0)}</b> / ${nf(k.target)} ${esc(k.unit||'')}</span></div></div>`).join('')}
-    </div>`}).join(''):`<div class="empty">${staff?'Chưa có mục tiêu. Bấm “+ Thêm mục tiêu” để lập OKR '+fmtQ(q)+'.':'Nhân viên chưa lập OKR '+fmtQ(q)+'.'}</div>`;
+    </div>`}).join(''):`<div class="empty">${staff?'Chưa có mục tiêu. Bấm “+ Thêm mục tiêu” để lập OKR '+fmtM(q)+'.':'Nhân viên chưa lập OKR '+fmtM(q)+'.'}</div>`;
   const editTools=ed?`<div class="row" style="gap:8px;margin-top:4px">${objs.length<5?`<button class="btn" data-act="op-new-obj">+ Thêm mục tiêu</button>`:''}${objs.length?`<button class="btn pri" data-act="op-submit">Gửi chị Linh duyệt</button>`:''}<span class="note">Tối đa 5 mục tiêu, mỗi mục tiêu thuộc 1 mảng công việc chính và có 1–5 kết quả then chốt (KR) đo được bằng số.</span></div>`
     :(staff&&doc.status==='submitted'&&S.canWrite?`<div class="row" style="margin-top:4px"><button class="btn" data-act="op-withdraw">Rút lại để sửa</button></div>`:'');
-  const sub=`${esc(s.name)} · ${fmtQ(q)} · <span class="pill ${st[0]}">${d?st[1]:'Chưa lập'}</span> · tiến độ ${p}% · thời gian quý đã qua ${elapsed}%`;
+  const sub=`${esc(s.name)} · ${fmtM(q)} · <span class="pill ${st[0]}">${d?st[1]:'Chưa lập'}</span> · tiến độ ${p}% · thời gian tháng đã qua ${elapsed}%`;
   return head(staff?'OKR cá nhân của tôi':'OKR cá nhân',sub,tools)+bar+`<div class="stack">${objHtml}${editTools}</div>`+(doc.status==='approved'?opCheckin(doc,staff):'');
 }
 
@@ -2330,7 +2330,7 @@ function opCheckin(doc,staff){
 }
 
 function opObjDlg(doc,o){const isNew=!o;o=o||{id:opRid(),title:'',okrId:'',krs:[{id:opRid(),title:'',target:'',unit:''},{id:opRid(),title:'',target:'',unit:''}]};
-  const dept=S.okrs.filter(x=>x.quarter===doc.quarter);
+  const dept=S.okrs.filter(x=>x.quarter===qOf(doc.quarter+'-01'));
   const row=k=>`<div class="op-krrow" data-kid="${esc(k.id||opRid())}" data-cur="${esc(k.current??0)}"><div class="modrow3" style="margin-bottom:4px"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt, VD: Tuyển đủ NVBH cho 10 nhà"><input data-kg class="num" type="number" step="any" min="0" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="op-rm-kr" title="Bỏ">✕</button></div>
     <div class="op-src"><select data-kc aria-label="Nguồn số liệu">${opSrcOpts(opObjDlg._area,k.src||'')}</select><select data-km aria-label="Cách đo" ${!k.src||String(k.src).startsWith('rk-')?'disabled':''}>${Object.entries(OP_MEAS).map(([v,l])=>`<option value="${v}" ${(k.meas||'qty')===v?'selected':''}>${l}</option>`).join('')}</select></div></div>`;
   opObjDlg._area=o.area||'';
@@ -2424,7 +2424,7 @@ vMe=function(){if(S.role!=='staff')return _vMeOp();const c=S.canWrite;S.canWrite
 
 /* Báo cáo tuần: thêm bảng check-in OKR cá nhân của tuần đang xem (chỉ hiện trên web, không vào bản in). */
 const _vWeeklyOp=vWeekly;
-vWeekly=function(){const h=_vWeeklyOp();const w=weekRange(S.rep.date||TODAY)[0],q=qOf(w);const st=activeStaff();const rows=st.map(s=>({s,d:opDoc(q,s.id)})).filter(r=>r.d&&r.d.status==='approved');
+vWeekly=function(){const h=_vWeeklyOp();const w=weekRange(S.rep.date||TODAY)[0],q=ymOf(addDays(w,6));const st=activeStaff();const rows=st.map(s=>({s,d:opDoc(q,s.id)})).filter(r=>r.d&&r.d.status==='approved');
   if(!rows.length)return h;
   return h+`<div class="panel" style="margin-top:14px"><h2>Check-in OKR cá nhân tuần ${opWkLbl(w)} <small>chỉ hiện trên web</small> <a class="btn sm ghost" href="#okr-ca-nhan">Chi tiết</a></h2><div class="tbl-wrap"><table><thead><tr><th>Nhân viên</th><th class="r">Tiến độ OKR</th><th>Đánh giá</th><th>Kết quả tuần</th><th>Kế hoạch tuần tới</th></tr></thead><tbody>
   ${rows.map(({s,d})=>{const c=(d.checkins||{})[w];const cf=c&&(OP_CONF.find(x=>x[0]===c.conf)||OP_CONF[0]);return `<tr><td>${esc(s.name)}</td><td class="r num">${opPct(opLive(d))}%</td><td>${c?`<span class="pill ${cf[0]}">${cf[1]}</span>`:'<span class="pill warn">Chưa check-in</span>'}</td><td class="wrap">${c?esc(c.done):''}</td><td class="wrap">${c?esc(c.next):''}</td></tr>`}).join('')}
