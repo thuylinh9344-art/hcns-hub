@@ -1535,15 +1535,16 @@ function rkData(m){
   allStaff().forEach(s=>{const code=String(s.code||'').toUpperCase();const p=plan[code];if(!p)return;const [tgt,alloc0]=p;const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');const alloc=tdp?tdp[1]:alloc0;
     const H=R.filter(r=>r.o===s.id&&r.start>=a&&r.start<=b);
     const real=H.filter(r=>r.status!=='Nghỉ việc');const pend=[];const left=H.length-real.length;
-    const cnt={NVBH:0,CHT:0,QLKV:0,VP:0};real.forEach(r=>cnt[r.g]++);
+    /* Quy đổi chỉ tiêu: 3 học việc = 1 NVBH */const hvW=r=>r.src==='tts'||/học việc/i.test(r.pos||'')?1/3:1;const r2=v=>Math.round(v*100)/100;
+    const cnt={NVBH:0,CHT:0,QLKV:0,VP:0};real.forEach(r=>cnt[r.g]+=hvW(r));Object.keys(cnt).forEach(k=>cnt[k]=r2(cnt[k]));const hv=real.filter(r=>hvW(r)<1).length;const realN=r2(real.reduce((t,r)=>t+hvW(r),0));
     const T=cv.filter(x=>x.o===s.id&&x.start&&x.start>=a&&x.start<=b&&!x.quit);
     const tOk=T.filter(x=>{const end=x.ac&&x.ac>=x.sub?x.ac:x.start;return diffDays(x.sub,end)<=RK_LIM[rkGrp(x.p)]}).length;
     const C=R.filter(r=>r.o===s.id&&r.start>=a&&r.start<=b);const cq=C.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<30).length;
     const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>x.v1&&x.v1>=x.sub);const fast=v1.filter(x=>wdBetween(x.sub,x.v1)<2).length;const stale=CV.filter(x=>x.stale).length;
-    const fill=tgt?Math.min(1,real.length/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=CV.length?1-stale/CV.length:null;
+    const fill=tgt?Math.min(1,realN/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=CV.length?1-stale/CV.length:null;
     const f=alloc/500,mF=Math.round(250*f),mT=Math.round(100*f),mQ=Math.round(50*f),mC=alloc-mF-mT-mQ;const sF=Math.round(mF*fill),sT=ttf==null?0:Math.round(mT*ttf),sQ=q90==null?mQ:(q90<.4?mQ:0),sC=Math.round(mC*(.5*(p1??0)+.5*(p2??0)));const kpi=sF+sT+sQ+sC;const tot=alloc?kpi/alloc*500:0;
     const eff=Object.entries(cnt).reduce((t,[g,n])=>t+n*(S.config.eff[RK_BASE[g]]||0),0);
-    out.push({s,code,tgt,alloc,mF,mT,mQ,mC,real:real.length,pend:pend.length,left,cnt,fill,sF,T:T.length,tOk,ttf,sT,C:C.length,cq,q90,sQ,CV:CV.length,v1:v1.length,fast,p1,stale,p2,sC,tot,kpi,eff})});
+    out.push({s,code,tgt,alloc,mF,mT,mQ,mC,real:realN,hv,heads:real.length,pend:pend.length,left,cnt,fill,sF,T:T.length,tOk,ttf,sT,C:C.length,cq,q90,sQ,CV:CV.length,v1:v1.length,fast,p1,stale,p2,sC,tot,kpi,eff})});
   return {rows:out,a,b,pm}}
 const rkPct=v=>v==null?'—':String(Math.round(v*1000)/10).replace('.',',')+'%';
 function vRecKpi(m){
@@ -1554,14 +1555,14 @@ function vRecKpi(m){
   ${rows.sort((x,y)=>y.tot-x.tot).map(r=>`<tr class="${r.tot<300?'recalert':''}"><td><b>${esc(r.s.name)}</b></td>
     <td class="r"><input class="num" type="number" min="0" id="rkt-${r.code}" data-rkt="${r.code}" value="${r.tgt}" style="width:58px;text-align:right" ${dis}></td>
     <td class="r"><input class="num" type="number" min="0" step="50" id="rka-${r.code}" data-rka="${r.code}" value="${r.alloc}" style="width:66px;text-align:right" ${dis}></td>
-    <td class="r num">${r.real}${r.left?` <span class="mini">(${r.left} đã nghỉ)</span>`:''}<div class="mini">${Object.entries(r.cnt).filter(([,n])=>n).map(([g,n])=>g+' '+n).join(' · ')}</div></td>
+    <td class="r num">${nf(r.real)}${r.left?` <span class="mini">(${r.left} đã nghỉ)</span>`:''}${r.hv?`<div class="mini">gồm ${r.hv} học việc = ${nf(Math.round(r.hv/3*100)/100)} NVBH</div>`:''}<div class="mini">${Object.entries(r.cnt).filter(([,n])=>n).map(([g,n])=>g+' '+n).join(' · ')}</div></td>
     <td class="r num">${nf(r.sF)}<span class="mini">/${r.mF}</span><div class="mini">${rkPct(r.fill)}</div></td>
     <td class="r num">${nf(r.sT)}<span class="mini">/${r.mT}</span><div class="mini">${r.T?`${r.tOk}/${r.T} · ${rkPct(r.ttf)}`:'chưa khớp hồ sơ'}</div></td>
     <td class="r num">${r.sQ}<span class="mini">/${r.mQ}</span><div class="mini">${r.C?`${r.cq}/${r.C} · ${rkPct(r.q90)}`:'chưa có dữ liệu'}</div></td>
     <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
     <td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
     <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
-  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
+  <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${nf(Math.round(sum.real*100)/100)}</b></td><td colspan="6" class="mini">3 học việc tính = 1 NVBH · Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
   <div class="row mt">${S.canWrite?`<button class="btn" data-act="rk-eff">Ghi số tuyển vào bảng Hiệu suất ${fmtM(m)}</button>`:''}<span class="note">Bôi đỏ khi tổng dưới 300/500.</span></div>
   <details class="mt"><summary class="note">Cách tính</summary><ul class="note">
     <li>Thực tuyển: người nhận việc trong tháng theo DSNS và đang làm; ai nghỉ việc thì tự trừ ra khi cập nhật DSNS, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người tuyển vị trí quản lý; khối văn phòng và kho gán cho người phụ trách khối văn phòng. QLKV quy đổi 1 người.</li>
@@ -1631,7 +1632,7 @@ document.addEventListener('change',e=>{const t=e.target;const m=S.month;
 /* ===================== Đồng bộ nhật ký công việc từ Google Trang tính "BÁO CÁO CÔNG VIỆC - HCNS UPHARMA" =====================
    Mỗi sheet nhân viên (dòng 2 có "Mã NV: UPxxxxxx", dữ liệu từ dòng 6, cột A–N). Tháng lấy ở sheet Khung ô B3 (mm/yyyy).
    Sheet là nguồn chính: mỗi lần đồng bộ thay toàn bộ nhật ký tháng của người đó, giữ nguyên trừ lỗi đã nhập trên trang. */
-const LOG_SHEETS={'2026-10':'1Kt-GcfWRoXCe8p5Rq34pz76ZJIDGHZr5-ykAHrOga54'};
+const LOG_SHEETS={'2026-10':'1Kt-GcfWRoXCe8p5Rq34pz76ZJIDGHZr5-ykAHrOga54','2026-11':'1Bw62mMCOR4VfnyWRa2RWieYRRBiJXte4i9lXo9_vuM4'};
 /* Mỗi tháng 1 file Báo cáo công việc: link lưu ở config/main.logSheets[yyyy-mm]; đồng bộ các file của tháng này và tháng trước. */
 const lgAll=()=>Object.entries({...LOG_SHEETS,...(S.config.logSheets||{})}).filter(([,v])=>v).sort();
 function lgSheets(){const all=lgAll();const from=ymOf(addDays(TODAY.slice(0,7)+'-01',-1));const r=all.filter(([k])=>k>=from);return r.length?r:all.slice(-1)}
@@ -2174,13 +2175,13 @@ const OP_ST={draft:['','Nháp'],submitted:['warn','Chờ duyệt'],returned:['ba
 const OP_AREAS=['Tuyển dụng','C&B','BHXH','HCNS phụ trách khu vực','Hành chính','Hồ sơ pháp lý/giấy tờ','Admin','Công đoàn'];
 const OP_PRE={'01':'Tuyển dụng','02':'C&B','03':'BHXH','04':'HCNS phụ trách khu vực','05':'Hồ sơ pháp lý/giấy tờ','06':'Admin','07':'Công đoàn','08':'Hành chính'};
 const OP_MEAS={qty:'SL hoàn thành',pts:'Điểm',n:'Số việc hoàn thành'};
-const OP_RK={'rk-real':'Thực tuyển (gồm học việc)','rk-NVBH':'Thực tuyển NVBH','rk-CHT':'Thực tuyển CHT','rk-QLKV':'Thực tuyển QLKV','rk-VP':'Thực tuyển văn phòng','rk-kpi':'Điểm KPI tuyển dụng (cộng các tháng)'};
+const OP_RK={'rk-real':'Thực tuyển (3 học việc = 1 NVBH)','rk-NVBH':'Thực tuyển NVBH','rk-CHT':'Thực tuyển CHT','rk-QLKV':'Thực tuyển QLKV','rk-VP':'Thực tuyển văn phòng','rk-kpi':'Điểm KPI tuyển dụng (cộng các tháng)'};
 const OP_RK_AREA='Tuyển dụng';
 let _opRkC={};
 function opRkCalc(sid,q){const [a]=quarterRange(q);const ms=[a.slice(0,7),addDays(a,40).slice(0,7),addDays(a,70).slice(0,7)].filter(m=>m<=TODAY.slice(0,7));
   const o={real:0,NVBH:0,CHT:0,QLKV:0,VP:0,kpi:0};
   ms.forEach(m=>{if(!(_opRkC[m]&&_opRkC[m].sys===S.sys&&_opRkC[m].rec===S.rec&&_opRkC[m].cfg===S.config)){const v={};try{rkData(m).rows.forEach(r=>{v[r.s.id]=r})}catch(_){}_opRkC[m]={sys:S.sys,rec:S.rec,cfg:S.config,v}}
-    const r=_opRkC[m].v[sid];if(!r)return;o.real+=r.real;['NVBH','CHT','QLKV','VP'].forEach(g=>o[g]+=(r.cnt&&r.cnt[g])||0);o.kpi+=Math.round(r.kpi||0)});return o}
+    const r=_opRkC[m].v[sid];if(!r)return;o.real+=r.real;['NVBH','CHT','QLKV','VP'].forEach(g=>o[g]+=(r.cnt&&r.cnt[g])||0);o.kpi+=Math.round(r.kpi||0)});Object.keys(o).forEach(k=>o[k]=Math.round(o[k]*100)/100);return o}
 const opHasSys=()=>{try{return S.role!=='staff'&&sysRows().length>0}catch(_){return false}};
 const opRkOf=d=>opHasSys()?opRkCalc(d.staffId,d.quarter):(d.rkLive||null);
 const opAreaOf=code=>OP_PRE[String(code||'').slice(0,2)]||((catBy(code)||{}).area)||'';
@@ -2261,7 +2262,7 @@ function opPerson(sid,tools){
   const objHtml=objs.length?objs.map((o,i)=>{const op=objPct(o);const link=deptOkr.find(x=>x.id===o.okrId);
     return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b><div class="note">${o.area&&OP_AREAS.includes(o.area)?`<span class="pill">${esc(o.area)}</span> `:'<span class="pill bad">Chưa chọn mảng</span> '}${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
       <div class="bar"><i class="${op>=elapsed?'ok':op>=elapsed-20?'':'warn'}" style="width:${op}%"></i></div>
-      ${(()=>{if(o.area===OP_RK_AREA){const rk=d?opRkOf(d):null;return rk?`<div class="mini">KPI tuyển dụng ${fmtQ(q)} (theo quy ước KPI tuyển dụng, không tính nhật ký): thực tuyển ${rk.real} người · ${nf(rk.kpi)} điểm KPI</div>`:''}const xs=E.filter(e=>opAreaOf(e.code)===o.area);return o.area?`<div class="mini">Nhật ký ${fmtQ(q)} mảng ${esc(o.area)} (cập nhật trực tiếp): ${xs.filter(opDone).length} việc hoàn thành · ${nf(Math.round(xs.reduce((t,e)=>t+entPts(e),0)))} điểm</div>`:''})()}
+      ${(()=>{if(o.area===OP_RK_AREA){const rk=d?opRkOf(d):null;return rk?`<div class="mini">KPI tuyển dụng ${fmtQ(q)} (theo quy ước KPI tuyển dụng, không tính nhật ký): thực tuyển ${nf(rk.real)} người (3 học việc = 1 NVBH) · ${nf(rk.kpi)} điểm KPI</div>`:''}const xs=E.filter(e=>opAreaOf(e.code)===o.area);return o.area?`<div class="mini">Nhật ký ${fmtQ(q)} mảng ${esc(o.area)} (cập nhật trực tiếp): ${xs.filter(opDone).length} việc hoàn thành · ${nf(Math.round(xs.reduce((t,e)=>t+entPts(e),0)))} điểm</div>`:''})()}
       ${(o.krs||[]).map((k,j)=>`<div class="kr"><span>KR${j+1}. ${esc(k.title)}<div class="mini">${esc(opSrcLbl(k,o.area))}</div></span><div class="bar"><i style="width:${krPct(k)}%"></i></div><div class="vals"><span class="num"><b>${nf(k.current||0)}</b> / ${nf(k.target)} ${esc(k.unit||'')}</span></div></div>`).join('')}
     </div>`}).join(''):`<div class="empty">${staff?'Chưa có mục tiêu. Bấm “+ Thêm mục tiêu” để lập OKR '+fmtQ(q)+'.':'Nhân viên chưa lập OKR '+fmtQ(q)+'.'}</div>`;
   const editTools=ed?`<div class="row" style="gap:8px;margin-top:4px">${objs.length<5?`<button class="btn" data-act="op-new-obj">+ Thêm mục tiêu</button>`:''}${objs.length?`<button class="btn pri" data-act="op-submit">Gửi chị Linh duyệt</button>`:''}<span class="note">Tối đa 5 mục tiêu, mỗi mục tiêu thuộc 1 mảng công việc chính và có 1–5 kết quả then chốt (KR) đo được bằng số.</span></div>`
