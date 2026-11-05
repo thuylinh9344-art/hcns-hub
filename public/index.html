@@ -1507,7 +1507,8 @@ const nvPerLbl=()=>(NV_PER.find(x=>x[0]===S.nvF.per)||['','Từ đầu năm'])[1
 const nvRedN=()=>{try{return sysRows().length?(()=>{const P=nvData().prov;return P.filter(p=>p.lv===2).length+P.reduce((n,p)=>n+p.red,0)+nvKho().filter(k=>k.lv===2).length})():0}catch(_){return 0}};
 /* ===================== KPI tuyển dụng theo khung 500 điểm (bàn giao T10/2026) =====================
    Lấp đầy 250 · Thời gian trúng tuyển 100 · Chất lượng 50 · Tuân thủ quy trình 100; quy đổi theo điểm tuyển dụng phân bổ cho từng người. */
-const RK_PLAN_DEF={'2026-10':{UP001200:[16,500],UP001340:[8,500],UP001181:[11,500],UP001336:[13,600],UP000279:[12,500],UP001466:[14,500],UP001619:[9,400]}};
+const RK_PLAN_DEF={'2026-10':{UP001200:[16,500],UP001340:[8,500],UP001181:[11,500],UP001336:[13,600],UP000279:[12,500],UP001466:[14,500],UP001619:[9,400]},
+  '2026-11':{UP000279:[16,500],UP001340:[7,500],UP001181:[16,500],UP001466:[8,500],UP001336:[11,600],UP001619:[11,400],UP001200:[11,500]}};
 const RK_LIM={NVBH:15,CHT:20,QLKV:30,VP:15};
 const RK_BASE={NVBH:'tdNT',CHT:'tdCHT',QLKV:'tdQLKV',VP:'tdVP'};
 /* Vùng phụ trách theo file bàn giao 28/10/2026 */
@@ -1630,7 +1631,11 @@ document.addEventListener('change',e=>{const t=e.target;const m=S.month;
 /* ===================== Đồng bộ nhật ký công việc từ Google Trang tính "BÁO CÁO CÔNG VIỆC - HCNS UPHARMA" =====================
    Mỗi sheet nhân viên (dòng 2 có "Mã NV: UPxxxxxx", dữ liệu từ dòng 6, cột A–N). Tháng lấy ở sheet Khung ô B3 (mm/yyyy).
    Sheet là nguồn chính: mỗi lần đồng bộ thay toàn bộ nhật ký tháng của người đó, giữ nguyên trừ lỗi đã nhập trên trang. */
-const LOG_SHEET='1Kt-GcfWRoXCe8p5Rq34pz76ZJIDGHZr5-ykAHrOga54';
+const LOG_SHEETS={'2026-10':'1Kt-GcfWRoXCe8p5Rq34pz76ZJIDGHZr5-ykAHrOga54'};
+/* Mỗi tháng 1 file Báo cáo công việc: link lưu ở config/main.logSheets[yyyy-mm]; đồng bộ các file của tháng này và tháng trước. */
+const lgAll=()=>Object.entries({...LOG_SHEETS,...(S.config.logSheets||{})}).filter(([,v])=>v).sort();
+function lgSheets(){const all=lgAll();const from=ymOf(addDays(TODAY.slice(0,7)+'-01',-1));const r=all.filter(([k])=>k>=from);return r.length?r:all.slice(-1)}
+const lgId=v=>{const m=String(v||'').match(/\/d\/([\w-]{20,})/);return m?m[1]:/^[\w-]{20,}$/.test(String(v||'').trim())?String(v).trim():''};
 const LOG_TABS=['Thư','Hương','Trinh','Ngân','Phương','Anh','Ngọc','Minh'];
 S.logBusy=false;S.logAt='';let _lgTried=0;
 const lgNum=v=>{let s=String(v??'').trim();if(!s)return null;if(s.includes(',')&&s.includes('.'))s=s.replace(/\./g,'').replace(',','.');else s=s.replace(',','.');const n=+s;return isNaN(n)?null:n};
@@ -1638,7 +1643,7 @@ const lgNum=v=>{let s=String(v??'').trim();if(!s)return null;if(s.includes(',')&
 const lgDate=(v,ym)=>{const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(!m)return '';const a=+m[1],b=+m[2],tm=+ym.slice(5,7);let d,mo;if(b===tm){d=a;mo=b}else if(a===tm){d=b;mo=a}else if(a>12){d=a;mo=b}else{d=a;mo=b}return `${m[3]}-${pad(mo)}-${pad(d)}`};
 async function refreshLogs(silent){
   if(!S.mcp||S.logBusy)return;S.logBusy=true;_lgTried=Date.now();if(!silent)render();
-  try{const get=async rg=>{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:LOG_SHEET,range:rg},{cache:false,silent:!!silent});return (res.payload&&res.payload.values)||[]};
+  try{const _sum=[],_miss=[];const _list=lgSheets();for(const [_mo,_sid] of _list){try{const get=async rg=>{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:_sid,range:rg},{cache:false,silent:!!silent});return (res.payload&&res.payload.values)||[]};
     const k=await get("'Khung'!B3");const mm=String((k[0]||[])[0]||'').match(/(\d{1,2})\/(\d{4})/);const ym=mm?`${mm[2]}-${pad(+mm[1])}`:ymOf(TODAY);
     const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).trim().toUpperCase()]=s});let n=0,ppl=0;const miss=[];
     for(const tab of LOG_TABS){let v;try{v=await get(`'${tab}'!A2:N`)}catch(e){try{await new Promise(r=>setTimeout(r,1500));v=await get(`'${tab}'!A2:N`)}catch(_){miss.push(tab);continue}}
@@ -1649,11 +1654,19 @@ async function refreshLogs(silent){
         const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
         const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,nod,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
       const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'sheet',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
-    S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật ${nf(n)} dòng nhật ký ${fmtM(ym)} của ${ppl} người`+(miss.length?` · chưa đọc được sheet ${miss.join(', ')}`:''));
-  }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc':'Chưa cập nhật được nhật ký, thử lại sau')}}
+    _sum.push(`${fmtM(ym)}: ${nf(n)} dòng của ${ppl} người`);if(miss.length)_miss.push(`${fmtM(ym)} sheet ${miss.join(', ')}`)}catch(e){if(_list.length===1)throw e;_miss.push(`file ${fmtM(_mo)} (kiểm tra link, file phải là Google Trang tính, không phải .xlsx)`)}}
+    S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật nhật ký ${_sum.join(' · ')||'—'}`+(_miss.length?` · chưa đọc được ${_miss.join('; ')}`:''));
+  }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc, và file phải là Google Trang tính (không phải .xlsx)':'Chưa cập nhật được nhật ký, thử lại sau')}}
   finally{S.logBusy=false;render()}}
-const lgBtn=()=>S.mcp&&S.canWrite?`<button class="btn" data-act="lg-refresh" ${S.logBusy?'disabled':''}>${S.logBusy?'Đang đọc nhật ký…':'Cập nhật nhật ký từ sheet'}</button>`:'';
+const lgBtn=()=>S.mcp&&S.canWrite?`<button class="btn" data-act="lg-refresh" ${S.logBusy?'disabled':''}>${S.logBusy?'Đang đọc nhật ký…':'Cập nhật nhật ký từ sheet'}</button><button class="btn" data-act="lg-links" title="Link file Báo cáo công việc từng tháng">Link sheet tháng</button>`:'';
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act="lg-refresh"]');if(el)refreshLogs(false)});
+function lgLinksDlg(){const all=Object.fromEntries(lgAll());const next=ymOf(addDays(TODAY.slice(0,7)+'-01',35));const ms=[...new Set([...Object.keys(all),ymOf(TODAY),next])].sort().reverse();
+  openDlg('Link file Báo cáo công việc theo tháng',`<p class="note" style="margin:0 0 10px">Mỗi tháng dán link Google Trang tính của file "BÁO CÁO CÔNG VIỆC - HCNS UPHARMA". Web tự đồng bộ file tháng này và tháng trước. File .xlsx phải mở bằng Google Trang tính → Tệp → Lưu dưới dạng Google Trang tính rồi dùng link của bản mới.</p>
+  <div class="form">${ms.map(m=>`<label class="full">${fmtM(m)}<input data-lgm="${m}" value="${esc(all[m]?'https://docs.google.com/spreadsheets/d/'+all[m]+'/edit':'')}" placeholder="https://docs.google.com/spreadsheets/d/…"></label>`).join('')}</div>`,
+  `<div></div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="lg-links-save">Lưu</button></div>`)}
+document.addEventListener('click',e=>{const el=e.target.closest('[data-act="lg-links"],[data-act="lg-links-save"]');if(!el)return;if(el.dataset.act==='lg-links'){if(needWrite())lgLinksDlg();return}
+  e.preventDefault();const o={...(S.config.logSheets||{})};let bad='';dlg.querySelectorAll('[data-lgm]').forEach(i=>{const m=i.dataset.lgm,v=i.value.trim();if(!v){delete o[m];return}const id=lgId(v);if(!id){bad=fmtM(m);return}o[m]=id});
+  if(bad){toast('Link '+bad+' chưa đúng');return}const cfg=clean(S.config);write('config/main',{...cfg,logSheets:o}).then(()=>{toast('Đã lưu link, đang đồng bộ…');setTimeout(()=>refreshLogs(false),600)}).catch(()=>{});closeDlg()});
 /* Tự đọc khi mở mục Nhật ký cá nhân hoặc KPI (tối đa 1 lần mỗi 30 phút) */
 setInterval(()=>{if(['ca-nhan','kpi','tong-quan'].includes(S.view)&&document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.loaded.has('logs')&&Date.now()-_lgTried>30*60e3)refreshLogs(true)},20e3);
 /* ===================== Báo cáo tuần gửi lãnh đạo (5 đầu mục chuẩn của phòng HCNS) =====================
