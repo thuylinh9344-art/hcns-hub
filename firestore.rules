@@ -41,6 +41,19 @@ service cloud.firestore {
     match /hcns_hub/main/catalog/{id} {
       allow get: if hubStaff();
     }
+    // Báo cáo nhân sự, KPI tuyển dụng, phân công: nhân viên HCNS được xem (chỉ đọc).
+    match /hcns_hub/main/sys/dsns {
+      allow get: if hubStaff();
+    }
+    match /hcns_hub/main/rec/cv {
+      allow get: if hubStaff();
+    }
+    match /hcns_hub/main/assign/{id} {
+      allow get: if hubStaff();
+    }
+    match /hcns_hub/main/effort/{id} {
+      allow read: if hubStaff() && resource.data.staffId == mySid();
+    }
     match /hcns_hub/main/okrs/{id} {
       allow read: if hubStaff();
     }
