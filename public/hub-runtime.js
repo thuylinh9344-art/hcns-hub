@@ -105,6 +105,7 @@
       path: col.path,
       doc: function (id) { return wrapDoc(id ? col.doc(id) : col.doc()); },
       add: function (b) { var r = col.doc(); return r.set(b).then(function () { return wrapDoc(r); }); },
+      where: function (f, op, v) { return wrapCol(col.where(f, op, v)); },
       get: function () { return col.get(); },
       onSnapshot: function (next, err) {
         return col.onSnapshot(next, function (e) { window.HUB_LAST_ERROR = e; if (err) err(mapErr(e)); });
@@ -200,7 +201,7 @@
       }, Promise.resolve()).then(function () { return ops.length; });
     });
   };
-  var COLS = ['staff', 'tasks', 'logs', 'effort', 'okrs', 'config', 'catalog', 'assign', 'sys', 'rec', 'chtplan'];
+  var COLS = ['staff', 'tasks', 'logs', 'effort', 'okrs', 'okrp', 'members', 'config', 'catalog', 'assign', 'sys', 'rec', 'chtplan'];
   window.hubExport = function () {
     var out = {};
     return Promise.all(COLS.map(function (c) {

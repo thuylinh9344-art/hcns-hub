@@ -7,26 +7,64 @@ service cloud.firestore {
     // và chỉ dán thêm khối "Bàn điều hành HCNS" bên dưới.
 
     // ===== Bàn điều hành HCNS =====
-    // Danh sách email Google được phép dùng. Thêm email của từng thành viên phòng, cách nhau bằng dấu phẩy.
-    function hubMember() {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email in [
-          'thuylinh9344@gmail.com'
-          // , 'email.thanh.vien@gmail.com'
-        ];
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
     }
+    // Quản trị: xem và sửa toàn bộ. Thêm email quản trị khác (nếu có), cách nhau bằng dấu phẩy.
+    function hubAdmin() {
+      return signedIn() && request.auth.token.email in [
+        'thuylinh9344@gmail.com'
+      ];
+    }
+    // Nhân viên: được cấp trên web ở mục "OKR cá nhân" → "Tài khoản đăng nhập của nhân viên"
+    // (lưu ở hcns_hub/main/members/<email>). Không cần sửa rules khi thêm/bớt nhân viên.
+    function memPath() {
+      return /databases/$(database)/documents/hcns_hub/main/members/$(request.auth.token.email);
+    }
+    function hubStaff() { return signedIn() && exists(memPath()); }
+    function mySid() { return get(memPath()).data.staffId; }
 
     match /hcns_hub/main/{document=**} {
-      allow read, write: if hubMember();
+      allow read, write: if hubAdmin();
     }
 
-    // Phương án chặt hơn (tùy chọn): chỉ quản trị sửa cấu hình, danh mục KPI và danh sách nhân sự.
-    // Dùng thì xóa khối "match /hcns_hub/main/{document=**}" ở trên và bỏ dấu // ở các dòng dưới.
-    // function hubAdmin() { return request.auth != null && request.auth.token.email in ['thuylinh9344@gmail.com']; }
-    // match /hcns_hub/main/{col}/{docId} {
-    //   allow read: if hubMember();
-    //   allow write: if hubAdmin() || (hubMember() && !(col in ['config', 'catalog', 'staff']));
-    // }
+    // --- Quyền của nhân viên: chỉ dữ liệu của chính mình ---
+    match /hcns_hub/main/members/{email} {
+      allow get: if signedIn() && email == request.auth.token.email;
+    }
+    match /hcns_hub/main/staff/{sid} {
+      allow get: if hubStaff() && sid == mySid();
+    }
+    match /hcns_hub/main/config/main {
+      allow get: if hubStaff();
+    }
+    match /hcns_hub/main/catalog/{id} {
+      allow get: if hubStaff();
+    }
+    match /hcns_hub/main/okrs/{id} {
+      allow read: if hubStaff();
+    }
+    match /hcns_hub/main/logs/{id} {
+      allow read: if hubStaff() && resource.data.staffId == mySid();
+    }
+    match /hcns_hub/main/tasks/{id} {
+      allow read: if hubStaff() && resource.data.owner == mySid();
+    }
+    match /hcns_hub/main/okrp/{id} {
+      allow read: if hubStaff() && resource.data.staffId == mySid();
+      // Tự lập OKR: chỉ được để Nháp hoặc Gửi duyệt, không tự duyệt.
+      allow create: if hubStaff()
+        && request.resource.data.staffId == mySid()
+        && id == request.resource.data.quarter + '_' + mySid()
+        && request.resource.data.status in ['draft', 'submitted'];
+      // Sửa/check-in: không đổi chủ, không tự duyệt, không sửa nhận xét duyệt.
+      allow update: if hubStaff()
+        && resource.data.staffId == mySid()
+        && request.resource.data.staffId == mySid()
+        && request.resource.data.quarter == resource.data.quarter
+        && (request.resource.data.status in ['draft', 'submitted']
+            || (request.resource.data.status == resource.data.status
+                && request.resource.data.get('review', null) == resource.data.get('review', null)));
+    }
   }
 }
