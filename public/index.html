@@ -1555,7 +1555,7 @@ function rkData(m){
     const T=cv.filter(x=>x.o===s.id&&x.start&&x.start>=a&&x.start<=b&&!x.quit);
     const tOk=T.filter(x=>{const end=x.ac&&x.ac>=x.sub?x.ac:x.start;return diffDays(x.sub,end)<=RK_LIM[rkGrp(x.p)]}).length;
     const C=R.filter(r=>r.o===s.id&&r.start>=a&&r.start<=b);const cq=C.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<30).length;
-    const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>x.v1&&x.v1>=x.sub);const fast=v1.filter(x=>wdBetween(x.sub,x.v1)<2).length;const stale=CV.filter(x=>x.stale).length;
+    const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>x.v1&&x.v1>=x.sub);const fast=v1.filter(x=>wdBetween(x.sub,x.v1)<=3).length;const stale=CV.filter(x=>x.stale).length;
     const fill=tgt?Math.min(1,realN/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=CV.length?1-stale/CV.length:null;
     const f=alloc/500,mF=Math.round(300*f),mT=Math.round(50*f),mQ=Math.round(50*f),mC=alloc-mF-mT-mQ;const sF=Math.round(mF*fill),sT=ttf==null?0:Math.round(mT*ttf),sQ=q90==null?mQ:(q90<.4?mQ:0),sC=Math.round(mC*(.5*(p1??0)+.5*(p2??0)));const kpi=sF+sT+sQ+sC;const tot=alloc?kpi/alloc*500:0;
     const eff=Object.entries(cnt).reduce((t,[g,n])=>t+n*(S.config.eff[RK_BASE[g]]||0),0);
@@ -1574,7 +1574,7 @@ function vRecKpi(m){
     <td class="r num">${nf(r.sF)}<span class="mini">/${r.mF}</span><div class="mini">${rkPct(r.fill)}</div></td>
     <td class="r num">${nf(r.sT)}<span class="mini">/${r.mT}</span><div class="mini">${r.T?`${r.tOk}/${r.T} · ${rkPct(r.ttf)}`:'chưa khớp hồ sơ'}</div></td>
     <td class="r num">${r.sQ}<span class="mini">/${r.mQ}</span><div class="mini">${r.C?`${r.cq}/${r.C} · ${rkPct(r.q90)}`:'chưa có dữ liệu'}</div></td>
-    <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý &lt;2 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
+    <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý ≤3 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
     <td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
     <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
   <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${nf(Math.round(sum.real*100)/100)}</b></td><td colspan="6" class="mini">3 học việc tính = 1 NVBH · Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)&&S.isLinh?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
@@ -1583,7 +1583,7 @@ function vRecKpi(m){
     <li>Thực tuyển: người nhận việc trong tháng theo DSNS và đang làm; ai nghỉ việc thì tự trừ ra khi cập nhật DSNS, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người tuyển vị trí quản lý; khối văn phòng và kho gán cho người phụ trách khối văn phòng. QLKV quy đổi 1 người.</li>
     <li>Trúng tuyển đúng hạn: từ ngày nộp CV đến ngày nhận việc trên Member (thiếu thì lấy ngày vào làm DSNS) ≤ NVBH 15 · CHT 20 · QLKV 30 · VP 15 ngày. Member chưa ghi ngày gửi thư mời nên đây là cách đo chặt hơn quy định.</li>
     <li>Chất lượng: nhóm vào làm trong tháng (${fmtM(m)}), tỷ lệ nghỉ trong 30 ngày đầu nhỏ hơn 40% được đủ điểm (10%); không có người vào làm thì để đủ điểm.</li>
-    <li>Tuân thủ: ½ × % hồ sơ có lịch PV vòng 1 trong dưới 2 ngày làm việc kể từ ngày nộp + ½ × % hồ sơ không bị treo (thay cho "cập nhật Member đúng hạn" vì sheet chưa ghi thời điểm cập nhật).</li>
+    <li>Tuân thủ: ½ × % hồ sơ có lịch PV vòng 1 trong vòng 3 ngày làm việc kể từ ngày nộp (quá 3 ngày là không đạt) + ½ × % hồ sơ không bị treo (thay cho "cập nhật Member đúng hạn" vì sheet chưa ghi thời điểm cập nhật).</li>
     <li>Điểm tối đa từng tiêu chí = tỷ trọng × điểm phân bổ của người đó (ví dụ phân bổ 600: lấp đầy 360, trúng tuyển đúng hạn 60, nghỉ &lt;30 ngày 60, tuân thủ 120). KPI tuyển dụng = tổng điểm 4 tiêu chí. Điểm HS tuyển = số thực tuyển × điểm cơ sở (NVBH ${S.config.eff.tdNT} · CHT ${S.config.eff.tdCHT} · QLKV ${S.config.eff.tdQLKV} · VP ${S.config.eff.tdVP}), cộng vào hiệu suất D khi bấm "Ghi số tuyển".</li></ul></details></div>`}
 async function rkSetPlan(m,code,idx,val){const cur=JSON.parse(JSON.stringify(rkPlan(m)));if(!cur[code])cur[code]=[0,500];cur[code][idx]=val;const rp={...(S.config.recPlan||{}),[m]:cur};await write('config/main',{...S.config,recPlan:rp})}
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.rkt!=null)rkSetPlan(S.month,t.dataset.rkt,0,+t.value||0);else if(t.dataset.rka!=null)rkSetPlan(S.month,t.dataset.rka,1,+t.value||0)});
