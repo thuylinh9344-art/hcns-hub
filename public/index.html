@@ -2026,7 +2026,7 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   <footer class="wd-foot">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} (gồm học việc sheet TTS) · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS${lk?' · bản đã chốt':''}</footer>`}
 /* Hồ sơ pháp lý dạng tick xanh: việc trong tuần + lũy kế tháng theo từng nhà thuốc */
 function wdLegalHtml(lines,groups){const items=lines.filter(l=>!/^Lũy kế tháng|^Trong tuần chưa ghi nhận/.test(l));
-  const tick=(l,open)=>`<li class="${open?'open':''}"><span class="tk">${open?'◷':'✓'}</span><span>${esc(l)}</span></li>`;
+  const tick=(l)=>`<li><span class="tk">✓</span><span>${esc(l)}</span></li>`;
   let h=`<ul class="wd-ticks">${items.length?items.map(l=>/^Không phát sinh/.test(l)?tick('Không phát sinh hồ sơ mới trong tuần',false):tick(l.replace(/\s*–\s*đang thực hiện/,' (đang thực hiện)'),/đang thực hiện/.test(l))).join(''):tick('Trong tuần không phát sinh hồ sơ mới',false)}</ul>`;
   if(groups.length)h+=`<div class="wd-lg"><p>Đã hoàn thành trong tháng</p>${groups.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.k)} <em>${g.n} hồ sơ</em></b>${g.nt.length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
   return h}
