@@ -158,6 +158,7 @@ td input{width:90px}
 .dc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px;margin:10px 0}.dc-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}.dc-grid .full{grid-column:1/-1}.dc-grid input{font-size:13.5px;color:var(--fg)}
 .dc-cand{background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}.dc-cand-h{font-size:12.5px;font-weight:600;color:var(--fg)}.dc-cand-h .note{font-weight:400}.dc-cand-r{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.dc-cand-r .pill{white-space:nowrap}.dc-cand-r .mini{line-height:1.6}
 .dc-grid .span2{grid-column:span 2}.dc-oth summary{cursor:pointer;margin-top:2px}.dc-oth[open] summary{margin-bottom:5px}
+.dc-res{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
 .dc-t td{vertical-align:middle}.dc-t input,.dc-t select{font-size:13px}.dc-off td{opacity:.5;text-decoration:line-through}
 .dc-st.qlkv-ok{background:#e3f3e9}.dc-st.da-qd{background:#dfeaf8}.dc-st.da-di{background:#cdebd8}.dc-st.huy{background:#eee}
 @media (max-width:700px){.dc-grid{grid-template-columns:1fr 1fr}}
@@ -610,7 +611,7 @@ function vAssign(){
 
 /* ===================== Nhân sự hệ thống (DSNS U) ===================== */
 const SHEET_ID='1AdSIpmxiyRQlbIGvavvLS4vytUVwCpK2Qe8ypRIDPGM';
-const SYS_COLS=['code','name','pos','dept','area','block','start','probEnd','status','quit','hdType','hdEnd','tsTo','shop','yr'];
+const SYS_COLS=['code','name','pos','dept','area','block','start','probEnd','status','quit','hdType','hdEnd','tsTo','shop','yr','plan'];
 const yrOf=r=>String(r.yr||'').trim()||(r.start||'').slice(0,4);
 const SHOP_ALIAS={SHOP0012:'SHOP012A',SHOP0004:'SHOP004A'};
 let _sysCache=null;
@@ -783,13 +784,13 @@ async function refreshSys(){if(!S.mcp||S.sysBusy)return;S.sysBusy=true;render();
     const cut=addDays(TODAY,-395);const rows=[];
     parts[0].forEach((a,i)=>{const b=parts[1][i]||[],c=parts[2][i]||[],d=parts[3][i]||[];const g=j=>String(a[j]??'').trim();if(!g(1))return;
       const st=g(17),q=parseDsnsDate(g(18));if(st==='Nghỉ việc'&&q&&q<cut)return;const sh=sysShop(d[0],g(6));
-      rows.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(15))||parseDsnsDate(g(11)),parseDsnsDate(g(16)),st,q,String(b[1]??'').trim(),parseDsnsDate(b[2]),parseDsnsDate(c[1]),sh,g(14)])});
+      rows.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(15))||parseDsnsDate(g(11)),parseDsnsDate(g(16)),st,q,String(b[1]??'').trim(),parseDsnsDate(b[2]),parseDsnsDate(c[1]),sh,g(14),g(7)])});
     if(!rows.length){toast('Sheet DSNS U không trả về dữ liệu, chưa cập nhật');return}
     const lim=window.HUB_STANDALONE?900000:240000;
     while(JSON.stringify(rows).length>lim){const i=rows.findIndex(r=>r[8]==='Nghỉ việc');if(i<0)break;rows.splice(i,1)}
     const body=window.HUB_STANDALONE?{source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rowsJson:JSON.stringify(rows)}:{source:'2026 - Data HCNS · sheet DSNS U',updatedAt:new Date().toISOString(),cols:SYS_COLS,rows};
     let tts=[];try{const a=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:SHEET_ID,range:"'TTS'!A3:T"},{cache:false});const b=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:SHEET_ID,range:"'TTS'!BI3:BI"},{cache:false});const A=(a.payload&&a.payload.values)||[],B=(b.payload&&b.payload.values)||[];const have=new Set(rows.map(x=>x[0]));
-      A.forEach((x,i)=>{const g=j=>String(x[j]??'').trim();if(!g(1)||have.has(g(1)))return;const q=parseDsnsDate(g(18));if(g(17)==='Nghỉ việc'&&q&&q<cut)return;const sh=sysShop((B[i]||[])[0],g(6));tts.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(11))||parseDsnsDate(g(15)),'',g(17),q,'','','',sh,''])})}catch(_){}
+      A.forEach((x,i)=>{const g=j=>String(x[j]??'').trim();if(!g(1)||have.has(g(1)))return;const q=parseDsnsDate(g(18));if(g(17)==='Nghỉ việc'&&q&&q<cut)return;const sh=sysShop((B[i]||[])[0],g(6));tts.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(11))||parseDsnsDate(g(15)),'',g(17),q,'','','',sh,'',g(7)])})}catch(_){}
     body.ttsJson=JSON.stringify(tts);
     await write('sys/dsns',body);let sm=tts.length?` · ${tts.length} học việc (sheet TTS)`:'';try{const r=await syncShops();if(r)sm+=` · nhà thuốc: ${r.hv} nhà HV, thêm ${r.add} nhà, gán phụ trách ${r.own} nhà`}catch(_){sm+=' · chưa đọc được sheet Theo dõi nhà mới'}toast('Đã cập nhật '+rows.length+' nhân sự từ DSNS U'+sm);
   }catch(e){const c=e&&e.code;
@@ -2110,15 +2111,20 @@ const DC_PA=[['A','A · < 20 km'],['B','B · ≥ 20 km'],['?','Chưa rõ']];
 const dcPerson=code=>{const c=String(code||'').trim().toUpperCase();if(!c)return null;return sysRows().find(r=>String(r.code).toUpperCase()===c)||null};
 const dcLearner=p=>!!p&&/học việc/i.test(p.status||'');
 /* Quân số dùng cho điều chuyển: chỉ Chính thức + Thử việc đang làm (bỏ học việc, báo nghỉ, thai sản, không lương) */
-function dcStaff(code){const R=sysRows().filter(r=>r.shop===code&&sysOn(r)&&r.status!=='Báo nghỉ việc'&&!/học việc/i.test(r.status||''));const cht=R.filter(r=>isCHT(r.pos)).length;return {cht,oth:R.length-cht}}
+/* Cột "Bộ phận dự kiến" (DSNS U cột H): người đã nhận việc ở nhà cũ, chờ nhà mới mở bán */
+function dcPlanShop(v){const m=String(v||'').match(/(?:nhà thuốc(?: số)?|nhà số|nhà|nt|shop)\s*0*(\d+)([a-z]?)\b/i);if(!m)return '';const c='SHOP'+(m[2]?m[1].padStart(3,'0')+m[2].toUpperCase():m[1].padStart(4,'0'));return SHOP_ALIAS[c]||c}
+let _dcRes=null;
+function dcReservedAll(){if(_dcRes&&_dcRes.src===S.sys)return _dcRes.m;const m={};sysRows().forEach(r=>{if(!r.plan||!sysActive(r)||r.status==='Báo nghỉ việc')return;const t=dcPlanShop(r.plan);if(t&&t!==r.shop)(m[t]??=[]).push(r)});_dcRes={src:S.sys,m};return m}
+const dcReserved=id=>dcReservedAll()[id]||[];
+function dcStaff(code){const R=sysRows().filter(r=>r.shop===code&&sysOn(r)&&r.status!=='Báo nghỉ việc'&&!/học việc/i.test(r.status||'')&&!(r.plan&&(S.dcShops||{})[dcPlanShop(r.plan)]&&dcPlanShop(r.plan)!==code));const cht=R.filter(r=>isCHT(r.pos)).length;return {cht,oth:R.length-cht}}
 const dcNT=c=>String(c||'').replace(/^SHOP0*/,'NT ');
 const dcLive=mv=>mv.st!=='huy';
 const dcKey=c=>String(c||'').toUpperCase().replace(/^SHOP|^NT\s*/,'').replace(/^0+/,'');
 function dcCalc(){const shops=Object.entries(S.dcShops).map(([id,x])=>({id,...x}));const moves=Object.entries(S.dcMoves).map(([id,x])=>({id,...x}));
-  const L=shops.map(s=>{const mv=moves.filter(m=>m.to===s.id).sort((a,b)=>(a.order||0)-(b.order||0));const live=mv.filter(dcLive).length;const need=+s.need||0,have=+s.have||0;const left=Math.max(0,need-have-live);
-    const st=left===0?(mv.filter(dcLive).every(m=>m.st==='da-di')&&live?'Đã đủ người':'Đủ nếu điều chuyển'):live?`Thiếu ${left}, tuyển thêm`:`Chưa có nguồn, tuyển ${left}`;
-    return {...s,mv,live,left,status:st}}).sort((a,b)=>(a.order??999)-(b.order??999)||String(a.id).localeCompare(String(b.id)));
-  const T={shops:L.length,need:L.reduce((a,s)=>a+(+s.need||0),0),have:L.reduce((a,s)=>a+(+s.have||0),0),live:moves.filter(m=>dcLive(m)&&S.dcShops[m.to]).length,left:L.reduce((a,s)=>a+s.left,0)};
+  const L=shops.map(s=>{const mv=moves.filter(m=>m.to===s.id).sort((a,b)=>(a.order||0)-(b.order||0));const live=mv.filter(dcLive).length;const mvc=new Set(mv.filter(dcLive).map(m=>String(m.code||'').toUpperCase()));const res=dcReserved(s.id).filter(r=>!mvc.has(String(r.code).toUpperCase()));const resN=res.filter(r=>!isCHT(r.pos)).length;const need=+s.need||0,have=Math.max(+s.have||0,resN);const left=Math.max(0,need-have-live);
+    const st=left===0?(!live?(res.length?'Đủ người – đã nhận việc chờ mở':'Đã đủ người'):mv.filter(dcLive).every(m=>m.st==='da-di')?'Đã đủ người':'Đủ nếu điều chuyển'):live?`Thiếu ${left}, tuyển thêm`:`Chưa có nguồn, tuyển ${left}`;
+    return {...s,mv,live,left,res,resN,haveEff:have,status:st}}).sort((a,b)=>(a.order??999)-(b.order??999)||String(a.id).localeCompare(String(b.id)));
+  const T={shops:L.length,need:L.reduce((a,s)=>a+(+s.need||0),0),have:L.reduce((a,s)=>a+s.haveEff,0),res:L.reduce((a,s)=>a+s.res.length,0),live:moves.filter(m=>dcLive(m)&&S.dcShops[m.to]).length,left:L.reduce((a,s)=>a+s.left,0)};
   T.A=moves.filter(m=>dcLive(m)&&m.pa==='A').length;T.B=moves.filter(m=>dcLive(m)&&m.pa==='B').length;T.ok=moves.filter(m=>dcLive(m)&&m.st!=='de-xuat').length;
   return {L,T,moves}}
 /* Nhà đang hoạt động còn dư người so với định biên tối thiểu, trừ người đã đề xuất điều đi */
@@ -2153,6 +2159,7 @@ function dcCand(s){const prov=s.prov;if(!prov)return {n:0,groups:[],near:[],othe
 const dcStLbl=st=>REC_PV2.includes(st)&&!/vòng 2/i.test(st)?st+' (chờ PV vòng 2)':st;
 const dcOwn=o=>{const s=o&&o!=='x'?allStaff().find(z=>z.id===o):null;return s?String(s.name||'').split(' ').pop():''};
 const dcCandLine=x=>`${x.code}${x.g===2?' (QL)':''}${x.v2?' · PV2 '+fmtD(x.v2):x.v1?' · PV1 '+fmtD(x.v1):' · nộp '+fmtD(x.sub)}${dcOwn(x.o)?' · '+dcOwn(x.o):''}`;
+function dcResHtml(s){if(!s.res.length)return '';return `<div class="dc-res full"><div class="dc-cand-h">Đã nhận việc, chờ nhà mở bán <span class="note">theo cột Bộ phận dự kiến trong DSNS U · tính vào NVBH đã có của nhà này, không tính vào quân số nhà đang làm</span></div>${s.res.map(r=>`<div class="dc-cand-r"><span class="pill ${isCHT(r.pos)?'warn':'ok'}">${esc(r.code)}</span><span><b>${esc(r.name)}</b> <span class="mini">${esc(r.pos||'')} · ${esc(r.status||'')} · đang ở ${esc(r.shop?dcNT(r.shop):(r.dept||'—'))}${r.start?' · vào '+fmtD(r.start):''}${/học việc/i.test(r.status||'')?' · học việc':''}</span></span></div>`).join('')}</div>`}
 function dcCandText(s){const c=dcCand(s);const t=c.n?c.groups.map(([st,l])=>`${dcStLbl(st)}: ${l.length} (${l.map(x=>x.code).join(', ')})`).join('; '):'chưa có';
   return (c.near.length?`[chung với ${c.near.map(o=>dcNT(o.id)).join(', ')}] `:'')+t+(c.other.length?` · khác trong tỉnh: ${c.other.length}`:'')}
 function dcCandHtml(s){const prov=s.prov;if(!S.rec||!S.rec.rowsJson)return `<div class="dc-cand full"><span class="note">Chưa có dữ liệu hồ sơ tuyển dụng – cập nhật ở mục Hồ sơ tuyển dụng.</span></div>`;
@@ -2174,7 +2181,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
     <div class="stat"><div class="k">Nhà sắp mở</div><div class="v">${T.shops}</div><div class="s">cần ${T.need} NVBH (định biên)</div></div>
     <div class="stat ok"><div class="k">Có nguồn điều chuyển</div><div class="v">${T.live}</div><div class="s">PA A ${T.A} · PA B ${T.B} · ${T.ok} đã được QLKV xác nhận</div></div>
     <div class="stat ${T.left?'bad':'ok'}"><div class="k">Còn phải tuyển</div><div class="v">${T.left}</div><div class="s">${L.filter(s=>s.left>0).length} nhà chưa đủ nguồn</div></div>
-    <div class="stat"><div class="k">NVBH đã có tại nhà mới</div><div class="v">${T.have}</div><div class="s">nhập tay khi nhà đã nhận người</div></div></div>
+    <div class="stat"><div class="k">NVBH đã có tại nhà mới</div><div class="v">${T.have}</div><div class="s">${T.res?`${T.res} người đã nhận việc chờ mở (Bộ phận dự kiến)`:'nhập tay hoặc ghi cột Bộ phận dự kiến trong DSNS'}</div></div></div>
   <details class="panel dc-rule"><summary><b>Nguyên tắc điều chuyển</b> <span class="note">bấm để xem</span></summary><ul>
     <li>Nhà cũ giữ tối thiểu <b>1 CHT + 2 NVBH</b>; nhà chưa có CHT giữ <b>3 NVBH</b>. Vượt định biên thì điều đi hỗ trợ. Chỉ tính nhân sự chính thức và thử việc: <b>không xét học việc</b>, không tính người báo nghỉ, thai sản, không lương.</li>
     <li>Nhà sắp mở định biên <b>2 NVBH</b>. Ưu tiên khoảng cách: <b>PA A</b> điều chuyển nội bộ trong bán kính 20 km; <b>PA B</b> từ 20 km trở lên, áp dụng chính sách điều động.</li>
@@ -2185,7 +2192,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
   if(!L.length)return h+`<div class="empty">Chưa có phương án. ${S.canWrite?'Bấm “+ Thêm nhà mới” hoặc nhập file phương án (.json).':''}</div>`;
   h+=view.map(s=>{const open=S.dcOpen[s.id]!==false;const sur=dcSurplus(s.prov).slice(0,6);
     return `<div class="panel dc-shop ${s.left?'dc-miss':''}">
-    <div class="dc-sh" data-act="dc-toggle" data-id="${esc(s.id)}"><b>${open?'▾':'▸'} ${esc(dcNT(s.id))}</b><span class="pill">${esc(s.prov||'—')}</span><span class="note">QLKV ${esc(s.mgr||'—')}</span><span class="pill ${s.left?(s.live?'warn':'bad'):'ok'}">${esc(s.status)}</span><span class="note">${s.live}/${Math.max(0,(+s.need||0)-(+s.have||0))} người có nguồn</span></div>
+    <div class="dc-sh" data-act="dc-toggle" data-id="${esc(s.id)}"><b>${open?'▾':'▸'} ${esc(dcNT(s.id))}</b><span class="pill">${esc(s.prov||'—')}</span><span class="note">QLKV ${esc(s.mgr||'—')}</span><span class="pill ${s.left?(s.live?'warn':'bad'):'ok'}">${esc(s.status)}</span><span class="note">${s.live}/${Math.max(0,(+s.need||0)-s.haveEff)} người có nguồn</span>${s.res.length?`<span class="pill ok">${s.res.length} đã nhận việc chờ mở</span>`:''}</div>
     ${open?`<div class="dc-grid">
       <label>Địa chỉ<input data-dcs="${esc(s.id)}" data-k="addr" value="${esc(s.addr||'')}" ${dis}></label>
       <label>Tỉnh<input data-dcs="${esc(s.id)}" data-k="prov" value="${esc(s.prov||'')}" ${dis}></label>
@@ -2195,7 +2202,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
       <label>NVBH đã có<input type="number" min="0" data-dcs="${esc(s.id)}" data-k="have" value="${esc(s.have??0)}" ${dis}></label>
       <label>Tọa độ (vĩ độ, kinh độ)<input data-dcs="${esc(s.id)}" data-k="geo" value="${esc(s.geo||'')}" placeholder="${DC_GEO[s.id]?esc(DC_GEO[s.id].join(', '))+' (mặc định)':'dán từ Google Maps'}" ${dis}></label>
       <label class="span2">Xã/phường tuyển (như cột Xã/Phường trên hồ sơ, cách nhau dấu phẩy)<input data-dcs="${esc(s.id)}" data-k="locs" value="${esc(s.locs||'')}" placeholder="để trống = tự nhận theo địa chỉ" ${dis}></label>
-      <label class="full">Ghi chú<input data-dcs="${esc(s.id)}" data-k="note" value="${esc(s.note||'')}" ${dis}></label>${dcCandHtml(s)}</div>
+      <label class="full">Ghi chú<input data-dcs="${esc(s.id)}" data-k="note" value="${esc(s.note||'')}" ${dis}></label>${dcResHtml(s)}${dcCandHtml(s)}</div>
     <div class="tbl-wrap"><table class="dc-t"><thead><tr><th>Nhà đi</th><th>Mã NV</th><th>Họ tên (DSNS)</th><th>PA</th><th>Khoảng cách</th><th>Tình trạng</th><th>Ngày đi</th><th>Ghi chú</th><th></th></tr></thead><tbody>
     ${s.mv.map(m=>{const p=dcPerson(m.code);return `<tr class="${m.st==='huy'?'dc-off':''}">
       <td><input class="dc-in" style="width:72px" data-dcm="${m.id}" data-k="from" value="${esc(m.from||'')}" ${dis}></td>
@@ -2212,7 +2219,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
       <span class="note">Nhà dư người cùng tỉnh: ${sur.length?sur.map(o=>`${dcNT(o.code)} (+${o.can})`).join(', '):'không có – cân nhắc tuyển mới hoặc PA B từ tỉnh lân cận'}</span></div>`:''}</div>`}).join('');
   return h}
 function dcText(){const {L,T}=dcCalc();return `PHƯƠNG ÁN ĐIỀU CHUYỂN NHÂN SỰ NHÀ MỚI – ${fmtDY(TODAY)}\n${T.shops} nhà sắp mở cần ${T.need} NVBH: có nguồn điều ${T.live} người (PA A ${T.A}, PA B ${T.B}), còn phải tuyển ${T.left}.\n`+
-  L.map(s=>`\n${dcNT(s.id)} (${s.prov||'—'}, QLKV ${s.mgr||'—'}${s.open?', mở '+fmtD(s.open):''}): ${s.status}`+(s.mv.filter(dcLive).length?'\n'+s.mv.filter(dcLive).map(m=>`  - từ ${m.from||'?'} · PA ${m.pa||'?'}${m.km?' · '+m.km:''} · ${(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1]}`).join('\n'):'')+(s.note?`\n  Ghi chú: ${s.note}`:'')+(S.rec&&S.rec.rowsJson?`\n  Ứng viên: ${dcCandText(s)}`:'')).join('')}
+  L.map(s=>`\n${dcNT(s.id)} (${s.prov||'—'}, QLKV ${s.mgr||'—'}${s.open?', mở '+fmtD(s.open):''}): ${s.status}`+(s.mv.filter(dcLive).length?'\n'+s.mv.filter(dcLive).map(m=>`  - từ ${m.from||'?'} · PA ${m.pa||'?'}${m.km?' · '+m.km:''} · ${(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1]}`).join('\n'):'')+(s.res.length?`\n  Đã nhận việc chờ mở: ${s.res.map(r=>`${r.code} ${r.name} (đang ở ${r.shop?dcNT(r.shop):r.dept||'—'})`).join(', ')}`:'')+(s.note?`\n  Ghi chú: ${s.note}`:'')+(S.rec&&S.rec.rowsJson?`\n  Ứng viên: ${dcCandText(s)}`:'')).join('')}
 const dcSaveShop=(id,patch)=>write('dcshop/'+id,{...(S.dcShops[id]||{}),...patch,updatedAt:new Date().toISOString()});
 const dcSaveMove=(id,patch)=>write('dcmove/'+id,{...(S.dcMoves[id]||{}),...patch,updatedAt:new Date().toISOString()});
 document.addEventListener('change',e=>{const t=e.target;
@@ -2230,9 +2237,9 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-
   else if(a==='dc-new-ok'){let c=String((document.getElementById('dcNewCode')||{}).value||'').trim().toUpperCase();if(!c){toast('Nhập mã nhà thuốc');return}if(/^\d+[A-Z]?$/.test(c))c='SHOP'+c.padStart(4,'0');
     const x=S.shops.find(s=>s.code===c)||{};dcSaveShop(c,{prov:(document.getElementById('dcNewProv')||{}).value||x.area||'',mgr:(document.getElementById('dcNewMgr')||{}).value||x.mgr||'',addr:'',need:2,have:0,open:x.open||'',note:'',order:Object.keys(S.dcShops).length+1});closeDlg()}
   else if(a==='dc-copy')copyText(dcText());
-  else if(a==='dc-csv'){const {L}=dcCalc();const rows=[['Nhà mới','Tỉnh','QLKV','Địa chỉ','Ngày mở bán','Định biên NVBH','NVBH đã có','Có nguồn điều','Còn phải tuyển','Tình trạng nhà','Nhà đi','Mã NV','Họ tên','Trạng thái NV','PA','Khoảng cách','Tình trạng điều','Ngày đi','Ghi chú','Ứng viên đang xử lý tại tỉnh']];
-    L.forEach(s=>{const base=[dcNT(s.id),s.prov||'',s.mgr||'',s.addr||'',s.open||'',s.need??'',s.have??'',s.live,s.left,s.status];const uv=S.rec&&S.rec.rowsJson?dcCandText(s):'';if(!s.mv.length)rows.push([...base,'','','','','','','','',s.note||'',uv]);
-      s.mv.forEach(m=>{const p=dcPerson(m.code);rows.push([...base,m.from||'',m.code||'',p?p.name:'',p?p.status:'',m.pa||'',m.km||'',(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1],m.date||'',m.note||'',uv])})});
+  else if(a==='dc-csv'){const {L}=dcCalc();const rows=[['Nhà mới','Tỉnh','QLKV','Địa chỉ','Ngày mở bán','Định biên NVBH','NVBH đã có','Có nguồn điều','Còn phải tuyển','Tình trạng nhà','Nhà đi','Mã NV','Họ tên','Trạng thái NV','PA','Khoảng cách','Tình trạng điều','Ngày đi','Ghi chú','Ứng viên đang xử lý tại tỉnh','Đã nhận việc chờ mở (Bộ phận dự kiến)']];
+    L.forEach(s=>{const base=[dcNT(s.id),s.prov||'',s.mgr||'',s.addr||'',s.open||'',s.need??'',s.haveEff,s.live,s.left,s.status];const uv=S.rec&&S.rec.rowsJson?dcCandText(s):'';const rs=s.res.map(r=>`${r.code} ${r.name} (${r.shop?dcNT(r.shop):r.dept||'—'})`).join('; ');if(!s.mv.length)rows.push([...base,'','','','','','','','',s.note||'',uv,rs]);
+      s.mv.forEach(m=>{const p=dcPerson(m.code);rows.push([...base,m.from||'',m.code||'',p?p.name:'',p?p.status:'',m.pa||'',m.km||'',(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1],m.date||'',m.note||'',uv,rs])})});
     saveFile('Phuong-an-dieu-chuyen-nha-moi_'+TODAY+'.csv',csv(rows))}});
 function confirmDel(el){if(el.dataset.sure){return true}el.dataset.sure='1';el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(el.isConnected){delete el.dataset.sure;el.textContent=el.dataset.act==='dc-del-shop'?'Xóa nhà này':'✕'}},2500);return false}
 
