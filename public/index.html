@@ -156,6 +156,7 @@ td input{width:90px}
 .dc-shop{margin-bottom:10px;padding:12px 14px}.dc-shop.dc-miss{border-left:4px solid var(--bad,#c8372d)}
 .dc-sh{display:flex;flex-wrap:wrap;gap:8px;align-items:center;cursor:pointer}
 .dc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 12px;margin:10px 0}.dc-grid label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}.dc-grid .full{grid-column:1/-1}.dc-grid input{font-size:13.5px;color:var(--fg)}
+.dc-cand{background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}.dc-cand-h{font-size:12.5px;font-weight:600;color:var(--fg)}.dc-cand-h .note{font-weight:400}.dc-cand-r{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.dc-cand-r .pill{white-space:nowrap}.dc-cand-r .mini{line-height:1.6}
 .dc-t td{vertical-align:middle}.dc-t input,.dc-t select{font-size:13px}.dc-off td{opacity:.5;text-decoration:line-through}
 .dc-st.qlkv-ok{background:#e3f3e9}.dc-st.da-qd{background:#dfeaf8}.dc-st.da-di{background:#cdebd8}.dc-st.huy{background:#eee}
 @media (max-width:700px){.dc-grid{grid-template-columns:1fr 1fr}}
@@ -2122,6 +2123,24 @@ function dcCalc(){const shops=Object.entries(S.dcShops).map(([id,x])=>({id,...x}
 /* Nhà đang hoạt động còn dư người so với định biên tối thiểu, trừ người đã đề xuất điều đi */
 function dcSurplus(prov){const used={};Object.values(S.dcMoves).filter(dcLive).forEach(m=>{const f=dcKey(m.from);if(f)used[f]=(used[f]||0)+1});
   return S.shops.filter(x=>x.type==='nt'&&(!prov||x.area===prov)).map(x=>{const s=dcStaff(x.code);const keep=s.cht?2:3;return {code:x.code,area:x.area,cht:s.cht,oth:s.oth,can:Math.max(0,s.oth-keep)-(used[dcKey(x.code)]||0)}}).filter(o=>o.can>0&&o.oth>0).sort((a,b)=>b.can-a.can)}
+/* Ứng viên đang xử lý trên sheet Hồ sơ tuyển dụng theo tỉnh của nhà mới (chỉ mã hồ sơ, không lưu họ tên) */
+const DC_FAIL=/không đạt|từ chối|loại|hủy|huỷ|không liên lạc|không nghe|không đến|không tham gia|rút|bỏ|fail|không phù hợp|blacklist/i;
+const dcStage=st=>/thư mời|offer|nhận việc|ký hđ|ký hợp đồng|chờ đi làm/i.test(st)?5:(REC_PV2.includes(st)||/vòng 2/i.test(st))?4:(REC_PV1.includes(st)||/vòng 1/i.test(st))?3:/mới tạo/i.test(st)?1:2;
+let _dcCand=null;
+function dcCand(prov){if(!prov)return {n:0,groups:[]};if(!_dcCand||_dcCand.rec!==S.rec)_dcCand={rec:S.rec,m:{}};if(_dcCand.m[prov])return _dcCand.m[prov];
+  const keys=[prov,...(REC_ALIAS[prov]||[])].map(normName);const from=addDays(TODAY,-60);
+  const L=recRows().filter(x=>x.g!==1&&!x.start&&x.sub>=from&&x.st&&!DC_FAIL.test(x.st)&&keys.includes(normName(x.ar)));
+  const by={};L.forEach(x=>(by[x.st]??=[]).push(x));
+  const groups=Object.entries(by).map(([st,l])=>[st,l.sort((a,b)=>(b.v2||b.v1||b.sub).localeCompare(a.v2||a.v1||a.sub)),dcStage(st)]).sort((a,b)=>b[2]-a[2]||b[1].length-a[1].length);
+  return _dcCand.m[prov]={n:L.length,groups}}
+const dcStLbl=st=>REC_PV2.includes(st)&&!/vòng 2/i.test(st)?st+' (chờ PV vòng 2)':st;
+const dcOwn=o=>{const s=o&&o!=='x'?allStaff().find(z=>z.id===o):null;return s?String(s.name||'').split(' ').pop():''};
+const dcCandLine=x=>`${x.code}${x.g===2?' (QL)':''}${x.v2?' · PV2 '+fmtD(x.v2):x.v1?' · PV1 '+fmtD(x.v1):' · nộp '+fmtD(x.sub)}${dcOwn(x.o)?' · '+dcOwn(x.o):''}`;
+function dcCandText(prov){const c=dcCand(prov);return c.n?c.groups.map(([st,l])=>`${dcStLbl(st)}: ${l.length} (${l.map(x=>x.code).join(', ')})`).join('; '):''}
+function dcCandHtml(prov){if(!S.rec||!S.rec.rowsJson)return `<div class="dc-cand full"><span class="note">Chưa có dữ liệu hồ sơ tuyển dụng – cập nhật ở mục Hồ sơ tuyển dụng.</span></div>`;
+  const c=dcCand(prov);const hd=`<div class="dc-cand-h">Ứng viên đang xử lý tại ${esc(prov||'—')} <span class="note">hồ sơ 60 ngày gần nhất, chưa đi làm, bỏ hồ sơ không đạt/từ chối · chung cho các nhà mới cùng tỉnh · hồ sơ cập nhật ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'}</span></div>`;
+  if(!c.n)return `<div class="dc-cand full">${hd}<span class="note">Không có ứng viên đang xử lý – cần đẩy nguồn tuyển.</span></div>`;
+  return `<div class="dc-cand full">${hd}${c.groups.map(([st,l,k])=>`<div class="dc-cand-r"><span class="pill ${k>=5?'ok':k>=4?'warn':''}">${esc(dcStLbl(st))} · ${l.length}</span><span class="mini">${l.map(x=>esc(dcCandLine(x))).join(' &nbsp;|&nbsp; ')}</span></div>`).join('')}</div>`}
 function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disabled';
   const provs=[...new Set(L.map(s=>s.prov).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')),mgrs=[...new Set(L.map(s=>s.mgr).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
   const view=L.filter(s=>(!f.prov||s.prov===f.prov)&&(!f.mgr||s.mgr===f.mgr)&&(!f.st||(f.st==='thieu'?s.left>0:f.st==='du'?s.left===0:s.mv.some(m=>m.st===f.st))));
@@ -2151,7 +2170,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
       <label>Ngày mở bán dự kiến<input type="date" data-dcs="${esc(s.id)}" data-k="open" value="${esc(s.open||'')}" ${dis}></label>
       <label>Định biên NVBH<input type="number" min="0" data-dcs="${esc(s.id)}" data-k="need" value="${esc(s.need??2)}" ${dis}></label>
       <label>NVBH đã có<input type="number" min="0" data-dcs="${esc(s.id)}" data-k="have" value="${esc(s.have??0)}" ${dis}></label>
-      <label class="full">Ghi chú<input data-dcs="${esc(s.id)}" data-k="note" value="${esc(s.note||'')}" ${dis}></label></div>
+      <label class="full">Ghi chú<input data-dcs="${esc(s.id)}" data-k="note" value="${esc(s.note||'')}" ${dis}></label>${dcCandHtml(s.prov)}</div>
     <div class="tbl-wrap"><table class="dc-t"><thead><tr><th>Nhà đi</th><th>Mã NV</th><th>Họ tên (DSNS)</th><th>PA</th><th>Khoảng cách</th><th>Tình trạng</th><th>Ngày đi</th><th>Ghi chú</th><th></th></tr></thead><tbody>
     ${s.mv.map(m=>{const p=dcPerson(m.code);return `<tr class="${m.st==='huy'?'dc-off':''}">
       <td><input class="dc-in" style="width:72px" data-dcm="${m.id}" data-k="from" value="${esc(m.from||'')}" ${dis}></td>
@@ -2168,7 +2187,7 @@ function vDc(){const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disab
       <span class="note">Nhà dư người cùng tỉnh: ${sur.length?sur.map(o=>`${dcNT(o.code)} (+${o.can})`).join(', '):'không có – cân nhắc tuyển mới hoặc PA B từ tỉnh lân cận'}</span></div>`:''}</div>`}).join('');
   return h}
 function dcText(){const {L,T}=dcCalc();return `PHƯƠNG ÁN ĐIỀU CHUYỂN NHÂN SỰ NHÀ MỚI – ${fmtDY(TODAY)}\n${T.shops} nhà sắp mở cần ${T.need} NVBH: có nguồn điều ${T.live} người (PA A ${T.A}, PA B ${T.B}), còn phải tuyển ${T.left}.\n`+
-  L.map(s=>`\n${dcNT(s.id)} (${s.prov||'—'}, QLKV ${s.mgr||'—'}${s.open?', mở '+fmtD(s.open):''}): ${s.status}`+(s.mv.filter(dcLive).length?'\n'+s.mv.filter(dcLive).map(m=>`  - từ ${m.from||'?'} · PA ${m.pa||'?'}${m.km?' · '+m.km:''} · ${(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1]}`).join('\n'):'')+(s.note?`\n  Ghi chú: ${s.note}`:'')).join('')}
+  L.map(s=>`\n${dcNT(s.id)} (${s.prov||'—'}, QLKV ${s.mgr||'—'}${s.open?', mở '+fmtD(s.open):''}): ${s.status}`+(s.mv.filter(dcLive).length?'\n'+s.mv.filter(dcLive).map(m=>`  - từ ${m.from||'?'} · PA ${m.pa||'?'}${m.km?' · '+m.km:''} · ${(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1]}`).join('\n'):'')+(s.note?`\n  Ghi chú: ${s.note}`:'')+(dcCandText(s.prov)?`\n  Ứng viên ${s.prov}: ${dcCandText(s.prov)}`:'')).join('')}
 const dcSaveShop=(id,patch)=>write('dcshop/'+id,{...(S.dcShops[id]||{}),...patch,updatedAt:new Date().toISOString()});
 const dcSaveMove=(id,patch)=>write('dcmove/'+id,{...(S.dcMoves[id]||{}),...patch,updatedAt:new Date().toISOString()});
 document.addEventListener('change',e=>{const t=e.target;
@@ -2186,9 +2205,9 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-
   else if(a==='dc-new-ok'){let c=String((document.getElementById('dcNewCode')||{}).value||'').trim().toUpperCase();if(!c){toast('Nhập mã nhà thuốc');return}if(/^\d+[A-Z]?$/.test(c))c='SHOP'+c.padStart(4,'0');
     const x=S.shops.find(s=>s.code===c)||{};dcSaveShop(c,{prov:(document.getElementById('dcNewProv')||{}).value||x.area||'',mgr:(document.getElementById('dcNewMgr')||{}).value||x.mgr||'',addr:'',need:2,have:0,open:x.open||'',note:'',order:Object.keys(S.dcShops).length+1});closeDlg()}
   else if(a==='dc-copy')copyText(dcText());
-  else if(a==='dc-csv'){const {L}=dcCalc();const rows=[['Nhà mới','Tỉnh','QLKV','Địa chỉ','Ngày mở bán','Định biên NVBH','NVBH đã có','Có nguồn điều','Còn phải tuyển','Tình trạng nhà','Nhà đi','Mã NV','Họ tên','Trạng thái NV','PA','Khoảng cách','Tình trạng điều','Ngày đi','Ghi chú']];
-    L.forEach(s=>{const base=[dcNT(s.id),s.prov||'',s.mgr||'',s.addr||'',s.open||'',s.need??'',s.have??'',s.live,s.left,s.status];if(!s.mv.length)rows.push([...base,'','','','','','','','',s.note||'']);
-      s.mv.forEach(m=>{const p=dcPerson(m.code);rows.push([...base,m.from||'',m.code||'',p?p.name:'',p?p.status:'',m.pa||'',m.km||'',(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1],m.date||'',m.note||''])})});
+  else if(a==='dc-csv'){const {L}=dcCalc();const rows=[['Nhà mới','Tỉnh','QLKV','Địa chỉ','Ngày mở bán','Định biên NVBH','NVBH đã có','Có nguồn điều','Còn phải tuyển','Tình trạng nhà','Nhà đi','Mã NV','Họ tên','Trạng thái NV','PA','Khoảng cách','Tình trạng điều','Ngày đi','Ghi chú','Ứng viên đang xử lý tại tỉnh']];
+    L.forEach(s=>{const base=[dcNT(s.id),s.prov||'',s.mgr||'',s.addr||'',s.open||'',s.need??'',s.have??'',s.live,s.left,s.status];const uv=dcCandText(s.prov);if(!s.mv.length)rows.push([...base,'','','','','','','','',s.note||'',uv]);
+      s.mv.forEach(m=>{const p=dcPerson(m.code);rows.push([...base,m.from||'',m.code||'',p?p.name:'',p?p.status:'',m.pa||'',m.km||'',(DC_ST.find(x=>x[0]===(m.st||'de-xuat'))||[])[1],m.date||'',m.note||'',uv])})});
     saveFile('Phuong-an-dieu-chuyen-nha-moi_'+TODAY+'.csv',csv(rows))}});
 function confirmDel(el){if(el.dataset.sure){return true}el.dataset.sure='1';el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(el.isConnected){delete el.dataset.sure;el.textContent=el.dataset.act==='dc-del-shop'?'Xóa nhà này':'✕'}},2500);return false}
 
