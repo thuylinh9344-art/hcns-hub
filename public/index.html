@@ -159,7 +159,7 @@ td input{width:90px}
 .dc-cand{background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}.dc-cand-h{font-size:12.5px;font-weight:600;color:var(--fg)}.dc-cand-h .note{font-weight:400}.dc-cand-r{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.dc-cand-r .pill{white-space:nowrap}.dc-cand-r .mini{line-height:1.6}
 .dc-grid .span2{grid-column:span 2}.dc-oth summary{cursor:pointer;margin-top:2px}.dc-oth[open] summary{margin-bottom:5px}
 .dc-res{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
-.nv-stats{grid-template-columns:repeat(7,minmax(0,1fr))}@media (max-width:1100px){.nv-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (max-width:520px){.nv-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}.nv-brk{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--line)}.nv-brk>div{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.nv-brk .pill{font-size:13px;font-weight:600}
+.nv-stats{grid-template-columns:repeat(4,minmax(0,1fr))}.nv-stats .stat{border-bottom:1px solid var(--line)}@media (max-width:1100px){.nv-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (max-width:520px){.nv-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}.nv-brk{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--line)}.nv-brk>div{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.nv-brk .pill{font-size:13px;font-weight:600}
 .dc-t td{vertical-align:middle}.dc-t input,.dc-t select{font-size:13px}.dc-off td{opacity:.5;text-decoration:line-through}
 .dc-st.qlkv-ok{background:#e3f3e9}.dc-st.da-qd{background:#dfeaf8}.dc-st.da-di{background:#cdebd8}.dc-st.huy{background:#eee}
 @media (max-width:700px){.dc-grid{grid-template-columns:1fr 1fr}}
@@ -1473,8 +1473,13 @@ function nvData(){const key=S.nvF.per+'|'+(nvCustom()?nvStart()+'~'+nvEnd():'')+
   const v={prov,T,p0};_nvCache={key,v};return v}
 
 /* Bóc tách nghỉ dưới 90 ngày: NVBH (nhà thuốc, vị trí bán hàng) */
-function nvNvbh(){const R=sysRows(),p0=nvStart(),d90=nvCohEnd();const coh=R.filter(r=>r.shop&&!(shopObj(r.shop)&&shopObj(r.shop).type==='vp')&&/bán hàng/i.test(r.pos||'')&&r.start&&r.start>=p0&&r.start<=d90);
-  const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;return {coh:coh.length,c90,r90:coh.length?r1(c90/coh.length*100):null}}
+function nvNvbh(){const R=sysRows(),p0=nvStart(),pE=nvEnd(),d90=nvCohEnd();const L=R.filter(r=>r.shop&&!(shopObj(r.shop)&&shopObj(r.shop).type==='vp')&&/bán hàng/i.test(r.pos||''));
+  const coh=L.filter(r=>r.start&&r.start>=p0&&r.start<=d90);const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;
+  /* Tỷ lệ nghỉ việc NVBH = số NVBH nghỉ trong kỳ / quân số NVBH bình quân các cuối tháng trong kỳ */
+  const ends=[];{let m=p0.slice(0,7);while(m<=pE.slice(0,7)){const e=monthRange(m)[1];ends.push(e>pE?pE:e);const d=pd(m+'-01');d.setMonth(d.getMonth()+1);m=iso(d).slice(0,7)}}
+  const hc=d=>L.filter(r=>r.start&&r.start<=d&&!(r.status==='Nghỉ việc'&&r.quit&&r.quit<=d)).length;const avg=ends.length?ends.reduce((x,e)=>x+hc(e),0)/ends.length:0;
+  const q=L.filter(r=>r.status==='Nghỉ việc'&&r.quit&&r.quit>=p0&&r.quit<=pE).length;
+  return {coh:coh.length,c90,r90:coh.length?r1(c90/coh.length*100):null,q,avg,rate:avg?r1(q/avg*100):null}}
 const NV_KHO=[['Kho Hà Nội',/kho\s*h[àa]\s*n[ộo]i/i],['Kho Đà Nẵng',/kho\s*đ[àa]\s*n[ẵa]ng/i]];
 function nvKho(){const R=sysRows(),p0=nvStart(),pE=nvEnd(),d90=nvCohEnd();
   const mons=[];{let m=p0.slice(0,7);while(m<=pE.slice(0,7)){mons.push(m);const d=pd(m+'-01');d.setMonth(d.getMonth()+1);m=iso(d).slice(0,7)}}
@@ -1505,10 +1510,12 @@ function vNv(){
     <div class="stat ${red.length||redK.length?'bad':'ok'}"><div class="k">Tỉnh báo đỏ</div><div class="v">${red.length}</div><div class="s">${redShops.length} nhà thuốc${redK.length?' · '+redK.map(k=>k.name).join(', '):''} báo đỏ</div></div>
     ${(()=>{const n=nvNvbh();const kc=K.reduce((x,k)=>x+k.coh,0),k9=K.reduce((x,k)=>x+k.c90,0);const kr=kc?r1(k9/kc*100):null;const cl=v=>v==null?'':v>=NV_TH?'bad':v>=30?'warn':'ok';const f=v=>v==null?'—':String(v).replace('.',',')+'%';
       return `<div class="stat ${cl(n.r90)}"><div class="k">Nghỉ dưới 90 ngày · NVBH</div><div class="v">${f(n.r90)}</div><div class="s">${n.c90}/${n.coh} NVBH vào làm từ ${fmtD(nvStart())} đến ${fmtD(nvCohEnd())} · mục tiêu dưới ${NV_TH}%</div></div>
-    <div class="stat ${cl(kr)}"><div class="k">Nghỉ dưới 90 ngày · Kho</div><div class="v">${f(kr)}</div><div class="s">${k9}/${kc} người vào làm · ${K.map(k=>`${k.name.replace('Kho ','')} ${k.coh?f(r1(k.c90/k.coh*100)):'—'}`).join(' · ')}</div></div>`})()}
+    <div class="stat ${cl(kr)}"><div class="k">Nghỉ dưới 90 ngày · Kho</div><div class="v">${f(kr)}</div><div class="s">${k9}/${kc} người vào làm từ ${fmtD(nvStart())} đến ${fmtD(nvCohEnd())} · ${K.map(k=>`${k.name.replace('Kho ','')} ${k.coh?f(r1(k.c90/k.coh*100)):'—'}`).join(' · ')}</div></div>`})()}
     <div class="stat ${T.gap?'bad':'ok'}"><div class="k">NVBH còn thiếu</div><div class="v">${T.gap}</div><div class="s">${T.oth}/${T.need} theo định biên</div></div>
     <div class="stat"><div class="k">Nghỉ việc trong kỳ</div><div class="v">${T.q}</div><div class="s">${T.early} người nghỉ khi chưa đủ 90 ngày</div></div>
-    <div class="stat"><div class="k">Tỷ lệ nghỉ việc</div><div class="v">${T.rate==null?'—':T.rate+'%'}</div><div class="s">số nghỉ / quân số bình quân cuối tháng</div></div>
+    ${(()=>{const n=nvNvbh();const kq=K.reduce((x,k)=>x+k.q,0),ka=K.reduce((x,k)=>x+k.avg,0);const kr=ka?r1(kq/ka*100):null;const f=v=>v==null?'—':String(v).replace('.',',')+'%';
+      return `<div class="stat"><div class="k">Tỷ lệ nghỉ việc · NVBH</div><div class="v">${f(n.rate)}</div><div class="s">${n.q} NVBH nghỉ / quân số bình quân ${Math.round(n.avg)} (cuối các tháng trong kỳ)</div></div>
+    <div class="stat"><div class="k">Tỷ lệ nghỉ việc · Kho</div><div class="v">${f(kr)}</div><div class="s">${kq} người nghỉ / quân số bình quân ${Math.round(ka)} · ${K.map(k=>`${k.name.replace('Kho ','')} ${k.avg?f(r1(k.q/k.avg*100)):'—'}`).join(' · ')}</div></div>`})()}
     <div class="stat ${T.bn?'warn':''}"><div class="k">Đang báo nghỉ</div><div class="v">${T.bn}</div><div class="s">sẽ làm thiếu thêm nếu chưa có người thay</div></div></div>`;
   const shopRow=s=>`<tr class="${s.lv===2?'recalert':''}" style="font-size:13px"><td style="padding-left:28px;white-space:nowrap" class="num">${esc(s.code.replace(/^SHOP0*/,'NT '))} <span class="mini">${s.kind}${s.cht?'':' · chưa có CHT'}</span></td><td class="r num">${s.oth}/${s.need}</td><td class="r">${s.gap?`<span class="pill bad">${s.gap}</span>`:''}</td><td class="r num">${s.q||''}</td><td class="r num">${s.early||''}</td><td class="r">${s.coh?`${s.c90}/${s.coh}`:''}</td><td class="r">${s.r90==null?'':nvPct(s.r90)}</td><td class="r num">${s.rate==null?'':s.rate+'%'}</td><td class="r num">${s.bn||''}</td><td>${nvTag(s.lv)}</td></tr>`;
   const hot=[...red.map(p=>({t:'Tỉnh',name:p.area,area:'',x:p})),...redShops.map(s=>({t:'Nhà thuốc',name:s.code.replace(/^SHOP0*/,'NT ')+(s.cht?'':' · chưa có CHT'),area:s.area,x:s})),...redK.map(k=>({t:'Kho',name:k.name,area:'',x:{oth:k.on,need:'—',gap:'—',c90:k.c90,coh:k.coh,r90:k.r90,bn:k.bn}}))];
