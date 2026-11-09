@@ -1440,15 +1440,16 @@ document.addEventListener('change',e=>{const t=e.target;
 const NV_TH=40,NV_MIN=3;
 /* Kỳ xét theo quý: người vào làm trong quý, nghỉ trong 90 ngày đầu (tính đến hôm nay). */
 const NV_Y=TODAY.slice(0,4),NV_QN=Math.floor((+TODAY.slice(5,7)-1)/3)+1,NV_RM=['I','II','III','IV'];
-const NV_PER=[...Array.from({length:NV_QN},(_,i)=>NV_QN-i).map(q=>['q'+q,`Quý ${NV_RM[q-1]}/${NV_Y}${q===NV_QN?' (đang chạy · 90 ngày gần nhất)':''}`]),['ytd','Từ đầu năm']];
+const NV_PER=[...Array.from({length:NV_QN},(_,i)=>NV_QN-i).map(q=>['q'+q,`Quý ${NV_RM[q-1]}/${NV_Y}${q===NV_QN?' (đang chạy · 90 ngày gần nhất)':''}`]),['ytd','Từ đầu năm'],['custom','Tùy chọn từ ngày… đến ngày…']];
 const nvQ=()=>{const m=/^q(\d)$/.exec(S.nvF.per||'');return m?+m[1]:0};
 /* Quý đang chạy: cửa sổ trượt 90 ngày liền kề tính đến hôm nay */
-function nvStart(){const q=nvQ();if(q===NV_QN)return addDays(TODAY,-89);return q?`${NV_Y}-${pad((q-1)*3+1)}-01`:NV_Y+'-01-01'}
-function nvEnd(){const q=nvQ();if(!q)return TODAY;const e=monthRange(`${NV_Y}-${pad(q*3)}`)[1];return e>TODAY?TODAY:e}
+const nvCustom=()=>S.nvF.per==='custom';
+function nvStart(){if(nvCustom()){const a=S.nvF.from||addDays(TODAY,-89),b=nvEnd();return a>b?b:a}const q=nvQ();if(q===NV_QN)return addDays(TODAY,-89);return q?`${NV_Y}-${pad((q-1)*3+1)}-01`:NV_Y+'-01-01'}
+function nvEnd(){if(nvCustom()){const b=S.nvF.to||TODAY;return b>TODAY?TODAY:b}const q=nvQ();if(!q)return TODAY;const e=monthRange(`${NV_Y}-${pad(q*3)}`)[1];return e>TODAY?TODAY:e}
 function nvCohStart(){return nvStart()}
-const nvCohEnd=()=>nvQ()?nvEnd():addDays(TODAY,-90);
+const nvCohEnd=()=>nvQ()||nvCustom()?nvEnd():addDays(TODAY,-90);
 let _nvCache=null;
-function nvData(){const key=S.nvF.per+'|'+(S.sys.updatedAt||'')+'|'+S.shops.length;if(_nvCache&&_nvCache.key===key)return _nvCache.v;
+function nvData(){const key=S.nvF.per+'|'+(nvCustom()?nvStart()+'~'+nvEnd():'')+'|'+(S.sys.updatedAt||'')+'|'+S.shops.length;if(_nvCache&&_nvCache.key===key)return _nvCache.v;
   const R=sysRows(),p0=nvStart(),pE=nvEnd(),d90=nvCohEnd();
   const ends=[];{let m=p0.slice(0,7);while(m<=pE.slice(0,7)){const e=monthRange(m)[1];ends.push(e>pE?pE:e);const d=pd(m+'-01');d.setMonth(d.getMonth()+1);m=iso(d).slice(0,7)}}
   const hc=(rs,d)=>rs.filter(r=>r.start&&r.start<=d&&!(r.status==='Nghỉ việc'&&r.quit&&r.quit<=d)).length;
@@ -1496,7 +1497,7 @@ const nvTag=l=>l===2?'<span class="pill bad">Báo đỏ</span>':l===1?'<span cla
 function vNv(){
   const hasSys=sysRows().length>0;const upd=S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'chưa có';
   const sel=(id,opts,v)=>`<select id="${id}">${opts.map(([k,l])=>`<option value="${k}" ${v===k?'selected':''}>${l}</option>`).join('')}</select>`;
-  const tools=sel('nvPer',NV_PER,S.nvF.per)+sysBtn()+`<button class="btn" data-act="nv-copy">Sao chép cảnh báo</button>`+(S.dl?`<button class="btn" data-act="nv-csv">Xuất CSV</button>`:'');
+  const tools=sel('nvPer',NV_PER,S.nvF.per)+(nvCustom()?`<span class="row" style="gap:6px;align-items:center"><label class="mini">Từ <input type="date" id="nvFrom" value="${nvStart()}" max="${TODAY}"></label><label class="mini">đến <input type="date" id="nvTo" value="${nvEnd()}" max="${TODAY}"></label></span>`:'')+sysBtn()+`<button class="btn" data-act="nv-copy">Sao chép cảnh báo</button>`+(S.dl?`<button class="btn" data-act="nv-csv">Xuất CSV</button>`:'');
   let h=head('Nghỉ việc theo tỉnh',`Khối nhà thuốc, Kho Hà Nội, Kho Đà Nẵng · ${nvPerLbl()} (${fmtDY(nvStart())}–${fmtDY(nvEnd())}) · nguồn DSNS, dữ liệu ngày ${upd} · báo đỏ khi tỉnh vừa thiếu NVBH vừa có tỷ lệ nghỉ dưới 90 ngày từ ${NV_TH}%`,tools);
   if(!hasSys)return h+'<div class="empty">Chưa có dữ liệu DSNS. Bấm "Cập nhật từ Google Sheet" để tải.</div>';
   const {prov,T}=nvData();const red=prov.filter(p=>p.lv===2),redShops=prov.flatMap(p=>p.shops.filter(s=>s.lv===2));const K=nvKho(),redK=K.filter(k=>k.lv===2);
@@ -1527,8 +1528,8 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="nv-
     const lv=l=>l===2?'Báo đỏ':l===1?'Theo dõi':'Ổn';prov.forEach(p=>{rows.push([p.area,'Cả tỉnh','',p.oth,p.need,p.gap,p.q,p.early,p.coh,p.c90,p.r90??'',p.rate??'',p.bn,lv(p.lv)]);p.shops.forEach(s=>rows.push([p.area,s.code.replace(/^SHOP0*/,'NT '),s.kind,s.oth,s.need,s.gap,s.q,s.early,s.coh,s.c90,s.r90??'',s.rate??'',s.bn,lv(s.lv)]))});
     nvKho().forEach(k=>rows.push(['Kho',k.name,'',k.on,'','',k.q,k.early,k.coh,k.c90,k.r90??'',k.rate??'',k.bn,lv(k.lv)]));saveFile('Nghi-viec-theo-tinh-'+TODAY+'.csv',csv(rows))}
 });
-document.addEventListener('change',e=>{if(e.target.id==='nvPer'){S.nvF.per=e.target.value;render()}});
-const nvPerLbl=()=>(NV_PER.find(x=>x[0]===S.nvF.per)||['','Từ đầu năm'])[1];
+document.addEventListener('change',e=>{if(e.target.id==='nvPer'){S.nvF.per=e.target.value;render()}else if(e.target.id==='nvFrom'||e.target.id==='nvTo'){S.nvF[e.target.id==='nvFrom'?'from':'to']=e.target.value;if(S.nvF.from&&S.nvF.to&&S.nvF.from>S.nvF.to){const t=S.nvF.from;S.nvF.from=S.nvF.to;S.nvF.to=t}render()}});
+const nvPerLbl=()=>nvCustom()?'Tùy chọn':(NV_PER.find(x=>x[0]===S.nvF.per)||['','Từ đầu năm'])[1];
 const nvRedN=()=>{try{return sysRows().length?(()=>{const P=nvData().prov;return P.filter(p=>p.lv===2).length+P.reduce((n,p)=>n+p.red,0)+nvKho().filter(k=>k.lv===2).length})():0}catch(_){return 0}};
 /* ===================== KPI tuyển dụng theo khung 500 điểm (bàn giao T10/2026) =====================
    Lấp đầy 250 · Thời gian trúng tuyển 100 · Chất lượng 50 · Tuân thủ quy trình 100; quy đổi theo điểm tuyển dụng phân bổ cho từng người. */
