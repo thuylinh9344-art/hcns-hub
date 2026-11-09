@@ -159,6 +159,7 @@ td input{width:90px}
 .dc-cand{background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}.dc-cand-h{font-size:12.5px;font-weight:600;color:var(--fg)}.dc-cand-h .note{font-weight:400}.dc-cand-r{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.dc-cand-r .pill{white-space:nowrap}.dc-cand-r .mini{line-height:1.6}
 .dc-grid .span2{grid-column:span 2}.dc-oth summary{cursor:pointer;margin-top:2px}.dc-oth[open] summary{margin-bottom:5px}
 .dc-res{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
+.nv-stats{grid-template-columns:repeat(7,minmax(0,1fr))}.nv-wide{grid-column:span 2}@media (max-width:1100px){.nv-stats{grid-template-columns:repeat(3,minmax(0,1fr))}.nv-wide{grid-column:span 3}}@media (max-width:520px){.nv-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.nv-wide{grid-column:1/-1}}.nv-brk{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--line)}.nv-brk>div{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.nv-brk .pill{font-size:13px;font-weight:600}
 .dc-t td{vertical-align:middle}.dc-t input,.dc-t select{font-size:13px}.dc-off td{opacity:.5;text-decoration:line-through}
 .dc-st.qlkv-ok{background:#e3f3e9}.dc-st.da-qd{background:#dfeaf8}.dc-st.da-di{background:#cdebd8}.dc-st.huy{background:#eee}
 @media (max-width:700px){.dc-grid{grid-template-columns:1fr 1fr}}
@@ -1470,6 +1471,9 @@ function nvData(){const key=S.nvF.per+'|'+(S.sys.updatedAt||'')+'|'+S.shops.leng
   const T={oth:0,need:0,gap:0,q:0,early:0,coh:0,c90:0,avg:0,bn:0};prov.forEach(p=>{for(const k in T)T[k]+=p[k]});T.r90=T.coh?r1(T.c90/T.coh*100):null;T.rate=T.avg?Math.round(T.q/T.avg*100):null;
   const v={prov,T,p0};_nvCache={key,v};return v}
 
+/* Bóc tách nghỉ dưới 90 ngày: NVBH (nhà thuốc, vị trí bán hàng) */
+function nvNvbh(){const R=sysRows(),p0=nvStart(),d90=nvCohEnd();const coh=R.filter(r=>r.shop&&!(shopObj(r.shop)&&shopObj(r.shop).type==='vp')&&/bán hàng/i.test(r.pos||'')&&r.start&&r.start>=p0&&r.start<=d90);
+  const c90=coh.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;return {coh:coh.length,c90,r90:coh.length?r1(c90/coh.length*100):null}}
 const NV_KHO=[['Kho Hà Nội',/kho\s*h[àa]\s*n[ộo]i/i],['Kho Đà Nẵng',/kho\s*đ[àa]\s*n[ẵa]ng/i]];
 function nvKho(){const R=sysRows(),p0=nvStart(),pE=nvEnd(),d90=nvCohEnd();
   const mons=[];{let m=p0.slice(0,7);while(m<=pE.slice(0,7)){mons.push(m);const d=pd(m+'-01');d.setMonth(d.getMonth()+1);m=iso(d).slice(0,7)}}
@@ -1496,9 +1500,10 @@ function vNv(){
   let h=head('Nghỉ việc theo tỉnh',`Khối nhà thuốc, Kho Hà Nội, Kho Đà Nẵng · ${nvPerLbl()} (${fmtDY(nvStart())}–${fmtDY(nvEnd())}) · nguồn DSNS, dữ liệu ngày ${upd} · báo đỏ khi tỉnh vừa thiếu NVBH vừa có tỷ lệ nghỉ dưới 90 ngày từ ${NV_TH}%`,tools);
   if(!hasSys)return h+'<div class="empty">Chưa có dữ liệu DSNS. Bấm "Cập nhật từ Google Sheet" để tải.</div>';
   const {prov,T}=nvData();const red=prov.filter(p=>p.lv===2),redShops=prov.flatMap(p=>p.shops.filter(s=>s.lv===2));const K=nvKho(),redK=K.filter(k=>k.lv===2);
-  h+=`<div class="stats">
+  h+=`<div class="stats nv-stats">
     <div class="stat ${red.length||redK.length?'bad':'ok'}"><div class="k">Tỉnh báo đỏ</div><div class="v">${red.length}</div><div class="s">${redShops.length} nhà thuốc${redK.length?' · '+redK.map(k=>k.name).join(', '):''} báo đỏ</div></div>
-    <div class="stat ${T.r90>=NV_TH?'bad':T.r90>=30?'warn':'ok'}"><div class="k">Nghỉ dưới 90 ngày</div><div class="v">${T.r90==null?'—':String(T.r90).replace('.',',')+'%'}</div><div class="s">${T.c90}/${T.coh} người vào làm từ ${fmtD(nvStart())} đến ${fmtD(nvCohEnd())} · mục tiêu dưới ${NV_TH}%</div></div>
+    <div class="stat nv-wide ${T.r90>=NV_TH?'bad':T.r90>=30?'warn':'ok'}"><div class="k">Nghỉ dưới 90 ngày · khối nhà thuốc</div><div class="v">${T.r90==null?'—':String(T.r90).replace('.',',')+'%'}</div><div class="s">${T.c90}/${T.coh} người vào làm từ ${fmtD(nvStart())} đến ${fmtD(nvCohEnd())} · mục tiêu dưới ${NV_TH}%</div>${(()=>{const n=nvNvbh();const kc=K.reduce((a,k)=>a+k.coh,0),k9=K.reduce((a,k)=>a+k.c90,0);const kr=kc?r1(k9/kc*100):null;const cl=v=>v==null?'':v>=NV_TH?'bad':v>=30?'warn':'ok';const f=v=>v==null?'—':String(v).replace('.',',')+'%';
+      return `<div class="nv-brk"><div><span class="pill ${cl(n.r90)}">NVBH ${f(n.r90)}</span><span class="mini">${n.c90}/${n.coh} người</span></div><div><span class="pill ${cl(kr)}">Kho ${f(kr)}</span><span class="mini">${k9}/${kc} người · ${K.map(k=>`${k.name.replace('Kho ','')} ${k.coh?f(r1(k.c90/k.coh*100)):'—'}`).join(' · ')}</span></div></div>`})()}</div>
     <div class="stat ${T.gap?'bad':'ok'}"><div class="k">NVBH còn thiếu</div><div class="v">${T.gap}</div><div class="s">${T.oth}/${T.need} theo định biên</div></div>
     <div class="stat"><div class="k">Nghỉ việc trong kỳ</div><div class="v">${T.q}</div><div class="s">${T.early} người nghỉ khi chưa đủ 90 ngày</div></div>
     <div class="stat"><div class="k">Tỷ lệ nghỉ việc</div><div class="v">${T.rate==null?'—':T.rate+'%'}</div><div class="s">số nghỉ / quân số bình quân cuối tháng</div></div>
