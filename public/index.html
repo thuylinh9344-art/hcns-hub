@@ -160,6 +160,7 @@ td input{width:90px}
 .dc-grid .span2{grid-column:span 2}.dc-oth summary{cursor:pointer;margin-top:2px}.dc-oth[open] summary{margin-bottom:5px}
 .dc-res{border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:5px}
 .nv-stats{grid-template-columns:repeat(4,minmax(0,1fr))}.nv-stats .stat{border-bottom:1px solid var(--line)}@media (max-width:1100px){.nv-stats{grid-template-columns:repeat(4,minmax(0,1fr))}}@media (max-width:520px){.nv-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}.nv-brk{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px;padding-top:7px;border-top:1px dashed var(--line)}.nv-brk>div{display:flex;flex-direction:column;gap:3px;align-items:flex-start}.nv-brk .pill{font-size:13px;font-weight:600}
+.kb-items summary{cursor:pointer;padding:6px 0}.kb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;margin-top:10px}.kb-card{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}.kb-ch{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}.kb-t{width:100%;font-size:13px}.kb-t td,.kb-t th{padding:4px 6px}.kb-tot td{font-weight:700;border-top:1px solid var(--line)}
 .dc-t td{vertical-align:middle}.dc-t input,.dc-t select{font-size:13px}.dc-off td{opacity:.5;text-decoration:line-through}
 .dc-st.qlkv-ok{background:#e3f3e9}.dc-st.da-qd{background:#dfeaf8}.dc-st.da-di{background:#cdebd8}.dc-st.huy{background:#eee}
 @media (max-width:700px){.dc-grid{grid-template-columns:1fr 1fr}}
@@ -2536,7 +2537,7 @@ const kbMoney=n=>Number(n||0).toLocaleString('en-US');
 function kbPanel(m){if(S.role==='staff')return '';const c=kbCfg(),rows=kbRows(m),dis=S.canWrite?'':'disabled';const tot=rows.reduce((a,r)=>a+r.amt,0);
   const inp=(r,k,v,w,t='number')=>`<input ${t==='number'?'class="num" type="number" step="any"':''} id="kb-${k}-${esc(r.s.id)}" data-kb="${k}" data-id="${esc(r.s.id)}" value="${esc(v??'')}" style="width:${w}px${t==='number'?';text-align:right':''}" ${dis}>`;
   return `<div class="panel mt" id="kbPanel"><h2>Danh sách xét thưởng KPIs ${fmtM(m)} <small>tổng chỉ tiêu lấy từ KPI tháng (tối đa 1050 = 1000 + 50đ báo cáo) · ô trống là để web tự tính</small></h2>
-  <div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap"><button class="btn pri" data-act="kb-print">In / Lưu PDF</button>${S.dl?`<button class="btn" data-act="kb-html">Tải bảng in (.html)</button>`:''}<span class="note">Xếp loại A ≥ ${c.tA} · B ≥ ${c.tB} · C ≥ ${c.tC} · thưởng ${kbMoney(c.A)} / ${kbMoney(c.B)} / ${kbMoney(c.C)} đ · TV, TS không xét</span></div>
+  <div class="row" style="gap:8px;margin-bottom:10px;flex-wrap:wrap"><button class="btn pri" data-act="kb-print">In / Lưu PDF</button>${S.dl?`<button class="btn" data-act="kb-html">Tải bảng in (.html)</button>`:''}${S.canWrite?`<label class="btn">Nhập bảng KPI cá nhân (.json)<input type="file" id="kbImport" accept=".json" hidden></label>`:''}<span class="note">Xếp loại A ≥ ${c.tA} · B ≥ ${c.tB} · C ≥ ${c.tC} · thưởng ${kbMoney(c.A)} / ${kbMoney(c.B)} / ${kbMoney(c.C)} đ · TV, TS không xét</span></div>
   <div class="tbl-wrap"><table><thead><tr><th>Mã NV</th><th>Họ và tên</th><th>Tình trạng</th><th class="r">Tổng chỉ tiêu</th><th class="r">Điểm trừ</th><th class="r">Điểm cộng</th><th class="r">Đánh giá lại</th><th>Xếp loại</th><th class="r">Mức thưởng</th><th>Ghi chú</th></tr></thead><tbody>
   ${rows.map(r=>`<tr><td class="num">${esc(r.s.code||'')}</td><td><b>${esc(r.s.name)}</b></td>
     <td><select data-kb="st" data-id="${esc(r.s.id)}" ${dis}>${['CT','TV','TS'].map(x=>`<option ${r.st===x?'selected':''}>${x}</option>`).join('')}</select></td>
@@ -2545,7 +2546,20 @@ function kbPanel(m){if(S.role==='staff')return '';const c=kbCfg(),rows=kbRows(m)
     <td class="r">${inp(r,'plus',r.o.plus??'',60)}</td>
     <td class="r num"><b>${r.v==null?'—':nf(r.v)}</b></td><td>${r.g?`<span class="grade ${r.g}">${r.g}</span>`:'—'}</td><td class="r num">${r.st==='CT'&&r.v!=null?kbMoney(r.amt):'—'}</td>
     <td>${inp(r,"note",r.o.note??"",180,"text").replace('<input','<input placeholder="'+esc(r.note)+'"')}</td></tr>`).join('')}
-  <tr><td></td><td><b>TỔNG</b></td><td colspan="6"></td><td class="r num"><b>${kbMoney(tot)}</b></td><td class="mini">${esc(kbWords(tot))}</td></tr></tbody></table></div></div>`}
+  <tr><td></td><td><b>TỔNG</b></td><td colspan="6"></td><td class="r num"><b>${kbMoney(tot)}</b></td><td class="mini">${esc(kbWords(tot))}</td></tr></tbody></table></div>${kbItemsHtml(rows)}</div>`}
+/* Bảng KPI cá nhân tự chấm (bản ký) theo nhóm việc */
+function kbItemsHtml(rows){const L=rows.filter(r=>Array.isArray(r.o.items)&&r.o.items.length);if(!L.length)return '';const n=v=>v==null||v===''?'—':nf(v);
+  return `<details class="kb-items mt"><summary><b>Bảng tổng hợp KPI cá nhân theo nhóm việc</b> <span class="note">${L.length} người · ${esc(L[0].o.src||'bản nhập')}</span></summary>
+  <div class="kb-grid">${L.map(r=>{const it=r.o.items;const t=k=>it.reduce((a,x)=>a+(+x[k]||0),0);return `<div class="kb-card"><div class="kb-ch"><b>${esc(r.s.name)}</b><span class="pill ${r.f>=1050?'ok':r.f>=950?'':r.f>=900?'warn':'bad'}">${nf(r.f)} điểm</span></div>
+    <table class="kb-t"><thead><tr><th>Nhóm việc</th><th class="r">Đích</th><th class="r">Tối đa</th><th class="r">Đạt</th><th class="r">%</th><th class="r">Thực hiện</th></tr></thead><tbody>
+    ${it.map(x=>`<tr><td>${esc(x.g)}${x.gc?`<div class="mini">${esc(x.gc)}</div>`:''}</td><td class="r num">${n(x.dich)}</td><td class="r num">${n(x.max)}</td><td class="r num"><b>${n(x.dat)}</b></td><td class="r num">${x.dich?Math.round(x.dat/x.dich*100)+'%':'—'}</td><td class="r num">${n(x.th)}</td></tr>`).join('')}
+    <tr class="kb-tot"><td>Tổng</td><td class="r num">${nf(t('dich'))}</td><td class="r num">${nf(t('max'))}</td><td class="r num">${nf(t('dat'))}</td><td></td><td class="r num">${nf(t('th'))}</td></tr></tbody></table></div>`}).join('')}</div></details>`}
+document.addEventListener('change',e=>{const t=e.target;if(t.id!=='kbImport'||!t.files||!t.files[0])return;if(!needWrite())return;
+  t.files[0].text().then(async txt=>{const j=JSON.parse(txt.replace(/^\uFEFF/,''));if(!j.month||!j.rows)throw 0;const m=j.month;
+    let D=S.kbDocs[m];if(!D){try{const g=await S.db.doc('bonus/'+m).get();D=g.exists?g.data():{}}catch(_){D={}}}
+    const rows=JSON.parse(JSON.stringify(D.rows||{}));let n=0;const ids=new Set(allStaff().map(x=>x.id));
+    Object.entries(j.rows).forEach(([sid,o])=>{if(!ids.has(sid))return;rows[sid]={...(rows[sid]||{}),...o};n++});
+    S.kbDocs[m]={...D,rows};await write('bonus/'+m,{...D,rows,month:m,updatedAt:new Date().toISOString()});toast(`Đã lưu KPI ${fmtM(m)} của ${n} người`);if(S.month!==m){S.month=m}render()}).catch(()=>toast('File không đúng định dạng bảng KPI cá nhân'));t.value=''});
 function kbHtml(m){const c=kbCfg(),D=kbDoc(m),rows=kbRows(m);const tot=rows.reduce((a,r)=>a+r.amt,0);const [y,mm]=m.split('-');
   const td=(v,cl='')=>`<td class="${cl}">${v??''}</td>`;
   return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><title>Danh sách xét thưởng KPIs tháng ${mm}/${y}</title><style>
