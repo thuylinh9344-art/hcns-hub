@@ -1814,17 +1814,12 @@ function wrBuild(){
     const lg=logs.filter(wrIsLegal);const lt=S.tasks.filter(t=>/pháp lý/i.test((t.module||'')+' '+(t.title||''))&&((isDone(t)&&inR(t.doneAt,r))||(!isDone(t)&&t.status!=='todo')));
     const L=[...lg.map(e=>`${lab(e)}${what(e)?': '+what(e):''}${+e.qty>1?` (${nf(e.qty)} hồ sơ)`:''}${isDoneLog(e)?'':' – đang thực hiện'} · ${wrShort(e.who.name)}`),...lt.map(t=>`${t.title} – ${isDone(t)?'đã xong '+fmtD(t.doneAt):'đang thực hiện'+(t.due?', hạn '+fmtD(t.due):'')}`)];
     const ml=staff.flatMap(s=>(logDoc(m,s.id)?.entries||[]).filter(e=>!isVoidLog(e)&&wrIsLegal(e)&&e.d<=ref));const G={};
-    ml.forEach(e=>{const g=(G[lab(e)]??={n:0,nt:new Set()});g.n+=(+e.qty||1);wrNT(e.result).forEach(x=>g.nt.add(x))});
-    const mt=Object.entries(G).map(([k,g])=>`${k} ${g.nt.size||g.n}${g.nt.size?` (NT ${[...g.nt].join(', ')})`:''}`).join('; ');
+    ml.forEach(e=>{const g=(G[lab(e)]??={n:0,nt:new Set(),res:new Set()});g.n+=(+e.qty||1);const nn=wrNT(e.result);nn.forEach(x=>g.nt.add(x));if(!nn.length&&wrClean(e.result))g.res.add(wrClean(e.result))});
+    const mt=Object.entries(G).map(([k,g])=>`${k} ${g.nt.size+g.res.size||g.n}${g.nt.size||g.res.size?` (${[...(g.nt.size?['NT '+[...g.nt].join(', ')]:[]),...g.res].join('; ')})`:''}`).join('; ');
     if(!L.length&&mt)L.push('Trong tuần chưa ghi nhận hồ sơ pháp lý mới.');
     if(mt)L.push(`Lũy kế tháng ${+m.slice(5,7)}: ${mt}.`);
-    /* Lũy kế hồ sơ pháp lý nhà mới từ T10/2026 (đọc cột Kết quả trong nhật ký các tháng) */
-    const mons=[];{let x=LEGAL_FROM;while(x<=m){mons.push(x);const dd=pd(x+'-01');dd.setMonth(dd.getMonth()+1);x=iso(dd).slice(0,7)}}
-    const GA={};mons.forEach(mo=>staff.forEach(s2=>(logDoc(mo,s2.id)?.entries||[]).filter(e=>!isVoidLog(e)&&wrIsLegal(e)&&(mo<m||e.d<=ref)).forEach(e=>{const g=(GA[lab(e)]??={n:0,nt:new Set()});g.n+=(+e.qty||1);wrNT(e.result).forEach(z=>g.nt.add(z))})));
-    const srt=a=>[...a].sort((u,v)=>(parseInt(u)||0)-(parseInt(v)||0));
-    X.legalAll=Object.entries(GA).map(([k,g])=>({k,n:g.nt.size||g.n,nt:srt(g.nt)}));
-    if(mons.length>1&&X.legalAll.length)L.push(`Lũy kế từ ${fmtM(LEGAL_FROM)}: ${X.legalAll.map(g=>`${g.k} ${g.n}${g.nt.length?` (NT ${g.nt.join(', ')})`:''}`).join('; ')}.`);
-    parts.push({lines:L.length?L:['Không phát sinh.']});X.legal=L;X.legalWeek=lg.length+lt.length;X.legalG=Object.entries(G).map(([k,g])=>({k,n:g.nt.size||g.n,nt:[...g.nt]}));parts.push({note:'s4'});secs.push({h:'IV. Hồ sơ pháp lý / giấy tờ',parts})}
+    X.legalAll=[];
+    parts.push({lines:L.length?L:['Không phát sinh.']});X.legal=L;X.legalWeek=lg.length+lt.length;X.legalG=Object.entries(G).map(([k,g])=>({k,n:g.nt.size+g.res.size||g.n,nt:[...g.nt],res:[...g.res]}));parts.push({note:'s4'});secs.push({h:'IV. Hồ sơ pháp lý / giấy tờ',parts})}
   /* ---------- V. Kế hoạch tuần tới ---------- */
   {const parts=[];let rows=[];try{rows=rkData(m).rows}catch(_){}
     const L1=[];const left=rows.filter(x=>x.tgt>x.real).sort((a,b)=>(b.tgt-b.real)-(a.tgt-a.real));
@@ -2065,8 +2060,7 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
 function wdLegalHtml(lines,groups,all){const items=lines.filter(l=>!/^Lũy kế tháng|^Lũy kế từ|^Trong tuần chưa ghi nhận/.test(l));
   const tick=(l)=>`<li><span class="tk">✓</span><span>${esc(l)}</span></li>`;
   let h=`<ul class="wd-ticks">${items.length?items.map(l=>/^Không phát sinh/.test(l)?tick('Không phát sinh hồ sơ mới trong tuần',false):tick(l.replace(/\s*–\s*đang thực hiện/,' (đang thực hiện)'),/đang thực hiện/.test(l))).join(''):tick('Trong tuần không phát sinh hồ sơ mới',false)}</ul>`;
-  if(groups.length)h+=`<div class="wd-lg"><p>Đã hoàn thành trong tháng</p>${groups.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.k)} <em>${g.n} hồ sơ</em></b>${g.nt.length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
-  if(all&&all.length&&all.some(a=>!groups.find(g=>g.k===a.k&&g.n===a.n)))h+=`<div class="wd-lg"><p>Lũy kế nhà mới từ ${fmtM(LEGAL_FROM)}</p>${all.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.k)} <em>${g.n} ${g.nt.length?'nhà':'hồ sơ'}</em></b>${g.nt.length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+  if(groups.length)h+=`<div class="wd-lg"><p>Đã hoàn thành trong tháng</p>${groups.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.k)} <em>${g.n} hồ sơ</em></b>${g.nt.length||(g.res||[]).length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}${(g.res||[]).map(t=>`<span>✓ ${esc(t)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
   return h}
 const WD_TICK_CSS=`.wd-ticks{list-style:none;margin:0;padding:0}.wd-ticks li{display:flex;gap:6px;align-items:flex-start;margin:2px 0;line-height:1.4;font-size:8.8pt}.wd-ticks .tk,.wd-lgr .tk{flex:none;width:14px;height:14px;border-radius:50%;background:#1f8a4c;color:#fff;font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}.wd-ticks li.open .tk{background:#c98500}
 .wd-lg{margin-top:6px;border-top:1px dashed #d9e2dc;padding-top:5px}.wd-lg p{margin:0 0 3px;font-size:7.5pt;color:#52514e;text-transform:uppercase;letter-spacing:.04em}.wd-lgr{margin:4px 0}.wd-lgr b{display:flex;gap:6px;align-items:center;font-size:8.8pt}.wd-lgr em{font-style:normal;font-weight:400;color:#52514e}
