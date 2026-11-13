@@ -1781,10 +1781,9 @@ function wrBuild(){
       const day=+ref.slice(8,10),dim=+me.slice(8,10),exp=day/dim;
       const rs=[...rows].sort((a,b)=>b.real/Math.max(b.tgt,1)-a.real/Math.max(a.tgt,1));
       const tot=rs.reduce((t,x)=>({tgt:t.tgt+x.tgt,real:t.real+x.real,w:t.w+wOf(x.s.id),cv:t.cv+x.CV,v1:t.v1+x.v1,st:t.st+x.stale}),{tgt:0,real:0,w:0,cv:0,v1:0,st:0});tot.ind=tot.tgt;{const tt=teamTgt(m);if(tt)tot.tgt=tt}
-      const KP={};wrKpis(m).forEach(k=>KP[k.id]=k);
-      parts.push({table:{cols:['Phụ trách','Địa bàn','Đã tuyển','Trong tuần','Hồ sơ nhận','Đã PV vòng 1','Hồ sơ treo','KPI tháng'],
-        rows:[...rs].sort((a,b)=>(KP[b.s.id]?.pct??-1)-(KP[a.s.id]?.pct??-1)).map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.real),nf(wOf(x.s.id)),nf(x.CV),nf(x.v1),x.stale?nf(x.stale):'',KP[x.s.id]?KP[x.s.id].pct+'%':'—']),
-        foot:[`Tổng cộng (chỉ tiêu team ${nf(tot.tgt)})`,'',`${nf(tot.real)} · ${wrPct(tot.real,tot.tgt)}`,nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):'','']}});
+            parts.push({table:{cols:['Phụ trách','Địa bàn','Đã tuyển','Trong tuần','Hồ sơ nhận','Đã PV vòng 1','Hồ sơ treo'],
+        rows:rs.map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.real),nf(wOf(x.s.id)),nf(x.CV),nf(x.v1),x.stale?nf(x.stale):'']),
+        foot:[`Tổng cộng (chỉ tiêu team ${nf(tot.tgt)})`,'',`${nf(tot.real)} · ${wrPct(tot.real,tot.tgt)}`,nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):'']}});
       const c=rs.reduce((t,x)=>{for(const k in x.cnt)t[k]=(t[k]||0)+x.cnt[k];return t},{});
       const slow=rs.filter(x=>x.tgt&&x.real/x.tgt<exp*.6);
       const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người so với chỉ tiêu team (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
@@ -2800,7 +2799,7 @@ wdHtml=function(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   return `<header class="hd2">${logo?`<img src="${logo}" alt="">`:''}<div class="t"><small>CÔNG TY CỔ PHẦN UPHARMA · PHÒNG HÀNH CHÍNH – NHÂN SỰ</small><h1>Báo cáo tuần ${d.wk}</h1><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])} · số liệu đến ${fmtDY(lk?lk.ref:d.ref)}</p></div><div class="by"><small>Người báo cáo</small><b>${esc(by)}</b></div></header>
   <div class="tl2">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><i>${WD2_TILE(k)}</i><div><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div></div>`).join('')}</div>
   <div class="g2">${card('b1',wd2Flow(C.flow)+wd2Short(C.short))}${C.rec?card('b2',wd2Hero(C.rec)):card('b2')}</div>
-  ${C.nv90||(C.kpi&&C.kpi.length)?`<div class="g2">${wd2Nv(C.nv90)}${wd2Kpi(C.kpi)}</div>`:''}
+  ${C.nv90?wd2Nv(C.nv90):''}
   <div class="g2">${card('b3')}<section class="c2" style="--ac:${WD2_SEC.b4[0]}"><h3><i>${WD2_SEC.b4[1]}</i>${esc(sec('b4').h)}${pill(sec('b4'))}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[],C.legalAll||[])}</section></div>
   <section class="c2 plan" style="--ac:${pc}"><h3><i>${pi}</i>${esc(plan.h)}</h3><ol>${wbLines(plan).map(l=>`<li><span>${wd2Num(l)}</span></li>`).join('')}</ol></section>
   <div class="g2 g2n">${wd2Note('iss','iss','⚠️','Vấn đề gặp phải','khó khăn, vướng mắc trong tuần')}${wd2Note('adv','adv','📣','Đề xuất – kiến nghị','cần lãnh đạo cho ý kiến')}</div>
@@ -2839,7 +2838,7 @@ const WD2_CSS=`.page{padding:9mm 10mm 8mm}
 .ws{margin:0 0 6px}.ws p{margin:0 0 3px;font-size:7.3pt;color:#52514e;text-transform:uppercase;letter-spacing:.04em}
 .ws .sr{display:grid;grid-template-columns:78px minmax(0,1fr) 22px 34px;gap:5px;align-items:center;font-size:7.8pt;margin:2px 0}.ws .sr span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ws .sr i{height:7px;background:#f1f1ee;border-radius:4px;overflow:hidden}.ws .sr u{display:block;height:100%;background:#c98500;border-radius:4px}.ws .sr b{text-align:right}.ws .sr small{color:#8a8984;font-size:7pt}
-.nv2 .gg{display:grid;grid-template-columns:1fr 1fr;gap:10px}.nv2 h4{margin:0 0 4px;font-size:8.5pt;color:#0b0b0b}.nv2 .gv{margin:0 0 7px}
+.nv2{margin-bottom:9px}.nv2 .gg{display:grid;grid-template-columns:1fr 1fr;gap:18px}.nv2 h4{margin:0 0 4px;font-size:8.5pt;color:#0b0b0b}.nv2 .gv{margin:0 0 7px}
 .nv2 .gl{display:flex;justify-content:space-between;align-items:baseline}.nv2 .gl span{font-size:7.6pt;color:#52514e}.nv2 .gl b{font-size:14pt;line-height:1.1}
 .nv2 .gb{position:relative;height:8px;background:#f1f1ee;border-radius:4px;margin:2px 0}.nv2 .gb u{display:block;height:100%;border-radius:4px}.nv2 .gb em{position:absolute;top:-3px;width:2px;height:14px;background:#0b0b0b;border-radius:1px}
 .nv2 small{display:block;font-size:6.9pt;color:#8a8984;line-height:1.35}
