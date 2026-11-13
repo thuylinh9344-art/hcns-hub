@@ -1762,6 +1762,12 @@ const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.
 function wrRedQ(){const keep=S.nvF.per;const q=Math.floor((+TODAY.slice(5,7)-1)/3)+1;try{S.nvF.per='q'+q;const {prov}=nvData();const K=nvKho();
     return {q,prov:prov.filter(p=>p.lv===2),shops:prov.flatMap(p=>p.shops.filter(s=>s.lv===2).map(s=>({...s,area:p.area}))),kho:K.filter(k=>k.lv===2)}}catch(_){return {q,prov:[],shops:[],kho:[]}}finally{S.nvF.per=keep}}
 
+/* CV xử lý trong tháng theo từng tuần báo cáo (thứ 6 – thứ 5) và tỷ lệ chuyển đổi CV → nhận việc */
+function wrCvW(m,ref){const [ma]=monthRange(m);const L=recRows().filter(x=>x.o!=='x');const nv=x=>x.ac||x.start||'';
+  const inM=x=>x.sub&&x.sub>=ma&&x.sub<=ref;const M=L.filter(inM);if(!M.length)return null;
+  const weeks=[];let w=weekRange(ma);while(w[0]<=ref){const a=w[0]<ma?ma:w[0],b=w[1]>ref?ref:w[1];weeks.push({a,b,cv:L.filter(x=>x.sub&&x.sub>=a&&x.sub<=b).length,done:L.filter(x=>x.sub&&x.sub>=a&&x.sub<=b&&x.st&&x.st!=='Mới tạo').length,v1:L.filter(x=>x.v1&&x.v1>=a&&x.v1<=b).length,nv:L.filter(x=>nv(x)&&nv(x)>=a&&nv(x)<=b).length});w=[addDays(w[0],7),addDays(w[1],7)]}if(weeks.length>1&&!weeks[weeks.length-1].cv)weeks.pop();
+  const done=M.filter(x=>x.st&&x.st!=='Mới tạo').length,v1=M.filter(x=>x.v1).length,conv=M.filter(x=>nv(x)).length;
+  return {cv:M.length,done,v1,conv,rate:M.length?r1(conv/M.length*100):0,rv1:M.length?r1(v1/M.length*100):0,weeks}}
 /* Báo cáo tuần: tỷ lệ nghỉ NVBH và Kho theo 90 ngày gần nhất (giống mục Nghỉ việc theo tỉnh) */
 function wrNv90D(){const keep=S.nvF.per;const q=Math.floor((+TODAY.slice(5,7)-1)/3)+1;try{S.nvF.per='q'+q;if(!sysRows().length)return null;const n=nvNvbh(),K=nvKho();
   const kc=K.reduce((x,k)=>x+k.coh,0),k9=K.reduce((x,k)=>x+k.c90,0),kq=K.reduce((x,k)=>x+k.q,0),ka=K.reduce((x,k)=>x+k.avg,0);
@@ -1818,6 +1824,9 @@ function wrBuild(){
       parts.push({lines:L});X.rec={tot,exp,rs,slow};
       sum.push(['Tuyển dụng tháng',`${tot.real}/${tot.tgt}`,`đạt ${wrPct(tot.real,tot.tgt)} · tiến độ thời gian ${Math.round(exp*100)}%`]);
     }
+      {const C=wrCvW(m,ref);if(C){X.cvw=C;const dl=C.weeks.length>1?C.weeks[C.weeks.length-1].cv-C.weeks[C.weeks.length-2].cv:0;
+        parts.push({lines:[`CV tháng ${+m.slice(5,7)}: nhận ${nf(C.cv)} CV, đã xử lý ${nf(C.done)}, phỏng vấn vòng 1 ${nf(C.v1)} (${String(C.rv1).replace('.',',')}%), nhận việc ${nf(C.conv)} – tỷ lệ chuyển đổi CV → nhận việc ${String(C.rate).replace('.',',')}%${C.weeks.length>1?`; tuần này ${dl>=0?'tăng':'giảm'} ${Math.abs(dl)} CV so với tuần trước`:''}.`]});
+        parts.push({table:{cols:['Tuần','CV nhận','CV đã xử lý','PV vòng 1','Nhận việc','Chuyển đổi'],rows:C.weeks.map((w,i)=>[`Tuần ${i+1} (${fmtD(w.a)}–${fmtD(w.b)})`,nf(w.cv),nf(w.done),nf(w.v1),nf(w.nv),w.cv?String(r1(w.nv/w.cv*100)).replace('.',',')+'%':'—']),foot:['Cộng tháng',nf(C.cv),nf(C.done),nf(C.v1),nf(C.conv),String(C.rate).replace('.',',')+'%']}})}}
     parts.push({note:'s2'});secs.push({h:`II. Tình hình tuyển dụng tháng ${+m.slice(5,7)}/${m.slice(0,4)} (lũy kế đến ${fmtDY(ref)})`,parts,src:`Nguồn: DSNS U và sheet TTS (thực tuyển = vào làm hoặc bắt đầu học việc trong tháng, chưa nghỉ) và hồ sơ tuyển dụng ${S.rec.updatedAt?'ngày '+fmtDY(S.rec.updatedAt.slice(0,10)):''}.`})}
   /* ---------- III. Công việc thường quy ---------- */
   const months=[...new Set([ymOf(r[0]),ymOf(r[1])])];const staff=activeStaff();
@@ -1923,6 +1932,7 @@ function wbBrief(d){const X=d.X,hc=X.hc,rc=X.rec,w=X.work||{by:{},late:[],done:0
   if(rc){const t=rc.tot,p=t.tgt?t.real/t.tgt:0;
     S2.push(`Đạt ${t.real}/${t.tgt} người (${wrPct(t.real,t.tgt)}) – tiến độ thời gian ${Math.round(rc.exp*100)}%; trong tuần tuyển thêm ${t.w}.`);
 
+    {const C=d.X.cvw;if(C){const n=C.weeks.length,lw=C.weeks[n-1],pw=n>1?C.weeks[n-2]:null;S2.push(`CV tháng: ${nf(C.cv)} CV (đã xử lý ${nf(C.done)}), nhận việc ${nf(C.conv)} – chuyển đổi CV → nhận việc ${String(C.rate).replace('.',',')}%; tuần này ${nf(lw.cv)} CV${pw?` (tuần trước ${nf(pw.cv)})`:''}.`)}}
     if(t.st)S2.push(`${t.st} hồ sơ treo quá hạn xử lý – yêu cầu xử lý dứt điểm trong tuần.`);
     st2=p>=rc.exp?'ok':p>=rc.exp*.8?'warn':'bad';tiles.splice(1,0,['Tuyển dụng tháng',`${t.real}/${t.tgt}`,`đạt ${wrPct(t.real,t.tgt)} · tiến độ ${Math.round(rc.exp*100)}%`,st2])}
   else S2.push('Chưa có kế hoạch tuyển dụng của tháng.');
@@ -2035,6 +2045,7 @@ function wdData(d){const lk=wkLock();if(lk&&lk.charts)return lk.charts;const X=d
     o.short=Object.values(by).sort((a,b)=>b.gap-a.gap||b.n-a.n).slice(0,8)}
   o.legal=X.legalG||[];o.legalAll=X.legalAll||[];
   if(rc){o.rec={real:rc.tot.real,tgt:rc.tot.tgt,exp:rc.exp,w:rc.tot.w}}
+  o.cvw=X.cvw||(()=>{try{return wrCvW(X.m,d.ref)}catch(_){return null}})();
   o.kpi=wrKpis(X.m).map(k=>({n:k.n,pct:k.pct,grade:k.grade}));
   o.nv90=wrNv90D();
   return o}
@@ -2820,6 +2831,11 @@ function wd2LegalManual(lines){const tick=l=>`<li><span class="tk">✓</span><sp
   let h=`<ul class="wd-ticks">${(top.length?top:['Trong tuần không phát sinh hồ sơ mới']).map(tick).join('')}</ul>`;
   if(grp.length)h+=`<div class="wd-lg"><p>Đã hoàn thành trong tháng</p>${grp.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.nt.length?g.lab:g.x)}${g.nt.length?` <em>${g.nt.length} nhà</em>`:''}</b>${g.nt.length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
   return h}
+/* CV theo tuần: cột nhóm CV nhận / PV vòng 1 / nhận việc + tỷ lệ chuyển đổi */
+function wd2Cv(C){if(!C)return '';const mx=Math.max(1,...C.weeks.map(w=>w.cv));const h=v=>Math.max(v?3:0,Math.round(v/mx*58));
+  return `<div class="cvw"><div class="cvh"><div><span>CV nhận trong tháng</span><b>${nf(C.cv)}</b><small>đã xử lý ${nf(C.done)}</small></div><div><span>PV vòng 1</span><b>${nf(C.v1)}</b><small>${wd2P(C.rv1)} số CV</small></div><div class="cvr"><span>CV → nhận việc</span><b>${wd2P(C.rate)}</b><small>${nf(C.conv)} người nhận việc</small></div></div>
+  <div class="cvc">${C.weeks.map((w,i)=>`<div class="cw"><div class="bars"><i class="b1" style="height:${h(w.cv)}px"><em>${w.cv||''}</em></i><i class="b2" style="height:${h(w.v1)}px"><em>${w.v1||''}</em></i><i class="b3" style="height:${h(w.nv)}px"><em>${w.nv||''}</em></i></div><span>T${i+1}</span><small>${fmtD(w.a)}–${fmtD(w.b)}</small></div>`).join('')}</div>
+  <div class="cvl"><span><i class="b1"></i>CV nhận</span><span><i class="b2"></i>PV vòng 1</span><span><i class="b3"></i>Nhận việc</span></div></div>`}
 function wd2Hero(R){const p=R.tgt?R.real/R.tgt:0,st=p>=R.exp?'ok':p>=R.exp*.8?'warn':'bad';
   return `<div class="h2"><div class="h2r">${wd2Ring(p,R.exp,st)}</div><div><b class="big">${nf(R.real)}<small>/${nf(R.tgt)}</small></b><span>người tuyển được trong tháng</span><div class="h2m"><em class="${st}">${Math.round(p*100)}% chỉ tiêu</em><em>tiến độ thời gian ${Math.round(R.exp*100)}%</em><em class="ok">+${nf(R.w)} trong tuần</em></div></div></div>`}
 const WD2_TILE=t=>/hiện hữu/i.test(t)?'👥':/tuyển/i.test(t)?'✅':/nghỉ/i.test(t)?'🚪':/hồ sơ|pháp lý/i.test(t)?'📄':'📌';
@@ -2831,7 +2847,7 @@ wdHtml=function(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   const plan=sec('b5'),[pc,pi]=WD2_SEC.b5;
   return `<header class="hd2">${logo?`<img src="${logo}" alt="">`:''}<div class="t"><small>CÔNG TY CỔ PHẦN UPHARMA · PHÒNG HÀNH CHÍNH – NHÂN SỰ</small><h1>Báo cáo tuần ${d.wk}</h1><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])} · số liệu đến ${fmtDY(lk?lk.ref:d.ref)}</p></div><div class="by"><small>Người báo cáo</small><b>${esc(by)}</b></div></header>
   <div class="tl2">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><i>${WD2_TILE(k)}</i><div><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div></div>`).join('')}</div>
-  <div class="g2">${card('b1',wd2Flow(C.flow)+wd2Short(C.short))}${C.rec?card('b2',wd2Hero(C.rec)):card('b2')}</div>
+  <div class="g2">${card('b1',wd2Flow(C.flow)+wd2Short(C.short))}${C.rec?card('b2',wd2Hero(C.rec)+wd2Cv(C.cvw)):card('b2',wd2Cv(C.cvw))}</div>
   ${C.nv90?wd2Nv(C.nv90):''}
   <div class="g2">${card('b3')}<section class="c2" style="--ac:${WD2_SEC.b4[0]}"><h3><i>${WD2_SEC.b4[1]}</i>${esc(sec('b4').h)}${pill(sec('b4'))}</h3>${wrNote('b4')&&!sec('b4').locked?wd2LegalManual(wbLines(sec('b4'))):wdLegalHtml(wbLines(sec('b4')),C.legal||[],C.legalAll||[])}</section></div>
   <section class="c2 plan" style="--ac:${pc}"><h3><i>${pi}</i>${esc(plan.h)}</h3><ol>${wbLines(plan).map(l=>`<li><span>${wd2Num(l)}</span></li>`).join('')}</ol></section>
@@ -2871,6 +2887,11 @@ const WD2_CSS=`.page{padding:9mm 10mm 8mm}
 .ws{margin:0 0 6px}.ws p{margin:0 0 3px;font-size:7.3pt;color:#52514e;text-transform:uppercase;letter-spacing:.04em}
 .ws .sr{display:grid;grid-template-columns:78px minmax(0,1fr) 22px 34px;gap:5px;align-items:center;font-size:7.8pt;margin:2px 0}.ws .sr span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ws .sr i{height:7px;background:#f1f1ee;border-radius:4px;overflow:hidden}.ws .sr u{display:block;height:100%;background:#c98500;border-radius:4px}.ws .sr b{text-align:right}.ws .sr small{color:#8a8984;font-size:7pt}
+.cvw{margin:4px 0 8px;border-top:1px dashed #e6e5e0;padding-top:7px}.cvh{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.cvh>div{background:#f6f6f3;border-radius:8px;padding:4px 7px}.cvh span{display:block;font-size:7pt;color:#52514e}.cvh b{display:block;font-size:13pt;line-height:1.15}.cvh small{font-size:6.8pt;color:#8a8984}.cvh .cvr{background:#e9f6ee}.cvh .cvr b{color:#17703c}
+.cvc{display:flex;gap:8px;align-items:flex-end;margin-top:7px;padding:0 2px}.cw{flex:1;text-align:center;min-width:0}.cw .bars{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:66px;border-bottom:1px solid #e6e5e0}
+.cw .bars i{display:block;width:30%;max-width:16px;border-radius:3px 3px 0 0;position:relative}.cw .bars em{position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-style:normal;font-size:6.5pt;color:#52514e}
+.b1{background:#9bbcf0}.b2{background:#2a6fdb}.b3{background:#1f8a4c}.cw span{display:block;font-size:7.3pt;font-weight:700;margin-top:2px}.cw small{display:block;font-size:6.3pt;color:#8a8984}
+.cvl{display:flex;gap:10px;justify-content:center;font-size:6.8pt;color:#52514e;margin-top:3px}.cvl i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;vertical-align:-1px}
 .nv2{margin-bottom:9px}.nv2 .gg{display:grid;grid-template-columns:1fr 1fr;gap:18px}.nv2 h4{margin:0 0 4px;font-size:8.5pt;color:#0b0b0b}.nv2 .gv{margin:0 0 7px}
 .nv2 .gl{display:flex;justify-content:space-between;align-items:baseline}.nv2 .gl span{font-size:7.6pt;color:#52514e}.nv2 .gl b{font-size:14pt;line-height:1.1}
 .nv2 .gb{position:relative;height:8px;background:#f1f1ee;border-radius:4px;margin:2px 0}.nv2 .gb u{display:block;height:100%;border-radius:4px}.nv2 .gb em{position:absolute;top:-3px;width:2px;height:14px;background:#0b0b0b;border-radius:1px}
