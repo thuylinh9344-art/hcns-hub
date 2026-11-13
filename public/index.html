@@ -1695,8 +1695,28 @@ async function refreshLogs(silent){
     S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật nhật ký ${_sum.join(' · ')||'—'}`+(_miss.length?` · chưa đọc được ${_miss.join('; ')}`:''));
   }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc, và file phải là Google Trang tính (không phải .xlsx)':'Chưa cập nhật được nhật ký, thử lại sau')}}
   finally{S.logBusy=false;render()}}
-const lgBtn=()=>S.mcp&&S.canWrite?`<button class="btn" data-act="lg-refresh" ${S.logBusy?'disabled':''}>${S.logBusy?'Đang đọc nhật ký…':'Cập nhật nhật ký từ sheet'}</button><button class="btn" data-act="lg-links" title="Link file Báo cáo công việc từng tháng">Link sheet tháng</button>`:'';
+const lgBtn=()=>(S.mcp&&S.canWrite?`<button class="btn" data-act="lg-refresh" ${S.logBusy?'disabled':''}>${S.logBusy?'Đang đọc nhật ký…':'Cập nhật nhật ký từ sheet'}</button><button class="btn" data-act="lg-links" title="Link file Báo cáo công việc từng tháng">Link sheet tháng</button>`:'')+(S.canWrite&&S.role!=='staff'?`<label class="btn" title="Dùng khi team ghi nhật ký vào file Excel (.xlsx) trên Drive: tải file về rồi chọn ở đây">${S.xlsBusy?'Đang đọc file Excel…':'Nhập nhật ký từ file Excel (.xlsx)'}<input type="file" id="lgXlsx" accept=".xlsx,.xlsm" hidden ${S.xlsBusy?'disabled':''}></label>`:'');
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act="lg-refresh"]');if(el)refreshLogs(false)});
+/* Nhập nhật ký từ file Excel (.xlsx) – cùng cách đọc như sheet tháng (tab Khung ô B3 = kỳ, tab từng người từ dòng 2) */
+function lgLoadXlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);return new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>ok(window.XLSX);sc.onerror=no;document.head.appendChild(sc)})}
+const lgXDate=v=>{if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return pad(d.getUTCDate())+'/'+pad(d.getUTCMonth()+1)+'/'+d.getUTCFullYear()}if(v instanceof Date)return pad(v.getDate())+'/'+pad(v.getMonth()+1)+'/'+v.getFullYear();return String(v??'')};
+async function importLogsXlsx(file){if(S.xlsBusy)return;S.xlsBusy=true;render();
+  try{const X=await lgLoadXlsx();const wb=X.read(await file.arrayBuffer(),{type:'array'});
+    const tab=n=>{const w=wb.Sheets[n]||wb.Sheets[Object.keys(wb.Sheets).find(k=>k.normalize('NFC').trim()===n.normalize('NFC'))||''];return w?X.utils.sheet_to_json(w,{header:1,raw:true,defval:''}):null};
+    const k=tab('Khung');const mm=String(((k||[])[2]||[])[1]||'').match(/(\d{1,2})\/(\d{4})/);const ym=mm?`${mm[2]}-${pad(+mm[1])}`:ymOf(TODAY);
+    const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).trim().toUpperCase()]=s});let n=0,ppl=0;const miss=[];
+    for(const tn of LOG_TABS){const all=tab(tn);if(!all){miss.push(tn);continue}const v=all.slice(1);
+      const mc=String((v[0]||[])[0]||'').match(/UP\d{6}/i);const s=mc&&byCode[mc[0].toUpperCase()];if(!s){miss.push(tn);continue}
+      const es=[];let last='';
+      v.slice(4).forEach((r,i)=>{const g=j=>j===1?lgXDate(r[j]).trim():String(r[j]??'').trim();const code=g(2);if(!code&&!g(4)&&!g(6))return;
+        const d0=lgDate(g(1),ym);const nod=!d0||ymOf(d0)!==ym;const d=nod?(last||ym+'-01'):d0;last=d;
+        const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
+        const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,nod,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
+      const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'xlsx',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
+    S.logAt=new Date().toISOString();toast(`Đã nhập nhật ký ${fmtM(ym)} từ file Excel: ${nf(n)} dòng của ${ppl} người`+(miss.length?` · chưa đọc được tab ${miss.join(', ')}`:''));
+  }catch(e){toast('Không đọc được file Excel nhật ký – kiểm tra đúng file Báo cáo công việc tháng (.xlsx)')}
+  finally{S.xlsBusy=false;render()}}
+document.addEventListener('change',e=>{const t=e.target;if(t.id==='lgXlsx'&&t.files&&t.files[0]){importLogsXlsx(t.files[0]);t.value=''}});
 function lgLinksDlg(){const all=Object.fromEntries(lgAll());const next=ymOf(addDays(TODAY.slice(0,7)+'-01',35));const ms=[...new Set([...Object.keys(all),ymOf(TODAY),next])].sort().reverse();
   openDlg('Link file Báo cáo công việc theo tháng',`<p class="note" style="margin:0 0 10px">Mỗi tháng dán link Google Trang tính của file "BÁO CÁO CÔNG VIỆC - HCNS UPHARMA". Web tự đồng bộ file tháng này và tháng trước. File .xlsx phải mở bằng Google Trang tính → Tệp → Lưu dưới dạng Google Trang tính rồi dùng link của bản mới.</p>
   <div class="form">${ms.map(m=>`<label class="full">${fmtM(m)}<input data-lgm="${m}" value="${esc(all[m]?'https://docs.google.com/spreadsheets/d/'+all[m]+'/edit':'')}" placeholder="https://docs.google.com/spreadsheets/d/…"></label>`).join('')}</div>`,
