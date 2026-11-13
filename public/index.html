@@ -1690,7 +1690,8 @@ async function refreshLogs(silent){
         const d0=lgDate(g(1),ym);const nod=!d0||ymOf(d0)!==ym;const d=nod?(last||ym+'-01'):d0;last=d;
         const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
         const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,nod,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
-      const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'sheet',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
+      const old=logDoc(ym,s.id);/* Không ghi đè dữ liệu đã nhập từ file Excel bằng sheet cũ ít dòng hơn */if(old&&old.source==='xlsx'&&es.length<=(old.entries||[]).length){miss.push(tn+' (giữ bản Excel)');continue}
+      await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'sheet',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
     _sum.push(`${fmtM(ym)}: ${nf(n)} dòng của ${ppl} người`);if(miss.length)_miss.push(`${fmtM(ym)} sheet ${miss.join(', ')}`)}catch(e){if(_list.length===1)throw e;_miss.push(`file ${fmtM(_mo)} (kiểm tra link, file phải là Google Trang tính, không phải .xlsx)`)}}
     S.logAt=new Date().toISOString();if(!silent)toast(`Đã cập nhật nhật ký ${_sum.join(' · ')||'—'}`+(_miss.length?` · chưa đọc được ${_miss.join('; ')}`:''));
   }catch(e){if(!silent){const c=e&&e.code;toast(c==='server_not_connected'?'Chưa kết nối Google Sheets':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet nhật ký':c==='tool_error'?'Google Sheets báo lỗi: kiểm tra quyền xem file Báo cáo công việc, và file phải là Google Trang tính (không phải .xlsx)':'Chưa cập nhật được nhật ký, thử lại sau')}}
