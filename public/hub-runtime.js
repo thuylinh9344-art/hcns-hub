@@ -154,8 +154,40 @@
       throw e;
     });
   }
+  /* Quyền đọc Drive chỉ xin khi quản trị bấm cập nhật nhật ký từ file Excel (.xlsx) */
+  var DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
+  var dProvider = new firebase.auth.GoogleAuthProvider();
+  dProvider.addScope(SHEETS_SCOPE); dProvider.addScope(DRIVE_SCOPE);
+  var driveToken = null, driveTokenAt = 0;
+  try { var _d = JSON.parse(sessionStorage.getItem('hubDriveTok') || 'null'); if (_d && _d.k && Date.now() - _d.at < 50 * 60 * 1000) { driveToken = _d.k; driveTokenAt = _d.at; } } catch (e) {}
+  function getDriveToken(silent) {
+    if (driveToken && Date.now() - driveTokenAt < 50 * 60 * 1000) return Promise.resolve(driveToken);
+    if (silent) return Promise.reject({ code: 'needs_reauth', message: 'Cần cấp quyền đọc Google Drive' });
+    var u = auth.currentUser;
+    if (!u) return Promise.reject({ code: 'needs_reauth', message: 'Chưa đăng nhập' });
+    return u.reauthenticateWithPopup(dProvider).then(function (res) {
+      if (!res.credential || !res.credential.accessToken) throw { code: 'needs_reauth', message: 'Không nhận được quyền đọc Google Drive' };
+      driveToken = res.credential.accessToken; driveTokenAt = Date.now();
+      try { sessionStorage.setItem('hubDriveTok', JSON.stringify({ k: driveToken, at: driveTokenAt })); } catch (e) {}
+      return driveToken;
+    }).catch(function (e) {
+      if (e && e.code && String(e.code).indexOf('auth/') === 0) throw { code: e.code === 'auth/popup-blocked' ? 'approval_required' : 'needs_reauth', message: e.message };
+      throw e;
+    });
+  }
+  function driveDownload(input, opts) {
+    return getDriveToken(opts && opts.silent).then(function (tok) {
+      var url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(input.fileId) + '?alt=media&supportsAllDrives=true';
+      return fetch(url, { headers: { Authorization: 'Bearer ' + tok } }).then(function (r) {
+        if (r.status === 401 || r.status === 403) { driveToken = null; try { sessionStorage.removeItem('hubDriveTok'); } catch (e) {} throw { code: 'needs_reauth', message: 'Cần cấp lại quyền đọc Google Drive' }; }
+        if (!r.ok) throw { code: 'tool_error', message: 'HTTP ' + r.status };
+        return r.arrayBuffer().then(function (buf) { return { content: [], payload: { buf: buf } }; });
+      });
+    });
+  }
   var mcp = {
     callTool: function (server, tool, input, opts) {
+      if (server === 'Google Drive' && tool === 'download') return driveDownload(input, opts);
       if (server !== 'Google Sheets' || tool !== 'get_values') return Promise.reject({ code: 'not_in_manifest', message: 'Chỉ hỗ trợ đọc Google Sheets' });
       return getSheetToken(opts && opts.silent).then(function (tok) {
         var url = 'https://sheets.googleapis.com/v4/spreadsheets/' + encodeURIComponent(input.spreadsheetId) + '/values/' + encodeURIComponent(input.range);

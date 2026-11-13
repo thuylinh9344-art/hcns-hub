@@ -1680,7 +1680,8 @@ const lgNum=v=>{let s=String(v??'').trim();if(!s)return null;if(s.includes(',')&
 const lgDate=(v,ym)=>{const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(!m)return '';const a=+m[1],b=+m[2],tm=+ym.slice(5,7);let d,mo;if(b===tm){d=a;mo=b}else if(a===tm){d=b;mo=a}else if(a>12){d=a;mo=b}else{d=a;mo=b}return `${m[3]}-${pad(mo)}-${pad(d)}`};
 async function refreshLogs(silent){
   if(!S.mcp||S.logBusy)return;S.logBusy=true;_lgTried=Date.now();if(!silent)render();
-  try{const _sum=[],_miss=[];const _list=lgSheets();for(const [_mo,_sid] of _list){try{const get=async rg=>{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:_sid,range:rg},{cache:false,silent:!!silent});return (res.payload&&res.payload.values)||[]};
+  try{const _sum=[],_miss=[];const _list=lgSheets();for(const [_mo,_sid] of _list){if(LOG_XLSX[_mo]&&window.HUB_STANDALONE){try{const res=await S.mcp.callTool('Google Drive','download',{fileId:LOG_XLSX[_mo]},{silent:!!silent});const r=await lgFromBuf(res.payload.buf);_sum.push(`${fmtM(r.ym)} (file Excel): ${nf(r.n)} dòng của ${r.ppl} người`);if(r.miss.length)_miss.push(`${fmtM(r.ym)} tab ${r.miss.join(', ')}`);continue}catch(e){if(!silent)_miss.push(`file Excel ${fmtM(_mo)} (${e&&e.code==='needs_reauth'?'bấm lại để cấp quyền đọc Drive':'chưa tải được'})`)}}
+    try{const get=async rg=>{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:_sid,range:rg},{cache:false,silent:!!silent});return (res.payload&&res.payload.values)||[]};
     const k=await get("'Khung'!B3");const mm=String((k[0]||[])[0]||'').match(/(\d{1,2})\/(\d{4})/);const ym=mm?`${mm[2]}-${pad(+mm[1])}`:ymOf(TODAY);
     const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).trim().toUpperCase()]=s});let n=0,ppl=0;const miss=[];
     for(const tab of LOG_TABS){let v;try{v=await get(`'${tab}'!A2:N`)}catch(e){try{await new Promise(r=>setTimeout(r,1500));v=await get(`'${tab}'!A2:N`)}catch(_){miss.push(tab);continue}}
@@ -1701,8 +1702,9 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act="lg-r
 /* Nhập nhật ký từ file Excel (.xlsx) – cùng cách đọc như sheet tháng (tab Khung ô B3 = kỳ, tab từng người từ dòng 2) */
 function lgLoadXlsx(){if(window.XLSX)return Promise.resolve(window.XLSX);return new Promise((ok,no)=>{const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';sc.onload=()=>ok(window.XLSX);sc.onerror=no;document.head.appendChild(sc)})}
 const lgXDate=v=>{if(typeof v==='number'&&v>20000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return pad(d.getUTCDate())+'/'+pad(d.getUTCMonth()+1)+'/'+d.getUTCFullYear()}if(v instanceof Date)return pad(v.getDate())+'/'+pad(v.getMonth()+1)+'/'+v.getFullYear();return String(v??'')};
-async function importLogsXlsx(file){if(S.xlsBusy)return;S.xlsBusy=true;render();
-  try{const X=await lgLoadXlsx();const wb=X.read(await file.arrayBuffer(),{type:'array'});
+/* File Excel nhật ký từng tháng trên Drive (team đang ghi vào file .xlsx) – web.app tự tải về đọc */
+const LOG_XLSX={'2026-11':'1PN8kxyDYDVK44i5pF7lwbJd5_rbzErrF'};
+async function lgFromBuf(buf){const X=await lgLoadXlsx();const wb=X.read(buf,{type:'array'});
     const tab=n=>{const w=wb.Sheets[n]||wb.Sheets[Object.keys(wb.Sheets).find(k=>k.normalize('NFC').trim()===n.normalize('NFC'))||''];return w?X.utils.sheet_to_json(w,{header:1,raw:true,defval:''}):null};
     const k=tab('Khung');const mm=String(((k||[])[2]||[])[1]||'').match(/(\d{1,2})\/(\d{4})/);const ym=mm?`${mm[2]}-${pad(+mm[1])}`:ymOf(TODAY);
     const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).trim().toUpperCase()]=s});let n=0,ppl=0;const miss=[];
@@ -1714,7 +1716,9 @@ async function importLogsXlsx(file){if(S.xlsBusy)return;S.xlsBusy=true;render();
         const c=catBy(code);let base=lgNum(g(11));if(base==null&&c)base=+c.base||0;const q=lgNum(g(5));
         const pts=lgNum(g(12));es.push({id:'s'+(i+6),d,nod,code,area:g(3)||(c?c.area:''),content:g(4)||(c?c.content:''),qty:q,base,pts,result:g(6),status:g(7)||'Hoàn thành',ontime:g(10),note:g(13)})});
       const old=logDoc(ym,s.id);await write('logs/'+ym+'_'+s.id,{month:ym,staffId:s.id,penalty:old?.penalty||0,penaltyNote:old?.penaltyNote||'',entries:es,source:'xlsx',updatedAt:new Date().toISOString()});n+=es.length;ppl++}
-    S.logAt=new Date().toISOString();toast(`Đã nhập nhật ký ${fmtM(ym)} từ file Excel: ${nf(n)} dòng của ${ppl} người`+(miss.length?` · chưa đọc được tab ${miss.join(', ')}`:''));
+    return {ym,n,ppl,miss}}
+async function importLogsXlsx(file){if(S.xlsBusy)return;S.xlsBusy=true;render();
+  try{const r=await lgFromBuf(await file.arrayBuffer());S.logAt=new Date().toISOString();toast(`Đã nhập nhật ký ${fmtM(r.ym)} từ file Excel: ${nf(r.n)} dòng của ${r.ppl} người`+(r.miss.length?` · chưa đọc được tab ${r.miss.join(', ')}`:''));
   }catch(e){toast('Không đọc được file Excel nhật ký – kiểm tra đúng file Báo cáo công việc tháng (.xlsx)')}
   finally{S.xlsBusy=false;render()}}
 document.addEventListener('change',e=>{const t=e.target;if(t.id==='lgXlsx'&&t.files&&t.files[0]){importLogsXlsx(t.files[0]);t.value=''}});
