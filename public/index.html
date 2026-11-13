@@ -1734,6 +1734,13 @@ const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.
 function wrRedQ(){const keep=S.nvF.per;const q=Math.floor((+TODAY.slice(5,7)-1)/3)+1;try{S.nvF.per='q'+q;const {prov}=nvData();const K=nvKho();
     return {q,prov:prov.filter(p=>p.lv===2),shops:prov.flatMap(p=>p.shops.filter(s=>s.lv===2).map(s=>({...s,area:p.area}))),kho:K.filter(k=>k.lv===2)}}catch(_){return {q,prov:[],shops:[],kho:[]}}finally{S.nvF.per=keep}}
 
+/* Báo cáo tuần: tỷ lệ nghỉ NVBH và Kho theo 90 ngày gần nhất (giống mục Nghỉ việc theo tỉnh) */
+function wrNv90(){const keep=S.nvF.per;const q=Math.floor((+TODAY.slice(5,7)-1)/3)+1;try{S.nvF.per='q'+q;const n=nvNvbh(),K=nvKho();
+  const kc=K.reduce((x,k)=>x+k.coh,0),k9=K.reduce((x,k)=>x+k.c90,0),kq=K.reduce((x,k)=>x+k.q,0),ka=K.reduce((x,k)=>x+k.avg,0);
+  const f=v=>v==null?'—':String(r1(v)).replace('.',',')+'%';const per=`${fmtD(nvStart())}–${fmtD(nvEnd())}`;
+  const kh=K.map(k=>`${k.name.replace('Kho ','')} ${k.coh?f(k.c90/k.coh*100):'—'}`).join(', ');
+  return [`Nghỉ việc 90 ngày gần nhất (${per}) – NVBH: nghỉ dưới 90 ngày ${f(n.r90)} (${n.c90}/${n.coh} người vào làm, mục tiêu dưới ${NV_TH}%); tỷ lệ nghỉ việc ${f(n.rate)} (${n.q} người nghỉ / quân số bình quân ${Math.round(n.avg)}).`,
+    `Nghỉ việc 90 ngày gần nhất (${per}) – Kho: nghỉ dưới 90 ngày ${f(kc?k9/kc*100:null)} (${k9}/${kc} người vào làm; ${kh}); tỷ lệ nghỉ việc ${f(ka?kq/ka*100:null)} (${kq} người nghỉ / quân số bình quân ${Math.round(ka)}).`]}catch(_){return []}finally{S.nvF.per=keep}}
 function wrBuild(){
   const r=repRange(),ref=(()=>{const f=addDays(r[1],1);return f<=TODAY?f:TODAY})(),m=ymOf(ref),[ma,me]=monthRange(m),nr=[addDays(r[1],1),addDays(r[1],7)];
   const R=sysRows(),hasSys=R.length>0,secs=[],sum=[],X={nr,m,hasSys};
@@ -1756,6 +1763,7 @@ function wrBuild(){
         `Nghỉ việc ${T.quits.length} người, trong đó ${T.early} người nghỉ khi chưa đủ 90 ngày (${wrPct(T.early,T.quits.length)} số nghỉ). Tỷ lệ nghỉ việc tháng: ${avg?String(r1(T.quits.length/avg*100)).replace('.',','):0}%.`,
         `Đang báo nghỉ việc: ${bn} người${away?`; nghỉ thai sản / không lương: ${away} người (đã tính trong hiện hữu)`:''}.`];
       {const tv=ttsRows();const tn=tv.filter(x=>inR(x.start,[ma,ref])),ton=tv.filter(x=>x.status!=='Nghỉ việc');if(tv.length)L.push(`Học việc (sheet TTS): ${tn.length} người bắt đầu trong tháng, ${tn.filter(x=>x.status!=='Nghỉ việc').length} người đang học (đã tính vào thực tuyển); toàn hệ thống đang có ${ton.length} người học việc.`)}
+      wrNv90().forEach(x=>L.push(x));
       if(nt.length){const t5=wrTop5();if(t5.length)L.push(`5 nhà thuốc thiếu nhân sự nhiều nhất: ${t5.join('; ')}.`)}
       if(red.prov.length||red.shops.length||red.kho.length)L.push(`Cảnh báo nghỉ dưới 90 ngày quý ${['I','II','III','IV'][red.q-1]}: ${[red.prov.length?'tỉnh '+red.prov.map(p=>p.area).join(', '):'',red.kho.length?red.kho.map(k=>`${k.name} (${k.r90}%)`).join(', '):'',red.shops.length?'nhà thuốc '+red.shops.map(s=>s.code.replace(/^SHOP0*/,'NT ')).join(', '):''].filter(Boolean).join('; ')}.`);
       parts.push({lines:L});X.hc={T,G,bn,shortN,gap,noCht,red,rate:avg?r1(T.quits.length/avg*100):0,nt:nt.length};
