@@ -1728,6 +1728,7 @@ const teamTgt=m=>{const c=(S.config.teamTgt||{})[m];return c!=null&&c!==''?+c:(T
 const wrKpis=m=>activeStaff().map(s=>({s,n:wrShort(s.name),k:kpiOf(m,s.id)})).filter(x=>x.k.has).map(x=>({n:x.n,id:x.s.id,pct:Math.round(x.k.pct),grade:x.k.grade})).sort((a,b)=>b.pct-a.pct);
 /* 5 nhà thuốc đang hoạt động thiếu nhân sự nhiều nhất (theo định biên NVBH; bỏ nhà chưa có nhân sự = chưa khai trương) */
 const wrTop5=()=>S.shops.filter(x=>x.type==='nt').map(x=>({x,s:shopStaff(x.code)})).filter(o=>o.s.short>0&&o.s.n>0).sort((a,b)=>b.s.short-a.s.short||(a.s.cht-b.s.cht)||a.s.n-b.s.n).slice(0,5).map(o=>`${o.x.code.replace(/^SHOP0*/,'NT ')} (${o.x.area||'—'}) thiếu ${o.s.short}${o.s.cht?'':', chưa có CHT'}`);
+const LEGAL_FROM='2026-10';
 const wrIsLegal=e=>/^05\./.test(String(e.code||''))||/pháp lý/i.test(String(e.area||''));
 const wrIsRecTask=t=>/tuyển dụng|chỉ tiêu tuyển/i.test((t.title||'')+' '+(t.module||''));
 const wrIsHdTask=t=>/^hết hạn hđ|^kết thúc thử việc/i.test(String(t.title||'').trim());
@@ -1817,6 +1818,12 @@ function wrBuild(){
     const mt=Object.entries(G).map(([k,g])=>`${k} ${g.nt.size||g.n}${g.nt.size?` (NT ${[...g.nt].join(', ')})`:''}`).join('; ');
     if(!L.length&&mt)L.push('Trong tuần chưa ghi nhận hồ sơ pháp lý mới.');
     if(mt)L.push(`Lũy kế tháng ${+m.slice(5,7)}: ${mt}.`);
+    /* Lũy kế hồ sơ pháp lý nhà mới từ T10/2026 (đọc cột Kết quả trong nhật ký các tháng) */
+    const mons=[];{let x=LEGAL_FROM;while(x<=m){mons.push(x);const dd=pd(x+'-01');dd.setMonth(dd.getMonth()+1);x=iso(dd).slice(0,7)}}
+    const GA={};mons.forEach(mo=>staff.forEach(s2=>(logDoc(mo,s2.id)?.entries||[]).filter(e=>!isVoidLog(e)&&wrIsLegal(e)&&(mo<m||e.d<=ref)).forEach(e=>{const g=(GA[lab(e)]??={n:0,nt:new Set()});g.n+=(+e.qty||1);wrNT(e.result).forEach(z=>g.nt.add(z))})));
+    const srt=a=>[...a].sort((u,v)=>(parseInt(u)||0)-(parseInt(v)||0));
+    X.legalAll=Object.entries(GA).map(([k,g])=>({k,n:g.nt.size||g.n,nt:srt(g.nt)}));
+    if(mons.length>1&&X.legalAll.length)L.push(`Lũy kế từ ${fmtM(LEGAL_FROM)}: ${X.legalAll.map(g=>`${g.k} ${g.n}${g.nt.length?` (NT ${g.nt.join(', ')})`:''}`).join('; ')}.`);
     parts.push({lines:L.length?L:['Không phát sinh.']});X.legal=L;X.legalWeek=lg.length+lt.length;X.legalG=Object.entries(G).map(([k,g])=>({k,n:g.nt.size||g.n,nt:[...g.nt]}));parts.push({note:'s4'});secs.push({h:'IV. Hồ sơ pháp lý / giấy tờ',parts})}
   /* ---------- V. Kế hoạch tuần tới ---------- */
   {const parts=[];let rows=[];try{rows=rkData(m).rows}catch(_){}
@@ -2005,7 +2012,7 @@ function wdData(d){const lk=wkLock();if(lk&&lk.charts)return lk.charts;const X=d
     o.blocks=hc.G.map(([n,g])=>({n,start:g.start,hires:g.hires.length,quits:g.quits.length,cur:g.cur}));
     const by={};S.shops.filter(x=>x.type==='nt').forEach(x=>{const s=shopStaff(x.code);if(s.short>0){const a=x.area||'Khác';(by[a]??={a,gap:0,n:0});by[a].gap+=s.short;by[a].n++}});
     o.short=Object.values(by).sort((a,b)=>b.gap-a.gap||b.n-a.n).slice(0,8)}
-  o.legal=X.legalG||[];
+  o.legal=X.legalG||[];o.legalAll=X.legalAll||[];
   if(rc){o.rec={real:rc.tot.real,tgt:rc.tot.tgt,exp:rc.exp,w:rc.tot.w}}
   o.kpi=wrKpis(X.m).map(k=>({n:k.n,pct:k.pct,grade:k.grade}));
   o.nv90=wrNv90D();
@@ -2050,15 +2057,16 @@ function wdHtml(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
     ${card(sec('b1'))}
     ${C.rec?card(sec('b2'),wdHero(C.rec)):card(sec('b2'))}
   </div>
-  <div class="wd-grid">${card(sec('b3'))}<section class="wd-card"><h3><i>4</i>${esc(sec('b4').h)}${sec('b4').sk?` <span class="wb-pill ${wbSt(sec('b4'))}">${WB_ST[wbSt(sec('b4'))][0]}</span>`:''}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[])}</section></div>
+  <div class="wd-grid">${card(sec('b3'))}<section class="wd-card"><h3><i>4</i>${esc(sec('b4').h)}${sec('b4').sk?` <span class="wb-pill ${wbSt(sec('b4'))}">${WB_ST[wbSt(sec('b4'))][0]}</span>`:''}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[],C.legalAll||[])}</section></div>
   <div class="wd-grid wd-1">${card(sec('b5'))}</div>
   ${wrNote('adv')?`<section class="wd-card wd-adv"><h3><i>!</i>Đề xuất – kiến nghị</h3><ul>${wrNote('adv').split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean).map(l=>`<li>${esc(l)}</li>`).join('')}</ul></section>`:''}
   <footer class="wd-foot">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} (gồm học việc sheet TTS) · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS${lk?' · bản đã chốt':''}</footer>`}
 /* Hồ sơ pháp lý dạng tick xanh: việc trong tuần + lũy kế tháng theo từng nhà thuốc */
-function wdLegalHtml(lines,groups){const items=lines.filter(l=>!/^Lũy kế tháng|^Trong tuần chưa ghi nhận/.test(l));
+function wdLegalHtml(lines,groups,all){const items=lines.filter(l=>!/^Lũy kế tháng|^Lũy kế từ|^Trong tuần chưa ghi nhận/.test(l));
   const tick=(l)=>`<li><span class="tk">✓</span><span>${esc(l)}</span></li>`;
   let h=`<ul class="wd-ticks">${items.length?items.map(l=>/^Không phát sinh/.test(l)?tick('Không phát sinh hồ sơ mới trong tuần',false):tick(l.replace(/\s*–\s*đang thực hiện/,' (đang thực hiện)'),/đang thực hiện/.test(l))).join(''):tick('Trong tuần không phát sinh hồ sơ mới',false)}</ul>`;
   if(groups.length)h+=`<div class="wd-lg"><p>Đã hoàn thành trong tháng</p>${groups.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.k)} <em>${g.n} hồ sơ</em></b>${g.nt.length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
+  if(all&&all.length&&all.some(a=>!groups.find(g=>g.k===a.k&&g.n===a.n)))h+=`<div class="wd-lg"><p>Lũy kế nhà mới từ ${fmtM(LEGAL_FROM)}</p>${all.map(g=>`<div class="wd-lgr"><b><span class="tk">✓</span>${esc(g.k)} <em>${g.n} ${g.nt.length?'nhà':'hồ sơ'}</em></b>${g.nt.length?`<div class="wd-chips">${g.nt.map(n=>`<span>✓ NT ${esc(n)}</span>`).join('')}</div>`:''}</div>`).join('')}</div>`;
   return h}
 const WD_TICK_CSS=`.wd-ticks{list-style:none;margin:0;padding:0}.wd-ticks li{display:flex;gap:6px;align-items:flex-start;margin:2px 0;line-height:1.4;font-size:8.8pt}.wd-ticks .tk,.wd-lgr .tk{flex:none;width:14px;height:14px;border-radius:50%;background:#1f8a4c;color:#fff;font-size:8px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}.wd-ticks li.open .tk{background:#c98500}
 .wd-lg{margin-top:6px;border-top:1px dashed #d9e2dc;padding-top:5px}.wd-lg p{margin:0 0 3px;font-size:7.5pt;color:#52514e;text-transform:uppercase;letter-spacing:.04em}.wd-lgr{margin:4px 0}.wd-lgr b{display:flex;gap:6px;align-items:center;font-size:8.8pt}.wd-lgr em{font-style:normal;font-weight:400;color:#52514e}
@@ -2799,7 +2807,7 @@ wdHtml=function(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||
   <div class="tl2">${B.tiles.map(([k,v,s,c])=>`<div class="${c}"><i>${WD2_TILE(k)}</i><div><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div></div>`).join('')}</div>
   <div class="g2">${card('b1',wd2Flow(C.flow)+wd2Short(C.short))}${C.rec?card('b2',wd2Hero(C.rec)):card('b2')}</div>
   ${C.nv90||(C.kpi&&C.kpi.length)?`<div class="g2">${wd2Nv(C.nv90)}${wd2Kpi(C.kpi)}</div>`:''}
-  <div class="g2">${card('b3')}<section class="c2" style="--ac:${WD2_SEC.b4[0]}"><h3><i>${WD2_SEC.b4[1]}</i>${esc(sec('b4').h)}${pill(sec('b4'))}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[])}</section></div>
+  <div class="g2">${card('b3')}<section class="c2" style="--ac:${WD2_SEC.b4[0]}"><h3><i>${WD2_SEC.b4[1]}</i>${esc(sec('b4').h)}${pill(sec('b4'))}</h3>${wdLegalHtml(wbLines(sec('b4')),C.legal||[],C.legalAll||[])}</section></div>
   <section class="c2 plan" style="--ac:${pc}"><h3><i>${pi}</i>${esc(plan.h)}</h3><ol>${wbLines(plan).map(l=>`<li><span>${wd2Num(l)}</span></li>`).join('')}</ol></section>
   <div class="g2 g2n">${wd2Note('iss','iss','⚠️','Vấn đề gặp phải','khó khăn, vướng mắc trong tuần')}${wd2Note('adv','adv','📣','Đề xuất – kiến nghị','cần lãnh đạo cho ý kiến')}</div>
   <footer class="ft2">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} (gồm học việc sheet TTS) · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · nhật ký công việc phòng HCNS${lk?' · bản đã chốt':''}</footer>`};
