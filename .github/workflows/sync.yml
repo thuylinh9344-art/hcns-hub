@@ -1,0 +1,33 @@
+name: Đồng bộ 3 link vào web HCNS
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: hcns-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Đọc Theo dõi nhà mới · Data nhân sự 2026 · Hồ sơ tuyển dụng và ghi vào web
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_LINH_HR }}
+          CHROME: /usr/bin/google-chrome
+        run: |
+          echo "$SA" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          cd tools/sync
+          npm i --no-save --silent --no-audit --no-fund playwright-core@1.47.2 google-auth-library@9 >/dev/null 2>&1
+          set +e
+          node run.mjs
+          code=$?
+          rm -f "$RUNNER_TEMP/sa.json"
+          exit $code
