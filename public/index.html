@@ -799,6 +799,8 @@ async function refreshSys(silent){if(!S.mcp||S.sysBusy)return;S.sysBusy=true;if(
     let tts=[];try{const a=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:SHEET_ID,range:"'TTS'!A3:T"},{cache:false});const b=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:SHEET_ID,range:"'TTS'!BI3:BI"},{cache:false});const A=(a.payload&&a.payload.values)||[],B=(b.payload&&b.payload.values)||[];const have=new Set(rows.map(x=>x[0]));
       A.forEach((x,i)=>{const g=j=>String(x[j]??'').trim();if(!g(1)||have.has(g(1)))return;const q=parseDsnsDate(g(18));if(g(17)==='Nghỉ việc'&&q&&q<cut)return;const sh=sysShop((B[i]||[])[0],g(6));tts.push([g(1),g(2),g(4),sh?'':g(6),g(9),g(10).replace(/^hệ thống (kênh )?(bán lẻ|BL) /i,'BL '),parseDsnsDate(g(11))||parseDsnsDate(g(15)),'',g(17),q,'','','',sh,'',g(7)])})}catch(_){}
     body.ttsJson=JSON.stringify(tts);
+    const _old=S.sys||{};const _same=(_old.rowsJson?_old.rowsJson===body.rowsJson:JSON.stringify(_old.rows||[])===JSON.stringify(body.rows||[]))&&(_old.ttsJson||'[]')===body.ttsJson;S.sysReadAt=Date.now();
+    if(silent&&_same)return;
     await write('sys/dsns',body);let sm=tts.length?` · ${tts.length} học việc (sheet TTS)`:'';try{const r=await syncShops();if(r)sm+=` · nhà thuốc: ${r.hv} nhà HV, thêm ${r.add} nhà, gán phụ trách ${r.own} nhà`}catch(_){sm+=' · chưa đọc được sheet Theo dõi nhà mới'}if(!silent)toast('Đã cập nhật '+rows.length+' nhân sự từ DSNS U'+sm);
   }catch(e){const c=e&&e.code;if(silent)return;
     toast(c==='server_not_connected'?'Chưa kết nối Google Sheets: thêm trong claude.ai Settings → Connectors':c==='needs_reauth'?'Cần kết nối lại Google Sheets trong claude.ai Settings → Connectors':c==='not_in_manifest'||c==='approval_required'?'Bạn chưa cho phép trang đọc Google Sheets':c==='selection_required'?'Hãy chọn tài khoản Google Sheets trong hộp thoại của claude.ai':c==='tool_error'?'Google Sheets báo lỗi: có thể bạn chưa có quyền xem file Data HCNS':c==='server_unavailable'?'Google Sheets đang không phản hồi, thử lại sau ít phút':'Chưa cập nhật được dữ liệu, thử lại sau')}
@@ -1105,7 +1107,8 @@ async function refreshRec(silent){
       if(!cs.length)return;cs.sort((a,b)=>b.sub.localeCompare(a.sub));cs[0].start=r.start;cs[0].quit=r.quit||'';matched++});
     const rows=cv.map(c=>[c.code,idx(pos,c.p),idx(areas,c.ar),d2n(c.sub),idx(sts,c.st),d2n(c.v1),d2n(c.v2),c.o==='x'?-2:c.o?idx(own,c.o):-1,c.src,d2n(c.start),d2n(c.quit),d2n(c.ac),c.lc?idx(locs,c.lc):-1]);
     const body={source:'Dữ liệu CV trên member · sheet '+REC_TAB,updatedAt:new Date().toISOString(),from,pos,areas,sts,own,locs,matched,dsnsAt:S.sys.updatedAt||'',rowsJson:JSON.stringify(rows)};
-    await write('rec/cv',body);if(!silent)toast(`Đã cập nhật ${nf(rows.length)} hồ sơ, ${nf(matched)} người đi làm thực tế`);
+    const _same=S.rec&&S.rec.rowsJson===body.rowsJson&&JSON.stringify(S.rec.sts||[])===JSON.stringify(sts)&&JSON.stringify(S.rec.own||[])===JSON.stringify(own);S.recReadAt=Date.now();
+    if(!_same||!silent)await write('rec/cv',body);if(!silent)toast(`Đã cập nhật ${nf(rows.length)} hồ sơ, ${nf(matched)} người đi làm thực tế`);
   }catch(e){if(!silent){const c=e&&e.code;
     toast(c==='server_not_connected'?'Chưa kết nối Google Sheets: thêm trong claude.ai Settings → Connectors':c==='needs_reauth'?'Cần đăng nhập lại Google để đọc sheet hồ sơ':c==='not_in_manifest'||c==='approval_required'?'Bạn chưa cho phép trang đọc Google Sheets':c==='selection_required'?'Hãy chọn tài khoản Google Sheets trong hộp thoại':c==='tool_error'?'Google Sheets báo lỗi: có thể bạn chưa có quyền xem file Dữ liệu CV trên member':'Chưa cập nhật được hồ sơ, thử lại sau')}}
   finally{S.recBusy=false;render()}
@@ -2300,14 +2303,15 @@ async function dcSync(silent){if(!S.mcp||S.dcSyncBusy)return;if(!S.dcLoaded){if(
       await write('dcshop/'+code,nx);cur?upd++:add++}
     S.dcSyncAt=now;S.dcLast=Date.now();
     try{await refreshRec(true)}catch(_){}
-    try{const su=S.sys&&S.sys.updatedAt;if(!silent||!su||Date.now()-new Date(su)>25*60e3){await refreshSys(true);await new Promise(r=>setTimeout(r,1500))}}catch(_){}
+    try{await refreshSys(true);await new Promise(r=>setTimeout(r,1200))}catch(_){}
     const done=await dcAutoMoves();if(done&&!silent)toast(`${done} người đã có tên tại nhà mới trong Data nhân sự 2026 → chuyển “Đã đi làm”`);
     if(!silent||add||opened)toast(`Đã đồng bộ sheet Theo dõi nhà mới: thêm ${add} nhà, cập nhật ${upd}, ${opened} nhà đã chuyển Mở bán · đã tải lại Data nhân sự 2026 và hồ sơ tuyển dụng`);
   }catch(e){if(!silent)toast('Không đọc được sheet Theo dõi nhà mới: '+(e&&e.message||e))}finally{S.dcSyncBusy=false;if(S.view==='dieu-chuyen')render()}}
 /* Người trong phương án đã có tên tại nhà mới trên DSNS U (bộ phận = nhà mới) → tự chuyển "Đã đi làm" */
 async function dcAutoMoves(){let n=0;for(const [id,m] of Object.entries(S.dcMoves)){if(!m.code||!m.to||m.st==='da-di'||m.st==='huy')continue;const p=dcPerson(m.code);if(p&&p.shop===m.to&&sysActive(p)){await write('dcmove/'+id,{...m,st:'da-di',date:m.date||TODAY,autoAt:new Date().toISOString(),note:(m.note?m.note+' · ':'')+'Tự cập nhật theo DSNS'});n++}}return n}
 /* Tự cập nhật 3 nguồn (Theo dõi nhà mới, Hồ sơ tuyển dụng, Data nhân sự 2026) khi mở web và mỗi 30 phút khi trang đang mở */
-setInterval(()=>{if(document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.role!=='staff'&&S.dcLoaded&&!S.dcSyncBusy&&(!S.dcLast||Date.now()-S.dcLast>30*60e3))dcSync(true)},20e3);
+const DC_EVERY=5*60e3;const dcTick=(gap)=>{if(document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.role!=='staff'&&S.dcLoaded&&!S.dcSyncBusy&&(!S.dcLast||Date.now()-S.dcLast>gap))dcSync(true)};
+setInterval(()=>dcTick(DC_EVERY),15e3);document.addEventListener('visibilitychange',()=>dcTick(60e3));window.addEventListener('focus',()=>dcTick(60e3));
 /* Biểu đồ tròn (donut) SVG cho mức trám nhân sự */
 function dcDonut(title,parts,big,sub,unit){const tot=parts.reduce((a,p)=>a+(+p[0]||0),0);const r=42,c=2*Math.PI*r;let off=0;
   const segs=tot?parts.filter(p=>p[0]>0).map(p=>{const len=p[0]/tot*c;const s=`<circle r="${r}" cx="60" cy="60" fill="none" stroke="${p[1]}" stroke-width="18" stroke-dasharray="${len} ${c-len}" stroke-dashoffset="${-off}" transform="rotate(-90 60 60)"><title>${esc(p[2])}: ${p[0]} ${unit}</title></circle>`;off+=len;return s}).join(''):'';
@@ -2318,7 +2322,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
   const view=L.filter(s=>(!f.prov||s.prov===f.prov)&&(!f.mgr||s.mgr===f.mgr)&&(!f.st||f.st==='open'||f.st==='removed'||(f.st==='done'?s.done:f.st==='notdone'?!s.done:f.st==='thieu'?s.left>0:f.st==='du'?s.left===0:s.mv.some(m=>m.st===f.st))));
   const opt=(arr,cur)=>arr.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('');
   const tools=(S.mcp&&S.canWrite?`<button class="btn pri" data-act="dc-sync" ${S.dcSyncBusy?'disabled':''}>${S.dcSyncBusy?'Đang cập nhật…':'Cập nhật ngay (nhà mới · DSNS · tuyển dụng)'}</button>`:'')+(S.canWrite?`<button class="btn" data-act="dc-add-shop">+ Thêm nhà mới</button>${!L.length?`<label class="btn">Nhập phương án (.json)<input type="file" id="dcImport" accept=".json" hidden></label>`:''}`:'')+(S.dl?`<button class="btn" data-act="dc-csv">Xuất Excel (CSV)</button>`:'')+`<button class="btn" data-act="dc-copy">Sao chép tóm tắt</button>`;
-  let h=head('Điều chuyển nhân sự nhà mới',`Tự cập nhật mỗi 30 phút từ 3 nguồn: Theo dõi nhà mới (nhà Chưa mở bán)${S.dcSyncAt?' · đồng bộ lúc '+new Date(S.dcSyncAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):''} · Data nhân sự 2026${S.sys&&S.sys.updatedAt?' ('+new Date(S.sys.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · Hồ sơ tuyển dụng${S.rec&&S.rec.updatedAt?' ('+new Date(S.rec.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · sửa trực tiếp, lưu ngay cho cả phòng`,tools);
+  let h=head('Điều chuyển nhân sự nhà mới',`Tự đọc lại 3 link mỗi 5 phút (và mỗi khi quay lại tab web): Theo dõi nhà mới (nhà Chưa mở bán)${S.dcSyncAt?' · đọc lần gần nhất lúc '+new Date(S.dcSyncAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):''} · Data nhân sự 2026${S.sys&&S.sys.updatedAt?' ('+new Date(S.sys.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · Hồ sơ tuyển dụng${S.rec&&S.rec.updatedAt?' ('+new Date(S.rec.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · sửa trực tiếp, lưu ngay cho cả phòng`,tools);
   h+=`<div class="panel dc-cov"><div class="dc-cov-h"><b>Mức trám nhân sự nhà mới</b> <span class="note">tính cả nhân sự thực tế (đang làm / đã nhận việc chờ mở) và người điều động chưa hủy · mục tiêu Q4: 80%</span></div>
     <div class="dc-cov-g">
       ${dcDonut('Theo nhà',[[T.fullReal,'#1f8a4c','Đủ bằng nhân sự thực tế'],[T.fullMv,'#7cc39a','Đủ nhờ điều động'],[T.missShops,'#e5a33a','Chưa đủ']],T.shopCov+'%',`${T.full}/${T.needShops} nhà`,'nhà')}
