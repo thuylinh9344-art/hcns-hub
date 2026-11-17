@@ -2187,7 +2187,7 @@ const dcNT=c=>String(c||'').replace(/^SHOP0*/,'NT ');
 const dcLive=mv=>mv.st!=='huy';
 const dcKey=c=>String(c||'').toUpperCase().replace(/^SHOP|^NT\s*/,'').replace(/^0+/,'');
 const dcAt=id=>sysRows().filter(r=>r.shop===id&&sysOn(r)&&r.status!=='Báo nghỉ việc');
-function dcCalc(){const shops=Object.entries(S.dcShops).map(([id,x])=>({id,...x})).filter(s=>S.dcF.st==='open'?s.sheetSt==='Mở bán':s.sheetSt!=='Mở bán');const moves=Object.entries(S.dcMoves).map(([id,x])=>({id,...x}));
+function dcCalc(){const shops=Object.entries(S.dcShops).map(([id,x])=>({id,...x})).filter(s=>S.dcF.st==='removed'?!!s.removed:!s.removed&&(S.dcF.st==='open'?s.sheetSt==='Mở bán':s.sheetSt!=='Mở bán'));const moves=Object.entries(S.dcMoves).map(([id,x])=>({id,...x}));
   const L=shops.map(s=>{const mv=moves.filter(m=>m.to===s.id).sort((a,b)=>(a.order||0)-(b.order||0));const live=mv.filter(dcLive).length;const mvc=new Set(mv.filter(dcLive).map(m=>String(m.code||'').toUpperCase()));const res=dcReserved(s.id).filter(r=>!mvc.has(String(r.code).toUpperCase()));const resN=res.filter(r=>!isCHT(r.pos)).length;const at=dcAt(s.id).filter(r=>!mvc.has(String(r.code).toUpperCase())&&!res.some(x=>x.code===r.code));const atN=at.filter(r=>!isCHT(r.pos)&&!/học việc/i.test(r.status||'')).length;const need=+s.need||0,have=Math.max(+s.have||0,resN+atN);const left=Math.max(0,need-have-live);
     const st=left===0?(!live?(res.length?'Đủ người – đã nhận việc chờ mở':'Đã đủ người'):mv.filter(dcLive).every(m=>m.st==='da-di')?'Đã đủ người':'Đủ nếu điều chuyển'):live?`Thiếu ${left}, tuyển thêm`:`Chưa có nguồn, tuyển ${left}`;
     return {...s,mv,live,left,res,resN,at,atN,haveEff:have,status:st}}).sort((a,b)=>(a.order??999)-(b.order??999)||String(a.id).localeCompare(String(b.id)));
@@ -2253,7 +2253,7 @@ async function dcSync(silent){if(!S.mcp||S.dcSyncBusy)return;if(!S.dcLoaded){if(
       const g=j=>String(r[j]??'').trim();const addr=g(1),prov=dcProvFix(g(2)),mgr=g(3),hd=g(4),dk=g(5),st=g(6),open=parseDsnsDate(g(7)),gc=g(8);
       const cur=S.dcShops[code];const isOpen=/^mở bán$/i.test(st);const pending=!isOpen&&(/chưa mở/i.test(st)||(!st&&!!addr));
       if(isOpen){if(cur&&cur.sheetSt!=='Mở bán'){await write('dcshop/'+code,{...cur,sheetSt:'Mở bán',sheetOpen:open||cur.sheetOpen||'',syncAt:now});opened++}continue}
-      if(!pending)continue;
+      if(!pending||(cur&&cur.removed))continue;
       const base=cur||{need:2,have:0,note:'',order:+(code.replace(/\D/g,''))||999,createdAt:now};
       const nx={...base,sheetSt:st||'Chưa mở bán',hd,dk,sheetNote:gc,syncAt:now};
       if(prov&&(!base.prov||base.prov===base.sheetProv))nx.prov=prov;nx.sheetProv=prov;
@@ -2274,7 +2274,7 @@ async function dcAutoMoves(){let n=0;for(const [id,m] of Object.entries(S.dcMove
 setInterval(()=>{if(document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.role!=='staff'&&S.dcLoaded&&!S.dcSyncBusy&&(!S.dcLast||Date.now()-S.dcLast>30*60e3))dcSync(true)},20e3);
 function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeout(()=>dcSync(true),200)}const {L,T}=dcCalc();const f=S.dcF;const dis=S.canWrite?'':'disabled';
   const provs=[...new Set(L.map(s=>s.prov).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')),mgrs=[...new Set(L.map(s=>s.mgr).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
-  const view=L.filter(s=>(!f.prov||s.prov===f.prov)&&(!f.mgr||s.mgr===f.mgr)&&(!f.st||f.st==='open'||(f.st==='thieu'?s.left>0:f.st==='du'?s.left===0:s.mv.some(m=>m.st===f.st))));
+  const view=L.filter(s=>(!f.prov||s.prov===f.prov)&&(!f.mgr||s.mgr===f.mgr)&&(!f.st||f.st==='open'||f.st==='removed'||(f.st==='thieu'?s.left>0:f.st==='du'?s.left===0:s.mv.some(m=>m.st===f.st))));
   const opt=(arr,cur)=>arr.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('');
   const tools=(S.mcp&&S.canWrite?`<button class="btn pri" data-act="dc-sync" ${S.dcSyncBusy?'disabled':''}>${S.dcSyncBusy?'Đang cập nhật…':'Cập nhật ngay (nhà mới · DSNS · tuyển dụng)'}</button>`:'')+(S.canWrite?`<button class="btn" data-act="dc-add-shop">+ Thêm nhà mới</button>${!L.length?`<label class="btn">Nhập phương án (.json)<input type="file" id="dcImport" accept=".json" hidden></label>`:''}`:'')+(S.dl?`<button class="btn" data-act="dc-csv">Xuất Excel (CSV)</button>`:'')+`<button class="btn" data-act="dc-copy">Sao chép tóm tắt</button>`;
   let h=head('Điều chuyển nhân sự nhà mới',`Tự cập nhật mỗi 30 phút từ 3 nguồn: Theo dõi nhà mới (nhà Chưa mở bán)${S.dcSyncAt?' · đồng bộ lúc '+new Date(S.dcSyncAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):''} · Data nhân sự 2026${S.sys&&S.sys.updatedAt?' ('+new Date(S.sys.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · Hồ sơ tuyển dụng${S.rec&&S.rec.updatedAt?' ('+new Date(S.rec.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · sửa trực tiếp, lưu ngay cho cả phòng`,tools);
@@ -2289,7 +2289,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
     <li>Nhà chưa có CHT nhưng có từ 3 chính thức: giữ đủ 3 chính thức (mầm CHT), ưu tiên điều người thử việc.</li>
     <li>Người đi hưởng chính sách điều động; chỉ tiêu số lượng/chất lượng nhân sự trong KPI tháng và Thưởng chất lượng nhân sự quý của CHT, QLC2, QLC3 tính cả người đã điều. QLKV xác nhận khoảng cách trước khi ra quyết định.</li></ul></details>
   <div class="row" style="flex-wrap:wrap;gap:8px;margin:12px 0"><select id="dcProv"><option value="">Tất cả tỉnh</option>${opt(provs.map(p=>[p,p]),f.prov)}</select><select id="dcMgr"><option value="">Tất cả QLKV</option>${opt(mgrs.map(p=>[p,p]),f.mgr)}</select>
-    <select id="dcSt"><option value="">Mọi tình trạng</option>${opt([['thieu','Nhà còn thiếu người'],['du','Nhà đủ nếu điều chuyển'],...DC_ST.map(([k,l])=>[k,'Có người: '+l]),['open','Nhà đã chuyển Mở bán (theo sheet)']],f.st)}</select><span class="note">${view.length}/${L.length} nhà</span></div>`;
+    <select id="dcSt"><option value="">Mọi tình trạng</option>${opt([['thieu','Nhà còn thiếu người'],['du','Nhà đủ nếu điều chuyển'],...DC_ST.map(([k,l])=>[k,'Có người: '+l]),['open','Nhà đã chuyển Mở bán (theo sheet)'],['removed','Nhà đã xóa (khôi phục được)']],f.st)}</select><span class="note">${view.length}/${L.length} nhà</span></div>`;
   if(!L.length)return h+`<div class="empty">Chưa có phương án. ${S.canWrite?'Bấm “+ Thêm nhà mới” hoặc nhập file phương án (.json).':''}</div>`;
   h+=view.map(s=>{const open=S.dcOpen[s.id]!==false;const sur=dcSurplus(s.prov).slice(0,6);
     return `<div class="panel dc-shop ${s.left?'dc-miss':''}">
@@ -2316,7 +2316,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
       <td><input class="dc-in" style="min-width:160px" data-dcm="${m.id}" data-k="note" value="${esc(m.note||'')}" ${dis}></td>
       <td>${S.canWrite?`<button class="btn ghost sm" data-act="dc-del-move" data-id="${m.id}" title="Xóa dòng">✕</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="9" class="note">Chưa có người đề xuất điều.</td></tr>`}
     </tbody></table></div>
-    <div class="row mt" style="flex-wrap:wrap;gap:8px">${S.canWrite?`<button class="btn sm" data-act="dc-add-move" data-id="${esc(s.id)}">+ Thêm người điều</button><button class="btn ghost sm" data-act="dc-del-shop" data-id="${esc(s.id)}">Xóa nhà này</button>`:''}
+    <div class="row mt" style="flex-wrap:wrap;gap:8px">${S.canWrite?`<button class="btn sm" data-act="dc-add-move" data-id="${esc(s.id)}">+ Thêm người điều</button>${s.removed?`<button class="btn pri sm" data-act="dc-restore" data-id="${esc(s.id)}">Khôi phục nhà này</button>`:`<button class="btn ghost sm" data-act="dc-del-shop" data-id="${esc(s.id)}">Xóa nhà này</button>`}`:''}
       <span class="note">Nhà dư người cùng tỉnh: ${sur.length?sur.map(o=>`${dcNT(o.code)} (+${o.can})`).join(', '):'không có – cân nhắc tuyển mới hoặc PA B từ tỉnh lân cận'}</span></div>`:''}</div>`}).join('');
   return h}
 function dcText(){const {L,T}=dcCalc();return `PHƯƠNG ÁN ĐIỀU CHUYỂN NHÂN SỰ NHÀ MỚI – ${fmtDY(TODAY)}\n${T.shops} nhà sắp mở cần ${T.need} NVBH: có nguồn điều ${T.live} người (PA A ${T.A}, PA B ${T.B}), còn phải tuyển ${T.left}.\n`+
@@ -2336,7 +2336,8 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-
   else if(a==='dc-sync'){dcSync(false)}
   else if(a==='dc-add-move'){const n=Object.values(S.dcMoves).filter(m=>m.to===id).length;write('dcmove/'+newId('dcmove'),{to:id,from:'',code:'',pa:'?',km:'',st:'de-xuat',date:'',note:'',order:n+1,createdAt:new Date().toISOString()})}
   else if(a==='dc-del-move'){if(confirmDel(el))del('dcmove/'+id)}
-  else if(a==='dc-del-shop'){if(confirmDel(el)){Object.entries(S.dcMoves).filter(([,m])=>m.to===id).forEach(([mid])=>del('dcmove/'+mid));del('dcshop/'+id)}}
+  else if(a==='dc-del-shop'){if(confirmDel(el)){dcSaveShop(id,{removed:true,removedAt:new Date().toISOString()});toast(dcNT(id)+' đã chuyển vào mục “Nhà đã xóa” – chọn bộ lọc đó để khôi phục')}}
+  else if(a==='dc-restore'){dcSaveShop(id,{removed:false,removedAt:''});toast('Đã khôi phục '+dcNT(id))}
   else if(a==='dc-add-shop'){const raw=(document.getElementById('dcNew')||{}).value;S.dcAdding=true;openDlg('Thêm nhà thuốc sắp mở',`<div class="form"><label class="full">Mã nhà thuốc (vd 196 hoặc SHOP0196)<input id="dcNewCode" placeholder="196"></label><label>Tỉnh<input id="dcNewProv"></label><label>QLKV<input id="dcNewMgr"></label></div>`,`<button type="button" class="btn pri" data-act="dc-new-ok">Thêm</button>`)}
   else if(a==='dc-new-ok'){let c=String((document.getElementById('dcNewCode')||{}).value||'').trim().toUpperCase();if(!c){toast('Nhập mã nhà thuốc');return}if(/^\d+[A-Z]?$/.test(c))c='SHOP'+c.padStart(4,'0');
     const x=S.shops.find(s=>s.code===c)||{};dcSaveShop(c,{prov:(document.getElementById('dcNewProv')||{}).value||x.area||'',mgr:(document.getElementById('dcNewMgr')||{}).value||x.mgr||'',addr:'',need:2,have:0,open:x.open||'',note:'',order:Object.keys(S.dcShops).length+1});closeDlg()}
