@@ -12,6 +12,7 @@
 .dc-cov{margin-bottom:12px}.dc-cov-h{margin-bottom:10px}.dc-cov-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dc-cov-g>div{background:var(--bg2,#f6f8f5);border-radius:10px;padding:10px 12px}.dc-cov-g .k{font-size:12px;color:var(--mut,#667);text-transform:uppercase;letter-spacing:.03em}.dc-cov-g .v{font-size:26px;font-weight:700;margin:2px 0}.dc-cov-g .v .u{font-size:13px;font-weight:500;color:var(--mut,#667)}.dc-cov-g .v.ok{color:#1f8a4c}.dc-cov-g .v.warn{color:#c47a12}.dc-cov-g .v.bad{color:#c0392b}.dc-cov-g .s{font-size:12px;color:var(--mut,#667)}.dc-cov-g .bar{position:relative;height:6px;background:#e3e8e1;border-radius:3px;margin:4px 0}.dc-cov-g .bar i{position:absolute;left:0;top:0;bottom:0;background:#1f8a4c;border-radius:3px}.dc-cov-g .bar b{position:absolute;top:-3px;width:2px;height:12px;background:#333}@media(max-width:760px){.dc-cov-g{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .dc-done{display:inline-flex;align-items:center;gap:3px;background:#1f8a4c;color:#fff;font-weight:700;font-size:12px;border-radius:999px;padding:2px 9px;margin-left:6px}.dc-done.sm{font-size:11px;padding:1px 7px;margin-left:0}
 .dc-cov-g{grid-template-columns:1.2fr 1.2fr 1fr!important}.dc-donut .k{font-size:12px;color:var(--mut,#667);text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}.dc-dn-b{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.dc-dn-b ul{list-style:none;margin:0;padding:0;font-size:13px}.dc-dn-b li{display:flex;align-items:center;gap:6px;margin:3px 0}.dc-dn-b li i{width:10px;height:10px;border-radius:2px;display:inline-block}.dc-cov-sum{display:flex;flex-direction:column;justify-content:center;gap:8px;font-size:14px}.dc-cov-sum .bad{color:#c0392b}@media(max-width:900px){.dc-cov-g{grid-template-columns:1fr!important}}
+.dc-reg{margin-bottom:12px}.dc-reg .dc-sh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer}.dc-reg-t td,.dc-reg-t th{white-space:nowrap;font-size:12.5px}.dc-reg-t td.mini{white-space:normal;min-width:220px}
 </style>
 <style>
 /* Layout: thanh điều hướng trái (cuộn ngang trên điện thoại) + vùng làm việc; thẻ chỉ dùng cho khối cần tách biệt */
@@ -2173,7 +2174,7 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-act="sf-clear"]
 S.dcShops={};S.dcMoves={};S.dcF={prov:'',mgr:'',st:'',q:''};S.dcOpen={};S.dcSub=false;
 (function dcSub(){const go=()=>{if(S.dcSub||!S.db||S.role==='staff')return;S.dcSub=true;
   S.db.collection('dcshop').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcShops=o;const _f=!S.dcLoaded;S.dcLoaded=true;if(_f)setTimeout(dcFixRestore,300);if(S.view==='dieu-chuyen'&&!(document.activeElement&&(document.activeElement.type==='date'||document.activeElement.dataset.date)&&document.activeElement.closest('.dc-shop')))render()},()=>{});
-  S.db.collection('dcmove').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcMoves=o;if(S.view==='dieu-chuyen')render()},()=>{})};
+  S.db.collection('dcmove').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcMoves=o;if(!S.dcMvLoaded){S.dcMvLoaded=true;setTimeout(dcSeedReg,600)}if(S.view==='dieu-chuyen')render()},()=>{})};
   const t=setInterval(()=>{if(S.db){go();clearInterval(t)}},400)})();
 const DC_ST=[['de-xuat','Đề xuất'],['qlkv-ok','QLKV đồng ý'],['da-qd','Đã ra quyết định'],['da-di','Đã đi làm'],['huy','Hủy / thay người']];
 const DC_PA=[['A','A · < 20 km'],['B','B · ≥ 20 km'],['?','Chưa rõ']];
@@ -2256,7 +2257,29 @@ const dcDateInp=(attr,v,dis,w)=>`<span class="dc-dt"${w?` style="width:${w}"`:''
 /* Khôi phục nhà bị xóa nhầm (17/11/2026: NT 182) – chạy 1 lần, không khôi phục lại nếu sau này xóa có chủ đích */
 const DC_FIX={SHOP0182:{prov:'Bắc Ninh',mgr:'Lưu Hồng Thịnh',addr:'Thôn Đông Thịnh, xã Bảo Đài, TP Bắc Ninh',sheetProv:'Bắc Ninh',sheetMgr:'Lưu Hồng Thịnh',sheetAddr:'Thôn Đông Thịnh, xã Bảo Đài, TP Bắc Ninh',sheetSt:'Chưa mở bán',hd:'Xong',dk:'Xong',need:2,have:0,note:'',order:182}};
 async function dcFixRestore(){if(!S.canWrite||S.role==='staff')return;for(const [id,d] of Object.entries(DC_FIX)){const cur=S.dcShops[id];if(cur&&cur.fix1117)continue;
-  if(!cur||cur.removed){try{await write('dcshop/'+id,{...d,...(cur||{}),removed:false,removedAt:'',fix1117:true,restoredAt:new Date().toISOString()});toast('Đã khôi phục '+dcNT(id))}catch(_){}}}}
+  if(!cur||cur.removed){try{await write('dcshop/'+id,{...d,...(cur||{}),removed:false,removedAt:'',fix1117:true,restoredAt:new Date().toISOString()});toast('Đã khôi phục '+dcNT(id))}catch(_){}}}if(S.dcMvLoaded)dcSeedReg()}
+/* Danh sách đăng ký điều động trên Member (17/11/2026) – nạp 1 lần vào phương án, sau đó sửa/cập nhật trực tiếp trên web */
+const DC_REG=[
+ {code:'UP000425',from:'NT 123',to:'SHOP0181',date:'2026-12-01',end:'2027-05-31',stay:'Có',canGo:'Đi điều động tại NT181. Các…',note:'Đăng ký trên Member · bổ sung đầy đủ ô "Tỉnh/khu vực có thể đi"'},
+ {code:'UP001082',from:'NT 52',to:'SHOP0182',date:'2026-12-01',end:'2026-05-31',stay:'Có',canGo:'Bắc Ninh – NT 182, NT 186',note:'Đăng ký trên Member · mong muốn NT 182 hoặc NT 186 (chốt 1 nhà) · ngày kết thúc ghi 31/05/2026 – kiểm tra'},
+ {code:'UP000638',from:'NT 47',to:'SHOP0186',date:'2026-12-01',end:'2027-05-31',stay:'Có',canGo:'NT 186',note:'Đăng ký trên Member · DSNS ghi bộ phận hiện tại NT 170 – đối chiếu'},
+ {code:'UP001346',from:'NT 132',to:'SHOP0191',date:'2026-11-16',end:'2027-02-16',stay:'Có',canGo:'Lâm Đồng',note:'Đăng ký trên Member'},
+ {code:'UP000891',from:'NT 117',to:'SHOP0179',date:'2026-11-25',end:'2027-02-25',stay:'Không',canGo:'Đắk Lắk',note:'Đăng ký trên Member'},
+ {code:'UP001002',from:'NT 93',to:'SHOP0190',date:'2026-12-02',end:'2027-03-02',stay:'Có',canGo:'Lâm Đồng',note:'Đăng ký trên Member'}];
+async function dcSeedReg(){if(!S.canWrite||S.role==='staff'||!S.dcLoaded)return;let n=0;
+  for(const r of DC_REG){const id='reg_'+r.code;if(S.dcMoves[id])continue;if(Object.values(S.dcMoves).some(m=>String(m.code||'').toUpperCase()===r.code&&m.to===r.to))continue;
+    const ord=Object.values(S.dcMoves).filter(m=>m.to===r.to).length+1;
+    try{await write('dcmove/'+id,{...r,pa:'B',km:'≥ 20 km',st:'de-xuat',src:'Đăng ký Member',order:ord,createdAt:new Date().toISOString()});n++}catch(_){}}
+  if(n)toast(`Đã đưa ${n} nhân sự đăng ký điều động vào phương án`)}
+const dcMonths=(a,b)=>dcDateOk(a)&&dcDateOk(b)&&b>=a?Math.round((new Date(b)-new Date(a))/864e5/30.4*10)/10:'';
+const dcPhase=m=>{const a=dcDateOk(m.date),b=dcDateOk(m.end);if(a&&b&&b<a)return ['bad','Sai ngày kết thúc'];if(m.st==='huy')return ['','Đã hủy'];if(!a)return ['','Chưa có ngày'];if(TODAY<a)return ['warn','Chờ đi'];if(!b||TODAY<=b)return ['ok','Đang điều động'];return ['','Đã kết thúc']};
+/* Bảng tổng: mọi người trong phương án (gồm danh sách đăng ký trên Member), họ tên/vị trí/bộ phận lấy trực tiếp từ Data nhân sự 2026 */
+function dcRegRows(){return Object.entries(S.dcMoves).map(([id,m])=>({id,...m})).filter(m=>m.code&&dcLive(m)&&S.dcShops[m.to]&&!S.dcShops[m.to].removed).map(m=>{const p=dcPerson(m.code)||{};const s=S.dcShops[m.to]||{};return {m,p,s,ph:dcPhase(m),mo:dcMonths(m.date,m.end)}}).sort((a,b)=>String(a.m.date||'9').localeCompare(String(b.m.date||'9'))||String(a.m.to).localeCompare(String(b.m.to)))}
+function dcRegHtml(){const L=dcRegRows();if(!L.length)return '';const open=S.dcRegOpen!==false;const stay=L.filter(x=>x.m.stay==='Có').length,on=L.filter(x=>x.ph[1]==='Đang điều động').length,wait=L.filter(x=>x.ph[1]==='Chờ đi').length,bad=L.filter(x=>x.ph[0]==='bad').length;
+  return `<div class="panel dc-reg"><div class="dc-sh" data-act="dc-reg-toggle"><b>${open?'▾':'▸'} Danh sách nhân sự đi điều động</b><span class="pill">${L.length} người</span><span class="pill ok">${on} đang điều động</span><span class="pill warn">${wait} chờ đi</span><span class="note">${stay} cần hỗ trợ lưu trú</span>${bad?`<span class="pill bad">${bad} sai ngày</span>`:''}${S.dl?`<button class="btn sm" style="margin-left:auto" data-act="dc-reg-csv">Xuất Excel (CSV)</button>`:''}</div>
+  ${open?`<div class="tbl-wrap"><table class="dc-t dc-reg-t"><thead><tr><th>#</th><th>Mã NV</th><th>Họ và tên</th><th>Vị trí</th><th>Tình trạng NV</th><th>Bộ phận hiện tại (DSNS)</th><th>Nhà đi (đăng ký)</th><th>Tỉnh hiện tại</th><th>PA</th><th>Tỉnh/khu vực có thể đi</th><th>Nhà mới đến</th><th>Tỉnh · QLKV nhà mới</th><th>Bắt đầu</th><th>Kết thúc</th><th>Số tháng</th><th>Lưu trú</th><th>Duyệt</th><th>Trạng thái</th><th>Ghi chú</th></tr></thead><tbody>
+  ${L.map((x,i)=>{const m=x.m,p=x.p,s=x.s;const cur=p.shop?dcNT(p.shop):(p.dept||'');const diff=p.shop&&m.from&&dcKey(p.shop)!==dcKey(m.from)&&p.shop!==m.to;return `<tr class="${x.ph[0]==='bad'?'dc-miss':''}"><td>${i+1}</td><td class="num">${esc(m.code)}</td><td><b>${esc(p.name||'—')}</b>${dcLearner(p)?' <span class="pill warn">Học việc</span>':''}</td><td>${esc(p.pos||'')}</td><td>${esc(p.status||'')}</td><td>${esc(cur)}${diff?' <span class="pill warn" title="Khác nhà đi khi đăng ký">≠ đăng ký</span>':''}${p.shop===m.to?' <span class="pill ok">đã có tên ở nhà mới</span>':''}</td><td>${esc(m.from||'')}</td><td>${esc(p.area||'')}</td><td>${esc(m.pa||'')}</td><td>${esc(m.canGo||'')}</td><td><b>${esc(dcNT(m.to))}</b></td><td>${esc(s.prov||'')}${s.mgr?' · '+esc(s.mgr):''}</td><td>${esc(dcDmy(m.date))}</td><td>${esc(dcDmy(m.end))}</td><td class="num">${x.mo}</td><td>${esc(m.stay||'')}</td><td>${esc((DC_ST.find(z=>z[0]===(m.st||'de-xuat'))||[])[1]||'')}</td><td><span class="pill ${x.ph[0]}">${esc(x.ph[1])}</span></td><td class="mini">${esc(m.note||'')}</td></tr>`}).join('')}
+  </tbody></table></div><div class="note mt">Họ tên, vị trí, tình trạng, bộ phận hiện tại tự cập nhật theo Data nhân sự 2026; tỉnh/QLKV nhà mới theo sheet Theo dõi nhà mới. Sửa ngày, lưu trú, nhà đến… ở bảng người điều của từng nhà bên dưới.</div>`:''}</div>`}
 const dcProvFix=p=>{let s=String(p||'').trim().replace(/\s+/g,' ');s=DC_PFIX[s.toLowerCase()]||s;return TURN_MERGE[s]||s};
 async function dcSync(silent){if(!S.mcp||S.dcSyncBusy)return;if(!S.dcLoaded){if(!silent)toast('Đang tải phương án, thử lại sau vài giây');return}S.dcSyncBusy=true;if(!silent)render();
   try{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:NT_SHEET,range:"'Theo dõi nhà mới'!C2:M"},{cache:false,silent:!!silent});const v=(res.payload&&res.payload.values)||[];
@@ -2306,6 +2329,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
     <div class="stat ok"><div class="k">Có nguồn điều chuyển</div><div class="v">${T.live}</div><div class="s">PA A ${T.A} · PA B ${T.B} · ${T.ok} đã được QLKV xác nhận</div></div>
     <div class="stat ${T.left?'bad':'ok'}"><div class="k">Còn phải tuyển</div><div class="v">${T.left}</div><div class="s">${L.filter(s=>s.left>0).length} nhà chưa đủ nguồn</div></div>
     <div class="stat"><div class="k">NVBH đã có tại nhà mới</div><div class="v">${T.have}</div><div class="s">${T.res?`${T.res} người đã nhận việc chờ mở (Bộ phận dự kiến)`:'nhập tay hoặc ghi cột Bộ phận dự kiến trong DSNS'}</div></div></div>
+  ${dcRegHtml()}
   <details class="panel dc-rule"><summary><b>Nguyên tắc điều chuyển</b> <span class="note">bấm để xem</span></summary><ul>
     <li>Nhà cũ giữ tối thiểu <b>1 CHT + 2 NVBH</b>; nhà chưa có CHT giữ <b>3 NVBH</b>. Vượt định biên thì điều đi hỗ trợ. Chỉ tính nhân sự chính thức và thử việc: <b>không xét học việc</b>, không tính người báo nghỉ, thai sản, không lương.</li>
     <li>Nhà sắp mở định biên <b>2 NVBH</b>. Ưu tiên khoảng cách: <b>PA A</b> điều chuyển nội bộ trong bán kính 20 km; <b>PA B</b> từ 20 km trở lên, áp dụng chính sách điều động.</li>
@@ -2327,7 +2351,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
       <label>Tọa độ (vĩ độ, kinh độ)<input data-dcs="${esc(s.id)}" data-k="geo" value="${esc(s.geo||'')}" placeholder="${DC_GEO[s.id]?esc(DC_GEO[s.id].join(', '))+' (mặc định)':'dán từ Google Maps'}" ${dis}></label>
       <label class="span2">Xã/phường tuyển (như cột Xã/Phường trên hồ sơ, cách nhau dấu phẩy)<input data-dcs="${esc(s.id)}" data-k="locs" value="${esc(s.locs||'')}" placeholder="để trống = tự nhận theo địa chỉ" ${dis}></label>
       <label class="full">Ghi chú<input data-dcs="${esc(s.id)}" data-k="note" value="${esc(s.note||'')}" ${dis}></label>${dcResHtml(s)}${dcCandHtml(s)}</div>
-    <div class="tbl-wrap"><table class="dc-t"><thead><tr><th>Nhà đi</th><th>Mã NV</th><th>Họ tên (DSNS)</th><th>PA</th><th>Khoảng cách</th><th>Tình trạng</th><th>Ngày đi</th><th>Ghi chú</th><th></th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="dc-t"><thead><tr><th>Nhà đi</th><th>Mã NV</th><th>Họ tên (DSNS)</th><th>PA</th><th>Khoảng cách</th><th>Tình trạng</th><th>Ngày đi</th><th>Ngày kết thúc</th><th>Lưu trú</th><th>Tỉnh/khu vực có thể đi</th><th>Ghi chú</th><th></th></tr></thead><tbody>
     ${s.mv.map(m=>{const p=dcPerson(m.code);return `<tr class="${m.st==='huy'?'dc-off':''}">
       <td><input class="dc-in" style="width:72px" data-dcm="${m.id}" data-k="from" value="${esc(m.from||'')}" ${dis}></td>
       <td><input class="dc-in num" style="width:92px" data-dcm="${m.id}" data-k="code" value="${esc(m.code||'')}" ${dis}></td>
@@ -2336,8 +2360,11 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
       <td><input class="dc-in" style="width:84px" data-dcm="${m.id}" data-k="km" value="${esc(m.km||'')}" placeholder="vd ~5 km" ${dis}></td>
       <td><select data-dcm="${m.id}" data-k="st" class="dc-st ${m.st||'de-xuat'}" ${dis}>${opt(DC_ST,m.st||'de-xuat')}</select></td>
       <td>${dcDateInp(`data-dcm="${m.id}" data-k="date"`,m.date,dis,'150px')}</td>
+      <td>${dcDateInp(`data-dcm="${m.id}" data-k="end"`,m.end,dis,'150px')}</td>
+      <td><select data-dcm="${m.id}" data-k="stay" ${dis}>${opt([['','—'],['Có','Có'],['Không','Không']],m.stay||'')}</select></td>
+      <td><input class="dc-in" style="min-width:140px" data-dcm="${m.id}" data-k="canGo" value="${esc(m.canGo||'')}" ${dis}></td>
       <td><input class="dc-in" style="min-width:160px" data-dcm="${m.id}" data-k="note" value="${esc(m.note||'')}" ${dis}></td>
-      <td>${S.canWrite?`<button class="btn ghost sm" data-act="dc-del-move" data-id="${m.id}" title="Xóa dòng">✕</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="9" class="note">Chưa có người đề xuất điều.</td></tr>`}
+      <td>${S.canWrite?`<button class="btn ghost sm" data-act="dc-del-move" data-id="${m.id}" title="Xóa dòng">✕</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="12" class="note">Chưa có người đề xuất điều.</td></tr>`}
     </tbody></table></div>
     <div class="row mt" style="flex-wrap:wrap;gap:8px">${S.canWrite?`<button class="btn sm" data-act="dc-add-move" data-id="${esc(s.id)}">+ Thêm người điều</button>${s.removed?`<button class="btn pri sm" data-act="dc-restore" data-id="${esc(s.id)}">Khôi phục nhà này</button>`:`<button class="btn ghost sm" data-act="dc-del-shop" data-id="${esc(s.id)}">Xóa nhà này</button>`}`:''}
       <span class="note">Nhà dư người cùng tỉnh: ${sur.length?sur.map(o=>`${dcNT(o.code)} (+${o.can})`).join(', '):'không có – cân nhắc tuyển mới hoặc PA B từ tỉnh lân cận'}</span></div>`:''}</div>`}).join('');
@@ -2359,6 +2386,8 @@ document.addEventListener('change',e=>{const t=e.target;
     for(const [id,d] of Object.entries(j.dcshop||{})){await write('dcshop/'+id,d);n++}for(const [id,d] of Object.entries(j.dcmove||{})){await write('dcmove/'+id,d);n++}toast('Đã nhập '+n+' bản ghi phương án')}).catch(()=>toast('File không đúng định dạng phương án điều chuyển'));t.value=''}});
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-"]');if(!el)return;const a=el.dataset.act,id=el.dataset.id;
   if(a==='dc-pick'){const p=el.parentNode.querySelector('.dc-dtp');if(p){try{p.showPicker()}catch(_){p.focus();p.click()}}return}
+  if(a==='dc-reg-toggle'){S.dcRegOpen=S.dcRegOpen===false;render();return}
+  if(a==='dc-reg-csv'){const rows=[['STT','Mã NV','Họ và tên','Vị trí','Tình trạng NV','Bộ phận hiện tại (DSNS)','Nhà đi (đăng ký)','Tỉnh hiện tại','Phương án','Tỉnh/khu vực có thể đi','Nhà mới đến','Tỉnh nhà mới','QLKV nhà mới','Ngày bắt đầu','Ngày kết thúc','Số tháng','Hỗ trợ lưu trú','Duyệt','Trạng thái','Ghi chú']];dcRegRows().forEach((x,i)=>{const m=x.m,p=x.p,s=x.s;rows.push([i+1,m.code,p.name||'',p.pos||'',p.status||'',p.shop?dcNT(p.shop):(p.dept||''),m.from||'',p.area||'',m.pa==='B'?'Phương án B – ≥ 20 km':m.pa==='A'?'Phương án A – < 20 km':'',m.canGo||'',dcNT(m.to),s.prov||'',s.mgr||'',dcDmy(m.date),dcDmy(m.end),x.mo,m.stay||'',(DC_ST.find(z=>z[0]===(m.st||'de-xuat'))||[])[1]||'',x.ph[1],m.note||''])});saveFile('DS-nhan-su-di-dieu-dong_'+TODAY+'.csv',csv(rows));return}
   if(a==='dc-toggle'){S.dcOpen[id]=S.dcOpen[id]===false;render()}
   else if(a==='dc-sync'){dcSync(false)}
   else if(a==='dc-add-move'){const n=Object.values(S.dcMoves).filter(m=>m.to===id).length;write('dcmove/'+newId('dcmove'),{to:id,from:'',code:'',pa:'?',km:'',st:'de-xuat',date:'',note:'',order:n+1,createdAt:new Date().toISOString()})}
