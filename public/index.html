@@ -8,7 +8,8 @@
 <title>Bàn điều hành HCNS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
-<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}img{max-width:100%}[hidden]{display:none!important}.dc-dt{position:relative;display:flex;align-items:center;width:100%}.dc-dt .dc-dtx{flex:1;min-width:0;padding-right:34px}.dc-dt .dc-dtp{position:absolute;right:6px;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}.dc-dt .dc-dtb{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:15px;padding:2px 4px;line-height:1}.dc-dt .dc-dtb:disabled{opacity:.4;cursor:default}
+</style>
 <style>
 /* Layout: thanh điều hướng trái (cuộn ngang trên điện thoại) + vùng làm việc; thẻ chỉ dùng cho khối cần tách biệt */
 :root{
@@ -2168,7 +2169,7 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-act="sf-clear"]
    Nguyên tắc: nhà cũ giữ tối thiểu 1 CHT + 2 NVBH (chưa có CHT: 3 NVBH); nhà sắp mở định biên 2 NVBH; PA A < 20 km (nội bộ), PA B ≥ 20 km theo chính sách điều động. */
 S.dcShops={};S.dcMoves={};S.dcF={prov:'',mgr:'',st:'',q:''};S.dcOpen={};S.dcSub=false;
 (function dcSub(){const go=()=>{if(S.dcSub||!S.db||S.role==='staff')return;S.dcSub=true;
-  S.db.collection('dcshop').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcShops=o;S.dcLoaded=true;if(S.view==='dieu-chuyen'&&!(document.activeElement&&document.activeElement.type==='date'&&document.activeElement.closest('.dc-shop')))render()},()=>{});
+  S.db.collection('dcshop').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcShops=o;S.dcLoaded=true;if(S.view==='dieu-chuyen'&&!(document.activeElement&&(document.activeElement.type==='date'||document.activeElement.dataset.date)&&document.activeElement.closest('.dc-shop')))render()},()=>{});
   S.db.collection('dcmove').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcMoves=o;if(S.view==='dieu-chuyen')render()},()=>{})};
   const t=setInterval(()=>{if(S.db){go();clearInterval(t)}},400)})();
 const DC_ST=[['de-xuat','Đề xuất'],['qlkv-ok','QLKV đồng ý'],['da-qd','Đã ra quyết định'],['da-di','Đã đi làm'],['huy','Hủy / thay người']];
@@ -2244,6 +2245,10 @@ function dcCandHtml(s){const prov=s.prov;if(!S.rec||!S.rec.rowsJson)return `<div
    Lấy nhà "Chưa mở bán" (hoặc chưa ghi tình trạng nhưng đã có địa chỉ); nhà đã chuyển "Mở bán" được đánh dấu và ẩn khỏi danh sách đang theo dõi. Giữ nguyên định biên, ghi chú, người điều đã nhập trên web. */
 const DC_PFIX={'lâm đồng':'Lâm Đồng','đắc lắc':'Đắk Lắk','đăk lăk':'Đắk Lắk','đắk lắk':'Đắk Lắk','đắk lăk':'Đắk Lắk','thừa thiên huế':'Huế'};
 const dcDateOk=v=>/^(20[2-9]\d|2100)-\d\d-\d\d$/.test(String(v||''))?v:'';
+const dcDmy=v=>dcDateOk(v)?v.split('-').reverse().join('/'):'';
+const dcParseDmy=s=>{s=String(s||'').trim();let m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/)||s.match(/^(\d{2})(\d{2})(\d{4})$/);if(!m)return '';const d=+m[1],mo=+m[2],y=+m[3];const dt=new Date(y,mo-1,d);if(dt.getMonth()!==mo-1||dt.getDate()!==d)return '';return dcDateOk(`${y}-${pad(mo)}-${pad(d)}`)};
+/* Ô ngày hiển thị dd/mm/yyyy (gõ tay hoặc bấm biểu tượng lịch) */
+const dcDateInp=(attr,v,dis,w)=>`<span class="dc-dt"${w?` style="width:${w}"`:''}><input class="dc-dtx" data-date="1" ${attr} value="${esc(dcDmy(v))}" placeholder="dd/mm/yyyy" inputmode="numeric" ${dis}><input type="date" class="dc-dtp" tabindex="-1" min="2020-01-01" max="2100-12-31" value="${esc(dcDateOk(v))}" ${dis}><button type="button" class="dc-dtb" data-act="dc-pick" title="Chọn ngày" ${dis}>📅</button></span>`;
 const dcProvFix=p=>{let s=String(p||'').trim().replace(/\s+/g,' ');s=DC_PFIX[s.toLowerCase()]||s;return TURN_MERGE[s]||s};
 async function dcSync(silent){if(!S.mcp||S.dcSyncBusy)return;if(!S.dcLoaded){if(!silent)toast('Đang tải phương án, thử lại sau vài giây');return}S.dcSyncBusy=true;if(!silent)render();
   try{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:NT_SHEET,range:"'Theo dõi nhà mới'!C2:M"},{cache:false,silent:!!silent});const v=(res.payload&&res.payload.values)||[];
@@ -2298,7 +2303,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
       <label>Địa chỉ<input data-dcs="${esc(s.id)}" data-k="addr" value="${esc(s.addr||'')}" ${dis}></label>
       <label>Tỉnh<input data-dcs="${esc(s.id)}" data-k="prov" value="${esc(s.prov||'')}" ${dis}></label>
       <label>QLKV<input data-dcs="${esc(s.id)}" data-k="mgr" value="${esc(s.mgr||'')}" ${dis}></label>
-      <label>Ngày mở bán dự kiến<input type="date" min="2020-01-01" max="2100-12-31" data-dcs="${esc(s.id)}" data-k="open" value="${esc(dcDateOk(s.open))}" ${dis}></label>
+      <label>Ngày mở bán dự kiến${dcDateInp(`data-dcs="${esc(s.id)}" data-k="open"`,s.open,dis)}</label>
       <label>Định biên NVBH<input type="number" min="0" data-dcs="${esc(s.id)}" data-k="need" value="${esc(s.need??2)}" ${dis}></label>
       <label>NVBH đã có<input type="number" min="0" data-dcs="${esc(s.id)}" data-k="have" value="${esc(s.have??0)}" ${dis}></label>
       <label>Tọa độ (vĩ độ, kinh độ)<input data-dcs="${esc(s.id)}" data-k="geo" value="${esc(s.geo||'')}" placeholder="${DC_GEO[s.id]?esc(DC_GEO[s.id].join(', '))+' (mặc định)':'dán từ Google Maps'}" ${dis}></label>
@@ -2312,7 +2317,7 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
       <td><select data-dcm="${m.id}" data-k="pa" ${dis}>${opt(DC_PA,m.pa||'?')}</select></td>
       <td><input class="dc-in" style="width:84px" data-dcm="${m.id}" data-k="km" value="${esc(m.km||'')}" placeholder="vd ~5 km" ${dis}></td>
       <td><select data-dcm="${m.id}" data-k="st" class="dc-st ${m.st||'de-xuat'}" ${dis}>${opt(DC_ST,m.st||'de-xuat')}</select></td>
-      <td><input type="date" min="2020-01-01" max="2100-12-31" data-dcm="${m.id}" data-k="date" value="${esc(dcDateOk(m.date))}" ${dis}></td>
+      <td>${dcDateInp(`data-dcm="${m.id}" data-k="date"`,m.date,dis,'150px')}</td>
       <td><input class="dc-in" style="min-width:160px" data-dcm="${m.id}" data-k="note" value="${esc(m.note||'')}" ${dis}></td>
       <td>${S.canWrite?`<button class="btn ghost sm" data-act="dc-del-move" data-id="${m.id}" title="Xóa dòng">✕</button>`:''}</td></tr>`}).join('')||`<tr><td colspan="9" class="note">Chưa có người đề xuất điều.</td></tr>`}
     </tbody></table></div>
@@ -2325,6 +2330,9 @@ const dcSaveShop=(id,patch)=>write('dcshop/'+id,{...(S.dcShops[id]||{}),...patch
 const dcSaveMove=(id,patch)=>write('dcmove/'+id,{...(S.dcMoves[id]||{}),...patch,updatedAt:new Date().toISOString()});
 const dcBadDate=t=>t.type==='date'&&t.value&&(+t.value.slice(0,4)<2020||+t.value.slice(0,4)>2100);
 document.addEventListener('change',e=>{const t=e.target;
+  if(t.classList&&t.classList.contains('dc-dtp')){const x=t.parentNode.querySelector('.dc-dtx');if(x){x.value=dcDmy(t.value);x.dispatchEvent(new Event('change',{bubbles:true}))}return}
+  if(t.dataset.date&&(t.dataset.dcs!=null||t.dataset.dcm!=null)){const iso=dcParseDmy(t.value);if(t.value.trim()&&!iso){toast('Nhập ngày theo dạng ngày/tháng/năm, ví dụ 20/12/2026');return}t.value=dcDmy(iso);
+    if(t.dataset.dcs!=null)dcSaveShop(t.dataset.dcs,{[t.dataset.k]:iso});else dcSaveMove(t.dataset.dcm,{[t.dataset.k]:iso});return}
   if((t.dataset.dcs!=null||t.dataset.dcm!=null)&&dcBadDate(t))return;
   if(t.dataset.dcs!=null){const k=t.dataset.k;const v=t.type==='number'?(t.value===''?0:+t.value):t.value.trim();dcSaveShop(t.dataset.dcs,{[k]:v})}
   else if(t.dataset.dcm!=null){const k=t.dataset.k;let v=t.value.trim();if(k==='code')v=v.toUpperCase();if(k==='from'&&/^\d+[A-Za-z]?$/.test(v))v='NT '+v.toUpperCase();dcSaveMove(t.dataset.dcm,{[k]:v})}
@@ -2332,6 +2340,7 @@ document.addEventListener('change',e=>{const t=e.target;
   else if(t.id==='dcImport'&&t.files&&t.files[0]){t.files[0].text().then(async txt=>{const j=JSON.parse(txt.replace(/^﻿/,''));let n=0;
     for(const [id,d] of Object.entries(j.dcshop||{})){await write('dcshop/'+id,d);n++}for(const [id,d] of Object.entries(j.dcmove||{})){await write('dcmove/'+id,d);n++}toast('Đã nhập '+n+' bản ghi phương án')}).catch(()=>toast('File không đúng định dạng phương án điều chuyển'));t.value=''}});
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-"]');if(!el)return;const a=el.dataset.act,id=el.dataset.id;
+  if(a==='dc-pick'){const p=el.parentNode.querySelector('.dc-dtp');if(p){try{p.showPicker()}catch(_){p.focus();p.click()}}return}
   if(a==='dc-toggle'){S.dcOpen[id]=S.dcOpen[id]===false;render()}
   else if(a==='dc-sync'){dcSync(false)}
   else if(a==='dc-add-move'){const n=Object.values(S.dcMoves).filter(m=>m.to===id).length;write('dcmove/'+newId('dcmove'),{to:id,from:'',code:'',pa:'?',km:'',st:'de-xuat',date:'',note:'',order:n+1,createdAt:new Date().toISOString()})}
