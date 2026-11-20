@@ -1739,7 +1739,9 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act="lg-l
   e.preventDefault();const o={...(S.config.logSheets||{})};let bad='';dlg.querySelectorAll('[data-lgm]').forEach(i=>{const m=i.dataset.lgm,v=i.value.trim();if(!v){delete o[m];return}const id=lgId(v);if(!id){bad=fmtM(m);return}o[m]=id});
   if(bad){toast('Link '+bad+' chưa đúng');return}const cfg=clean(S.config);write('config/main',{...cfg,logSheets:o}).then(()=>{toast('Đã lưu link, đang đồng bộ…');setTimeout(()=>refreshLogs(false),600)}).catch(()=>{});closeDlg()});
 /* Tự đọc khi mở mục Nhật ký cá nhân hoặc KPI (tối đa 1 lần mỗi 30 phút) */
-setInterval(()=>{if(['ca-nhan','kpi','tong-quan'].includes(S.view)&&document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.loaded.has('logs')&&Date.now()-_lgTried>30*60e3)refreshLogs(true)},20e3);
+/* Báo cáo tuần lấy mục III từ nhật ký công việc: khi đang mở báo cáo thì đọc lại sheet nhật ký mỗi 5 phút (các màn khác 30 phút) */
+const LG_REP=['bao-cao-tuan','bao-cao'];
+setInterval(()=>{const rep=LG_REP.includes(S.view);if((rep||['ca-nhan','kpi','tong-quan'].includes(S.view))&&document.visibilityState==='visible'&&S.mcp&&S.canWrite&&S.loaded.has('logs')&&Date.now()-_lgTried>(rep?5:30)*60e3)refreshLogs(true)},5e3);
 /* ===================== Báo cáo tuần gửi lãnh đạo (5 đầu mục chuẩn của phòng HCNS) =====================
    I. Biến động nhân sự trong tháng · II. Tuyển dụng · III. Công việc thường quy · IV. Pháp lý · V. Kế hoạch tuần tới
    Số liệu tự lấy từ DSNS, hồ sơ tuyển dụng, nhật ký công việc và việc giao. Mỗi mục có ô "nhận định / bổ sung" lưu theo tuần. */
