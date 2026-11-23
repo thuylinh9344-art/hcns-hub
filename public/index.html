@@ -16,6 +16,32 @@
 .dc-rf-bar{flex-wrap:wrap;gap:6px;margin:8px 0;align-items:center}.dc-rf-bar select,.dc-rf-bar input.dc-rf{font-size:12.5px;padding:4px 6px;max-width:190px}
 
 /* Linh 20/11/2026: tạm ẩn chú thích dưới biểu đồ độ phủ nhà cũ/nhà mới */.dc-cr .dc-donut ul{display:none}
+
+/* Điều chuyển – giao diện gọn (23/11/2026) */
+.dc2-cov{margin-bottom:14px}.dc2-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:12px}.dc2-h h3,.dc2-lh h3{margin:0;font-size:16px}.dc2-h .note{cursor:help}
+.dc2-tot{margin-left:auto;font-size:13px;color:var(--muted);background:var(--sunken);border-radius:999px;padding:4px 12px}.dc2-tot b{color:var(--fg)}.dc2-tot b.bad,.dc2-row b.bad{color:var(--bad)}
+.dc2-g{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.dc2-card{border:1px solid var(--line);border-radius:14px;padding:14px 16px;background:var(--surface);display:flex;flex-direction:column;gap:10px}.dc2-card.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.dc2-ch{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}.dc2-ch b{display:block;font-size:15px}.dc2-ch span{font-size:12.5px;color:var(--muted)}
+.dc2-pc{font-size:30px;font-weight:800;line-height:1;letter-spacing:-.02em}.dc2-pc.ok{color:var(--ok)}.dc2-pc.warn{color:var(--warn)}.dc2-pc.bad{color:var(--bad)}
+.dc2-cb{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;align-items:center}.dc2-cb .dc-donut ul{display:none}.dc2-cb .dc-donut .k{display:none}.dc2-cb svg{width:120px;height:120px}
+.dc2-kv{display:flex;flex-direction:column;gap:6px;font-size:13px;min-width:0}.dc2-kv .btn{align-self:flex-start;margin-top:4px}
+.dc2-bar{position:relative;height:8px;border-radius:99px;background:var(--sunken)}.dc2-bar i{position:absolute;inset:0 auto 0 0;border-radius:99px;background:var(--ok)}.dc2-bar b{position:absolute;top:-3px;width:2px;height:14px;background:var(--fg);opacity:.55}
+.dc2-row{display:flex;align-items:center;gap:8px;color:var(--muted)}.dc2-row b{margin-left:auto;color:var(--fg);font-variant-numeric:tabular-nums}.dc2-dot{width:9px;height:9px;border-radius:3px;flex:none}
+.dc2-g+.dc-ol{margin-top:12px}
+.dc2-lh{display:flex;align-items:center;gap:8px;margin:18px 0 8px}.dc2-lh .note{font-weight:400;font-size:13px;margin-left:6px}
+.dc2-shop{padding:0!important;overflow:hidden;border-left:4px solid var(--line)!important;margin-bottom:8px}.dc2-shop.b{border-left-color:var(--bad)!important}.dc2-shop.w{border-left-color:var(--warn)!important}.dc2-shop.g{border-left-color:var(--ok)!important}
+.dc2-shop>*:not(.dc2-sh){margin-left:14px;margin-right:14px}.dc2-shop.open{padding-bottom:12px!important}
+.dc2-sh{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(0,1fr) minmax(0,1.1fr) 80px 90px minmax(160px,1.6fr);gap:12px;align-items:center;padding:10px 14px;cursor:pointer}
+.dc2-sh:hover{background:var(--sunken)}.dc2-shop.open .dc2-sh{border-bottom:1px solid var(--line);background:var(--sunken)}
+.dc2-nt{display:flex;align-items:center;gap:8px;white-space:nowrap}.dc2-nt i{font-style:normal;color:var(--muted);width:12px}.dc2-nt b{font-size:15px}
+.dc2-c{display:flex;flex-direction:column;min-width:0;font-size:13px;line-height:1.3}.dc2-c>.mini{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.dc2-c{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dc2-ppl{display:flex;gap:4px;margin-top:3px}.dc2-ppl i{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);display:inline-block}.dc2-ppl i.h{background:var(--ok);border-color:var(--ok)}.dc2-ppl i.m{background:#8fd0a8;border-color:#8fd0a8}
+.dc2-ch .dc2-pc{font-size:30px}.dc2-stats{grid-template-columns:repeat(4,minmax(0,1fr))!important}@media(max-width:700px){.dc2-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+.dc2-st{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media(max-width:900px){.dc2-g{grid-template-columns:minmax(0,1fr)}.dc2-sh{grid-template-columns:1fr 1fr 1fr}.dc2-st{grid-column:1/-1;justify-content:flex-start}}
+@media(max-width:520px){.dc2-cb{grid-template-columns:minmax(0,1fr)}.dc2-sh{grid-template-columns:1fr 1fr}}
 </style>
 <style>
 /* Layout: thanh điều hướng trái (cuộn ngang trên điện thoại) + vùng làm việc; thẻ chỉ dùng cho khối cần tách biệt */
@@ -2382,13 +2408,25 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
   const provs=[...new Set(L.map(s=>s.prov).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi')),mgrs=[...new Set(L.map(s=>s.mgr).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
   const view=L.filter(s=>(!f.prov||s.prov===f.prov)&&(!f.mgr||s.mgr===f.mgr)&&(!f.st||f.st==='open'||f.st==='removed'||(f.st==='done'?s.done:f.st==='notdone'?!s.done:f.st==='thieu'?s.left>0:f.st==='du'?s.left===0:s.mv.some(m=>m.st===f.st))));
   const opt=(arr,cur)=>arr.map(([v,l])=>`<option value="${v}" ${cur===v?'selected':''}>${l}</option>`).join('');
-  const tools=(S.mcp&&S.canWrite?`<button class="btn pri" data-act="dc-sync" ${S.dcSyncBusy?'disabled':''}>${S.dcSyncBusy?'Đang cập nhật…':'Cập nhật ngay (nhà mới · DSNS · tuyển dụng)'}</button>`:'')+(S.canWrite?`<button class="btn" data-act="dc-add-shop">+ Thêm nhà mới</button>${!L.length?`<label class="btn">Nhập phương án (.json)<input type="file" id="dcImport" accept=".json" hidden></label>`:''}`:'')+(S.dl?`<button class="btn" data-act="dc-csv">Xuất Excel (CSV)</button>`:'')+`<button class="btn" data-act="dc-copy">Sao chép tóm tắt</button>`;
-  let h=head('Điều chuyển nhân sự nhà mới',`Tự đọc lại 3 link mỗi 5 phút (và mỗi khi quay lại tab web): Theo dõi nhà mới (nhà Chưa mở bán)${S.dcSyncAt?' · đọc lần gần nhất lúc '+new Date(S.dcSyncAt).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):''} · Data nhân sự 2026${S.sys&&S.sys.updatedAt?' ('+new Date(S.sys.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · Hồ sơ tuyển dụng${S.rec&&S.rec.updatedAt?' ('+new Date(S.rec.updatedAt).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'})+')':''} · sửa trực tiếp, lưu ngay cho cả phòng`,tools);
+  const tools=(S.mcp&&S.canWrite?`<button class="btn pri" data-act="dc-sync" ${S.dcSyncBusy?'disabled':''}>${S.dcSyncBusy?'Đang cập nhật…':'↻ Cập nhật ngay'}</button>`:'')+(S.canWrite?`<button class="btn" data-act="dc-add-shop">+ Thêm nhà mới</button>${!L.length?`<label class="btn">Nhập phương án (.json)<input type="file" id="dcImport" accept=".json" hidden></label>`:''}`:'')+(S.dl?`<button class="btn" data-act="dc-csv">Xuất Excel (CSV)</button>`:'')+`<button class="btn" data-act="dc-copy">Sao chép tóm tắt</button>`;
+  const _t=x=>x?new Date(x).toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit'}):'—';
+  let h=head('Điều chuyển nhân sự nhà mới',`<span title="Tự đọc lại mỗi 5 phút: Theo dõi nhà mới · Data nhân sự 2026 · Hồ sơ tuyển dụng">Cập nhật lúc <b>${_t(S.dcSyncAt)}</b> · nhà mới · DSNS ${_t(S.sys&&S.sys.updatedAt)} · tuyển dụng ${_t(S.rec&&S.rec.updatedAt)}</span> · sửa trực tiếp, lưu ngay cho cả phòng`,tools);
   {const er=S.syncErr||{};const nm={nha:'Theo dõi nhà mới',sys:'Data nhân sự 2026',rec:'Hồ sơ tuyển dụng'};const ks=Object.keys(er).filter(k=>nm[k]);if(ks.length)h+=`<div class="panel" style="border-left:4px solid #c0392b;margin-bottom:10px"><b>⚠ Chưa đọc được: ${ks.map(k=>nm[k]).join(', ')}</b> <span class="note">(${esc(ks.map(k=>er[k]).join(' · ').slice(0,160))})</span><br><span class="note">Số liệu bên dưới đang dừng ở lần đọc trước. Bấm <b>Cập nhật ngay</b> để đăng nhập/cấp quyền Google rồi web sẽ tự đọc tiếp.</span> ${S.canWrite?'<button class="btn pri sm" data-act="dc-sync">Cập nhật ngay</button>':''}</div>`}
-  h+=`<div class="panel dc-cov"><div class="dc-cov-h"><b>Độ phủ nhân sự: nhà cũ và nhà mới</b> <span class="note">= số nhà ✓ Done / tổng số nhà · <b>nhà cũ: NT 170 trở về trước</b> · <b>nhà mới: NT 171 trở lên</b> (mỗi nhóm gồm cả nhà đã mở bán và chưa mở bán, trừ nhà đóng điểm) · nhà Done khi có từ 2 nhân sự · nhà đã mở bán: nhân sự đang làm theo Data nhân sự 2026 (kể cả CHT) − người điều động đi + người điều động đến · nhà chưa mở bán: NVBH thực tế/đã nhận việc chờ mở + người điều động chưa hủy · mục tiêu Q4: 80%</span></div>
-    ${[['NHÀ CŨ (NT ≤ 170)',C.old,'old'],['NHÀ MỚI (NT ≥ 171)',C.nw,'new']].map(([n,c,k])=>`<div class="dc-cr"><div class="dc-cr-n"><a href="#" data-act="dc-open-list" data-id="${k}">${n}</a><span class="note">${c.tot} nhà · ${c.openN} đã mở bán · ${c.soonN} chưa mở bán</span></div>${dcDonut('',[[c.doneReal,'#1f8a4c','Done bằng nhân sự thực tế'],[c.doneMv,'#7cc39a','Done nhờ điều động'],[c.miss,'#e5a33a','Chưa đủ 2 người']],c.cov+'%',`${c.done}/${c.tot} nhà`,'nhà')}<div class="dc-cr-s"><div class="dc-cr-v ${c.cov>=80?'ok':c.cov>=50?'warn':'bad'}">${c.cov}%</div><div>Độ phủ = <b>${c.done}</b> nhà Done / <b>${c.tot}</b> nhà</div><div class="bar"><i style="width:${Math.min(100,c.cov)}%"></i><b style="left:80%" title="Mục tiêu 80%"></b></div><div>Còn <b class="bad">${c.miss}</b> nhà chưa đủ 2 người · cần thêm <b class="bad">${c.lack}</b> người · <a href="#" data-act="dc-open-list" data-id="${k}">${S.dcOpenList===k?'Ẩn':'Xem'} danh sách</a></div></div></div>${S.dcOpenList===k?dcOpenListHtml(c.list,n.replace(/ \(.*/,'').replace(/^N/,'N').toLowerCase().replace(/^n/,'N')):''}`).join('')}
-    <div class="dc-cr-tot">Toàn hệ thống (nhà cũ + nhà mới): <b>${C.all.done}/${C.all.tot}</b> nhà Done · độ phủ <b>${C.all.cov}%</b> · còn thiếu ${C.all.lack} người để mỗi nhà đủ 2${S.openShops?'':' · <span class="bad">chưa có danh sách nhà mở bán từ sheet – bấm Cập nhật ngay</span>'}</div></div>`;
-  h+=`  <div class="stats">
+  {const card=(n,c,k)=>`<div class="dc2-card${S.dcOpenList===k?' on':''}">
+      <div class="dc2-ch"><div><b>${n}</b><span>${c.tot} nhà · ${c.openN} đã mở · ${c.soonN} chưa mở</span></div><span class="dc2-pc ${c.cov>=80?'ok':c.cov>=50?'warn':'bad'}">${c.cov}%</span></div>
+      <div class="dc2-cb">${dcDonut('',[[c.doneReal,'#2D7A4C','Done bằng nhân sự thực tế'],[c.doneMv,'#8fd0a8','Done nhờ điều động'],[c.miss,'#e5a33a','Chưa đủ 2 người']],c.done+'/'+c.tot,'nhà Done','nhà')}
+        <div class="dc2-kv"><div class="dc2-bar"><i style="width:${Math.min(100,c.cov)}%"></i><b style="left:80%" title="Mục tiêu 80%"></b></div><span class="mini">Mục tiêu 80%</span>
+          <div class="dc2-row"><span class="dc2-dot" style="background:#2D7A4C"></span>Đủ bằng nhân sự thực tế<b>${c.doneReal}</b></div>
+          <div class="dc2-row"><span class="dc2-dot" style="background:#8fd0a8"></span>Đủ nhờ điều động<b>${c.doneMv}</b></div>
+          <div class="dc2-row"><span class="dc2-dot" style="background:#e5a33a"></span>Chưa đủ 2 người<b class="bad">${c.miss}</b></div>
+          <div class="dc2-row">Cần thêm<b class="bad">${c.lack} người</b></div>
+          <button class="btn sm" data-act="dc-open-list" data-id="${k}">${S.dcOpenList===k?'Ẩn danh sách':'Xem danh sách nhà'}</button></div></div></div>`;
+    const OL=S.dcOpenList==='old'?dcOpenListHtml(C.old.list,'Nhà cũ'):S.dcOpenList==='new'?dcOpenListHtml(C.nw.list,'Nhà mới'):'';
+    h+=`<div class="panel dc2-cov"><div class="dc2-h"><h3>Độ phủ nhân sự</h3><span class="note" title="Nhà cũ: NT 170 trở về trước · Nhà mới: NT 171 trở lên · gồm cả nhà đã mở bán và chưa mở bán, trừ nhà đóng điểm · nhà đã mở bán: nhân sự đang làm theo DSNS (kể cả CHT) − người điều đi + người điều đến · nhà chưa mở bán: NVBH thực tế/đã nhận việc chờ mở + người điều động chưa hủy">Nhà Done = có từ 2 nhân sự · ⓘ</span>
+      <span class="dc2-tot">Toàn hệ thống <b>${C.all.done}/${C.all.tot}</b> nhà · <b>${C.all.cov}%</b> · thiếu <b class="bad">${C.all.lack}</b> người</span></div>
+      ${S.openShops?'':'<div class="note bad" style="margin-bottom:8px">Chưa có danh sách nhà mở bán từ sheet – bấm Cập nhật ngay.</div>'}
+      <div class="dc2-g">${card('Nhà cũ · NT ≤ 170',C.old,'old')}${card('Nhà mới · NT ≥ 171',C.nw,'new')}</div>${OL}</div>`}
+  h+=`  <div class="stats dc2-stats">
     <div class="stat"><div class="k">Nhà sắp mở</div><div class="v">${T.shops}</div><div class="s">cần ${T.need} NVBH (định biên)</div></div>
     <div class="stat ok"><div class="k">Có nguồn điều chuyển</div><div class="v">${T.live}</div><div class="s">PA A ${T.A} · PA B ${T.B} · ${T.ok} đã được QLKV xác nhận</div></div>
     <div class="stat ${T.left?'bad':'ok'}"><div class="k">Còn phải tuyển</div><div class="v">${T.left}</div><div class="s">${L.filter(s=>s.left>0).length} nhà chưa đủ nguồn</div></div>
@@ -2402,9 +2440,16 @@ function vDc(){if(!S.dcAuto&&S.mcp&&S.canWrite&&S.dcLoaded){S.dcAuto=1;setTimeou
   <div class="row" style="flex-wrap:wrap;gap:8px;margin:12px 0"><select id="dcProv"><option value="">Tất cả tỉnh</option>${opt(provs.map(p=>[p,p]),f.prov)}</select><select id="dcMgr"><option value="">Tất cả QLKV</option>${opt(mgrs.map(p=>[p,p]),f.mgr)}</select>
     <select id="dcSt"><option value="">Mọi tình trạng</option>${opt([['done','✓ Done – đủ tối thiểu 2 nhân sự'],['notdone','Chưa đủ 2 nhân sự'],['thieu','Nhà còn thiếu người'],['du','Nhà đủ nếu điều chuyển'],...DC_ST.map(([k,l])=>[k,'Có người: '+l]),['open','Nhà đã chuyển Mở bán (theo sheet)'],['removed','Nhà đã xóa (khôi phục được)']],f.st)}</select><span class="note">${view.length}/${L.length} nhà</span></div>`;
   if(!L.length)return h+`<div class="empty">Chưa có phương án. ${S.canWrite?'Bấm “+ Thêm nhà mới” hoặc nhập file phương án (.json).':''}</div>`;
-  h+=view.map(s=>{const open=S.dcOpen[s.id]!==false;const sur=dcSurplus(s.prov).slice(0,6);
-    return `<div class="panel dc-shop ${s.left?'dc-miss':''}">
-    <div class="dc-sh" data-act="dc-toggle" data-id="${esc(s.id)}"><b>${open?'▾':'▸'} ${esc(dcNT(s.id))}</b>${s.done?'<span class="dc-done" title="Đã đủ tối thiểu 2 nhân sự (thực tế + điều động)">✓ Done</span>':''}<span class="pill">${esc(s.prov||'—')}</span><span class="note">QLKV ${esc(s.mgr||'—')}</span>${dcDateOk(s.open)?`<span class="note">mở bán ${esc(fmtDY(s.open))}</span>`:''}${s.sheetSt==='Mở bán'?'<span class="pill ok">Đã mở bán</span>':''}${s.hd&&/chưa/i.test(s.hd)?'<span class="pill warn">Chưa ký HĐ thuê</span>':''}${s.dk&&/chưa/i.test(s.dk)?'<span class="pill warn">Chưa xong đăng ký</span>':''}<span class="pill ${s.left?(s.live?'warn':'bad'):'ok'}">${esc(s.status)}</span><span class="note">${s.live}/${Math.max(0,(+s.need||0)-s.haveEff)} người có nguồn</span>${s.at&&s.at.length?`<span class="pill ok">${s.at.length} đang làm tại nhà (DSNS)</span>`:''}${s.res.length?`<span class="pill ok">${s.res.length} đã nhận việc chờ mở</span>`:''}</div>
+  h+=`<div class="dc2-lh"><h3>Nhà sắp mở <span class="note">${view.length}/${L.length} nhà</span></h3><span style="flex:1"></span><button class="btn sm ghost" data-act="dc-expand" data-id="1">Mở tất cả</button><button class="btn sm ghost" data-act="dc-expand" data-id="0">Thu gọn</button></div>`;
+  h+=view.map(s=>{const open=S.dcOpen[s.id]===true;const sur=dcSurplus(s.prov).slice(0,6);
+    return `<div class="panel dc-shop dc2-shop ${s.left?(s.live?'w':'b'):'g'}${open?' open':''}">
+    <div class="dc2-sh" data-act="dc-toggle" data-id="${esc(s.id)}">
+      <span class="dc2-nt"><i>${open?'▾':'▸'}</i><b>${esc(dcNT(s.id))}</b>${s.done?'<span class="dc-done sm">✓ Done</span>':''}</span>
+      <span class="dc2-c"><span class="mini">Tỉnh</span>${esc(s.prov||'—')}</span>
+      <span class="dc2-c"><span class="mini">QLKV</span>${esc(s.mgr||'—')}</span>
+      <span class="dc2-c"><span class="mini">Mở bán</span>${dcDateOk(s.open)?esc(fmtD(s.open)):'—'}</span>
+      <span class="dc2-c"><span class="mini">Nhân sự</span><span class="dc2-ppl">${Array.from({length:Math.max(2,+s.need||2)},(_,i)=>`<i class="${i<s.haveEff?'h':i<s.haveEff+s.live?'m':''}"></i>`).join('')}</span></span>
+      <span class="dc2-st"><span class="pill ${s.left?(s.live?'warn':'bad'):'ok'}">${esc(s.status)}</span>${s.sheetSt==='Mở bán'?'<span class="pill ok">Đã mở bán</span>':''}${s.hd&&/chưa/i.test(s.hd)?'<span class="pill warn">Chưa ký HĐ</span>':''}${s.dk&&/chưa/i.test(s.dk)?'<span class="pill warn">Chưa xong ĐK</span>':''}</span></div>
     ${open?`<div class="dc-grid">
       <label>Địa chỉ<input data-dcs="${esc(s.id)}" data-k="addr" value="${esc(s.addr||'')}" ${dis}></label>
       <label>Tỉnh<input data-dcs="${esc(s.id)}" data-k="prov" value="${esc(s.prov||'')}" ${dis}></label>
@@ -2454,7 +2499,8 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="dc-
   if(a==='dc-rf-clear'){S.dcRF={q:'',to:'',prov:'',mgr:'',pa:'',ph:'',st:'',stay:'',src:''};render();return}
   if(a==='dc-reg-toggle'){S.dcRegOpen=S.dcRegOpen===false;render();return}
   if(a==='dc-reg-csv'){const rows=[['STT','Mã NV','Họ và tên','Bộ phận hiện tại (DSNS)','Nhà đi (đăng ký)','Tỉnh hiện tại','Phương án','Nhà mới đến','Tỉnh nhà mới','QLKV nhà mới','Ngày bắt đầu','Ngày kết thúc','Số tháng','Hỗ trợ lưu trú','Trạng thái','Ghi chú']];dcRegFilter(dcRegRows()).forEach((x,i)=>{const m=x.m,p=x.p,s=x.s;rows.push([i+1,m.code,p.name||'',p.shop?dcNT(p.shop):(p.dept||''),m.from||'',p.area||'',m.pa==='B'?'Phương án B – ≥ 20 km':m.pa==='A'?'Phương án A – < 20 km':'',dcNT(m.to),s.prov||'',s.mgr||'',dcDmy(m.date),dcDmy(m.end),x.mo,m.stay||'',x.ph[1],m.note||''])});saveFile('DS-nhan-su-di-dieu-dong_'+TODAY+'.csv',csv(rows));return}
-  if(a==='dc-toggle'){S.dcOpen[id]=S.dcOpen[id]===false;render()}
+  if(a==='dc-toggle'){S.dcOpen[id]=!S.dcOpen[id];render()}
+  else if(a==='dc-expand'){const on=id==='1';dcCalc().L.forEach(x=>S.dcOpen[x.id]=on);render()}
   else if(a==='dc-sync'){dcSync(false)}
   else if(a==='dc-add-move'){const n=Object.values(S.dcMoves).filter(m=>m.to===id).length;write('dcmove/'+newId('dcmove'),{to:id,from:'',code:'',pa:'?',km:'',st:'de-xuat',date:'',note:'',order:n+1,createdAt:new Date().toISOString()})}
   else if(a==='dc-del-move'){if(confirmDel(el))del('dcmove/'+id)}
