@@ -386,10 +386,10 @@ function kpiOf(m,sid){
     grade:es.length?gradeOf(val/max*100):'—',over:raw>max,late:es.filter(e=>e.ontime==='Không').length,open:es.filter(e=>!isDoneLog(e)).length,noQty:es.filter(e=>isDoneLog(e)&&e.code&&!(+e.qty)).length,last:es.reduce((a,e)=>e.d>a?e.d:a,'')};
 }
 function areaPts(m,sid,range){const es=(logDoc(m,sid)?.entries||[]).filter(e=>!range||inR(e.d,range));const o={};es.forEach(e=>{const k=e.area||'Khác';o[k]=(o[k]||0)+entPts(e)});return Object.entries(o).sort((a,b)=>b[1]-a[1])}
-const shopsOf=(m,sid,type)=>S.shops.filter(s=>s.type===type&&s.m&&s.m[m]===sid);
+const shopsOf=(m,sid,type)=>type==='nt'&&typeof pvActive==='function'&&pvActive(m)?pvShopsOf(m,sid):S.shops.filter(s=>s.type===type&&s.m&&s.m[m]===sid);
 const effDoc=(m,sid)=>S.effort.find(x=>x.month===m&&x.staffId===sid);
 function rankD(s){let r=1;(S.config.dCut||[]).forEach((t,i)=>{if(s>=t-1e-9)r=i+2});return 'D'+r}
-function effOf(m,sid){const e=effDoc(m,sid)||{};const b=S.config.eff;const nt=shopsOf(m,sid,'nt').length,vp=shopsOf(m,sid,'vp').length;
+function effOf(m,sid){const e=typeof effAuto==='function'?effAuto(m,sid,effDoc(m,sid)||{}):(effDoc(m,sid)||{});const b=S.config.eff;const nt=shopsOf(m,sid,'nt').length,vp=shopsOf(m,sid,'vp').length;
   let sc=nt*b.nt+vp*b.vp;EFF_KEYS.forEach(([k])=>sc+=(+e[k]||0)*(+b[k]||0));sc=r3(sc);return {nt,vp,e,score:sc,rank:rankD(sc),has:sc>0}}
 const dNum=d=>+String(d||'').replace(/\D/g,'')||0;
 function dCompare(cur,now){const a=dNum(cur),b=dNum(now);if(!a||!b)return '';return b>a?`<span class="up" title="Cao hơn hạng hiện hữu">▲</span>`:b<a?`<span class="down" title="Thấp hơn hạng hiện hữu">▼</span>`:''}
@@ -615,7 +615,7 @@ function scatter(rows){const pts=rows.filter(r=>r.k.has||r.e.has);if(!pts.length
   </svg></div><p class="note">Trục dọc là điểm hiệu suất (đường đứt = 1,0 tương ứng D4); trục ngang là KPI (đường đứt = ngưỡng loại C).</p>`}
 
 /* ===================== Phân công & hạng D ===================== */
-function vAssign(){
+function vAssign0(){
   const m=S.month,pm=prevM(m),st=activeStaff(),b=S.config.eff,dis=S.canWrite?'':'disabled';
   const rows=st.map(s=>({s,e:effOf(m,s.id)}));const dist={};rows.forEach(r=>{if(r.e.has)dist[r.e.rank]=(dist[r.e.rank]||0)+1});
   const areas=[...new Set(S.shops.map(x=>x.area).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'vi'));
@@ -659,7 +659,7 @@ const sysActive=r=>r.status!=='Nghỉ việc';
 const sysOn=r=>sysActive(r)&&r.status!=='Nghỉ thai sản'&&r.status!=='Nghỉ không lương';
 const isCHT=p=>/cửa hàng trưởng|phụ trách cửa hàng/i.test(p||'');
 const shopObj=code=>S.shops.find(x=>x.code===code);
-const shopOwner=(code,m)=>{const x=shopObj(code);return x?.m?.[m]||x?.m?.[prevM(m)]||''};
+const shopOwner=(code,m)=>{if(typeof pvActive==='function'&&pvActive(m)){const u=pvUniverse().find(y=>y.code===code);if(u)return pvOwner(m,u).sid}const x=shopObj(code);return x?.m?.[m]||x?.m?.[prevM(m)]||''};
 const sysPlace=r=>r.shop?r.shop.replace(/^SHOP0*/,'NT '):(r.dept||r.block||'');
 function sysMonth(m){const [a,b]=monthRange(m);const R=sysRows();const y=m.slice(0,4);
   const hires=R.filter(r=>inR(r.start,[a,b])&&yrOf(r)===y),quits=R.filter(r=>r.status==='Nghỉ việc'&&inR(r.quit,[a,b])&&yrOf(r)===y);
@@ -3115,6 +3115,144 @@ wdFile=function(d){return `<!doctype html><html lang="vi"><head><meta charset="u
 
 function opWaitN(){tkClean();opRkSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
 init();
+
+/* ===================== Phân công theo tỉnh + ngoại lệ, tuyển dụng tự đếm, thường quy đánh dấu (Linh chốt 24/11/2026) =====================
+   assign/prov    : {m:{'YYYY-MM':{p:{<tỉnh>:staffId}, x:{<mã NT>:staffId|''}}}} – tháng trống tự kế thừa tháng gần nhất trước đó
+   assign/routine : {m:{'YYYY-MM':{'hs1|<việc>':[staffId,…]}}}                – cũng kế thừa tháng trước
+   Danh sách nhà: nhà Mở bán (sheet Theo dõi nhà mới) + nhà Chưa mở bán, bỏ nhà đóng điểm.
+   Từ T11/2026: số tuyển dụng tự đếm từ Hồ sơ tuyển dụng (người đi làm thực tế trong tháng), thường quy tự đếm từ bảng đánh dấu. */
+const PV_FROM='2026-11';
+const PV_SEED={"2026-08":{"p":{"Bắc Ninh":"Phương","Thái Nguyên":"Phương","Bắc Giang":"Phương","Phú Thọ":"Phương"},"x":{}},"2026-09":{"p":{"Hải Phòng":"Hương","Thanh Hóa":"Trinh","Đà Nẵng":"Ngân","Quảng Nam":"Minh","Nghệ An":"Trinh","Bắc Ninh":"Phương","Thái Nguyên":"Phương","Bình Dương":"Minh","Thái Bình":"Hương","Hà Tĩnh":"Trinh","Quảng Ninh":"Hương","Khánh Hòa":"Anh","An Giang":"Minh","Quảng Bình":"Ngân","Bình Định":"Anh","Chưa xác định":"Hương","Gia Lai":"Anh","Ninh Bình":"Hương","Quảng Ngãi":"Minh","Hưng Yên":"Hương","Quảng Trị":"Ngân","Huế":"Ngân","Cần Thơ":"Minh","Vĩnh Phúc":"Phương","Bắc Giang":"Phương","Hà Nội":"Hương","Phú Thọ":"Phương","Đắc Lắc":"Anh"},"x":{"SHOP0175":"Ngân"}},"2026-10":{"p":{"Hải Phòng":"Hương","Thanh Hóa":"Trinh","Đà Nẵng":"Ngân","Quảng Nam":"Anh","Nghệ An":"Trinh","Bắc Ninh":"Phương","Thái Nguyên":"Phương","Bình Dương":"Minh","Hà Tĩnh":"Trinh","Quảng Ninh":"Hương","Khánh Hòa":"Anh","An Giang":"Anh","Quảng Bình":"Ngân","Bình Định":"Anh","Chưa xác định":"Hương","Gia Lai":"Anh","Ninh Bình":"Hương","Quảng Ngãi":"Anh","Hưng Yên":"Hương","Quảng Trị":"Ngân","Huế":"Ngân","Cần Thơ":"Anh","Vĩnh Phúc":"Phương","Bắc Giang":"Phương","Hà Nội":"Hương","Phú Thọ":"Phương","Đắc Lắc":"Anh"},"x":{"SHOP0036":"Minh","SHOP0037":"Minh","SHOP0038":"Minh","SHOP0039":"Minh","SHOP0175":"Ngân"}},"2026-11":{"p":{"Hải Phòng":"Hương","Thanh Hóa":"Trinh","Đà Nẵng":"Ngân","Quảng Nam":"Anh","Nghệ An":"Trinh","Bắc Ninh":"Phương","Thái Nguyên":"Phương","Bình Dương":"Minh","Hà Tĩnh":"Trinh","Quảng Ninh":"Hương","Khánh Hòa":"Anh","An Giang":"Anh","Quảng Bình":"Ngân","Bình Định":"Anh","Chưa xác định":"Hương","Gia Lai":"Anh","Ninh Bình":"Hương","Quảng Ngãi":"Anh","Hưng Yên":"Hương","Quảng Trị":"Ngân","Huế":"Ngân","Cần Thơ":"Anh","Vĩnh Phúc":"Phương","Bắc Giang":"Phương","Hà Nội":"Hương","Phú Thọ":"Phương","Đắc Lắc":"Anh"},"x":{"SHOP0036":"Minh","SHOP0037":"Minh","SHOP0038":"Minh","SHOP0039":"Minh","SHOP0175":"Ngân"}},"2026-12":{"p":{"Hải Phòng":"Hương","Thanh Hóa":"Trinh","Đà Nẵng":"Ngân","Quảng Nam":"Anh","Nghệ An":"Trinh","Bắc Ninh":"Phương","Thái Nguyên":"Phương","Bình Dương":"Minh","Hà Tĩnh":"Trinh","Quảng Ninh":"Hương","Khánh Hòa":"Anh","An Giang":"Anh","Quảng Bình":"Ngân","Bình Định":"Anh","Chưa xác định":"Hương","Gia Lai":"Anh","Ninh Bình":"Hương","Quảng Ngãi":"Anh","Hưng Yên":"Hương","Quảng Trị":"Ngân","Huế":"Ngân","Cần Thơ":"Anh","Vĩnh Phúc":"Phương","Bắc Giang":"Phương","Hà Nội":"Hương","Phú Thọ":"Phương","Đắc Lắc":"Anh"},"x":{"SHOP0036":"Minh","SHOP0037":"Minh","SHOP0038":"Minh","SHOP0039":"Minh","SHOP0175":"Ngân"}}};
+S.pv=null;S.pvLoaded=false;S.rt=null;S.pf={q:'',prov:'',all:false};S.pvTab='prov';
+const pvKey=p=>normName(p).replace(/^(tỉnh|thành phố|tp\.?)\s+/,'').replace(/đắk/g,'đắc').replace(/lắk/g,'lắc').replace(/thừa thiên\s*/,'');
+function pvMonths(doc,m){return Object.keys((doc&&doc.m)||{}).filter(k=>k<=m).sort().reverse()}
+function pvGet(kind,m,key){if(!S.pv)return undefined;for(const k of pvMonths(S.pv,m)){const o=(S.pv.m[k]||{})[kind]||{};if(Object.prototype.hasOwnProperty.call(o,key))return {v:o[key],from:k}}return undefined}
+function pvActive(m){return !!S.pv&&pvMonths(S.pv,m).length>0}
+function pvProvOwner(m,prov){const k=pvKey(prov);if(!S.pv)return undefined;for(const mm of pvMonths(S.pv,m)){const o=(S.pv.m[mm]||{}).p||{};for(const [p,v] of Object.entries(o))if(pvKey(p)===k)return {v,from:mm,name:p}}return undefined}
+let _pvU=null;
+function pvUniverse(){
+  const key=JSON.stringify([S.openShops&&S.openShops.length,Object.keys(S.dcShops||{}).length,(S.closedShops||[]).length,S.shops.length]);
+  if(_pvU&&_pvU.key===key&&_pvU.src===S.openShops&&_pvU.dc===S.dcShops)return _pvU.v;
+  const o={};
+  if(S.openShops&&S.openShops.length)S.openShops.forEach(x=>{if(x.code)o[x.code]={code:x.code,prov:x.prov||'',st:'open'}});
+  else S.shops.filter(x=>x.type==='nt').forEach(x=>{o[x.code]={code:x.code,prov:x.area||'',st:'open'}});
+  Object.entries(S.dcShops||{}).forEach(([id,s])=>{if(s.removed||o[id])return;o[id]={code:id,prov:s.prov||'',st:s.sheetSt==='Mở bán'?'open':'soon'}});
+  const v=Object.values(o).filter(x=>!(typeof dcClosed==='function'&&dcClosed(x.code))).sort((a,b)=>a.code.localeCompare(b.code));
+  _pvU={key,src:S.openShops,dc:S.dcShops,v};return v}
+function pvOwner(m,x){const e=pvGet('x',m,x.code);if(e&&e.v)return {sid:e.v,ex:true};const p=pvProvOwner(m,x.prov);return {sid:p?p.v:'',ex:false}}
+function pvShopsOf(m,sid){return pvUniverse().filter(x=>pvOwner(m,x).sid===sid)}
+/* Thường quy */
+const RT_DEFAULT={hs1:['Vinh Quang','DSCM','Hành chính khác','ĐKKD','Chấm ăn CNHN','Bảng thưởng phát sinh/chi phí nhân sự'],hs2:['HĐLĐ','Công đoàn U','Điều xe CNHN','Đồng phục C'],hs3:['Đồng phục U, Data, VPP CCDC','Quản lý Data nhân sự','Thanh toán thuê nhà'],hs4:['Lương'],hs5:['BHXH']};
+const rtRef=()=>Object.keys(S.hsRef||{}).length?S.hsRef:RT_DEFAULT;
+function rtTasks(){const T=[];Object.entries(rtRef()).sort().forEach(([tier,list])=>(list||[]).forEach(n=>{if(n)T.push({tier,name:n,key:tier+'|'+n})}));return T}
+function rtMap(m){if(!S.rt)return null;const ks=pvMonths(S.rt,m);return ks.length?{v:S.rt.m[ks[0]]||{},from:ks[0]}:null}
+function rtCount(m,sid){const r=rtMap(m);if(!r)return null;const o={hs1:0,hs2:0,hs3:0,hs4:0,hs5:0};Object.entries(r.v).forEach(([k,ids])=>{const t=k.split('|')[0];if((ids||[]).includes(sid)&&t in o)o[t]++});return o}
+/* Tuyển dụng tự đếm: người đi làm thực tế trong tháng, theo người phụ trách hồ sơ */
+function tdAuto(m,sid){const r=monthRange(m);const o={tdNT:0,tdCHT:0,tdQLKV:0,tdVP:0,list:{tdNT:[],tdCHT:[],tdQLKV:[],tdVP:[]}};
+  (S.rec&&S.rec.rowsJson?recRows():[]).forEach(x=>{if(x.o!==sid||!x.start||!inR(x.start,r))return;const p=(x.p||'').toLowerCase().trim();
+    const k=p.includes('cửa hàng trưởng')?'tdCHT':/^quản lý/.test(p)?'tdQLKV':x.g===0?'tdNT':'tdVP';o[k]++;o.list[k].push(x.p)});return o}
+function effAuto(m,sid,e){if(m<PV_FROM)return e;const o={...e};const t=tdAuto(m,sid);['tdNT','tdCHT','tdQLKV','tdVP'].forEach(k=>o[k]=t[k]);const rc=rtCount(m,sid);if(rc)Object.assign(o,rc);o._td=t;o._rt=!!rc;return o}
+/* Khởi tạo một lần từ file Excel "Phân công xếp hạng D HCNS 2026" (T8–T12) */
+function pvSeed(){if(!S.canWrite||S.role==='staff')return;const st=allStaff();const byLast={};st.forEach(s=>{const w=String(s.name||'').trim().split(/\s+/).pop();if(w)byLast[normName(w)]=s.id});
+  const m={};Object.entries(PV_SEED).forEach(([ym,v])=>{const p={},x={};Object.entries(v.p).forEach(([pr,n])=>{const id=byLast[normName(n)];if(id)p[pr]=id});Object.entries(v.x).forEach(([c,n])=>{const id=byLast[normName(n)];if(id)x[c]=id});m[ym]={p,x}});
+  if(Object.values(m).some(v=>Object.keys(v.p).length))write('assign/prov',{m,updatedAt:new Date().toISOString(),seeded:'Excel Phân công xếp hạng D HCNS 2026'}).catch(()=>{})}
+(function pvSub(){const t=setInterval(()=>{if(!S.db||S.role==='staff')return;clearInterval(t);
+  S.db.doc('assign/prov').onSnapshot(s=>{S.pv=s.exists?s.data():null;const f=!S.pvLoaded;S.pvLoaded=true;_pvU=null;if(f&&!s.exists)setTimeout(()=>{if(!S.pv&&allStaff().length)pvSeed()},2500);if(S.view==='phan-cong'&&!pvBusy())render()},()=>{S.pvLoaded=true});
+  S.db.doc('assign/routine').onSnapshot(s=>{S.rt=s.exists?s.data():null;if(S.view==='phan-cong'&&!pvBusy())render()},()=>{})},400)})();
+const pvBusy=()=>{const a=document.activeElement;return !!(a&&a.closest&&a.closest('.pv-q'))};
+function pvSet(kind,m,key,val){const d=JSON.parse(JSON.stringify(S.pv||{m:{}}));d.m=d.m||{};const mm=d.m[m]=d.m[m]||{};mm[kind]=mm[kind]||{};
+  if(val===null)delete mm[kind][key];else mm[kind][key]=val;d.updatedAt=new Date().toISOString();S.pv=d;_pvU=null;return write('assign/prov',d)}
+function rtToggle(m,key,sid,on){const d=JSON.parse(JSON.stringify(S.rt||{m:{}}));d.m=d.m||{};if(!d.m[m]){const r=rtMap(m);d.m[m]=r?JSON.parse(JSON.stringify(r.v)):{}}
+  const a=new Set(d.m[m][key]||[]);on?a.add(sid):a.delete(sid);d.m[m][key]=[...a];d.updatedAt=new Date().toISOString();S.rt=d;return write('assign/routine',d)}
+
+function vAssign(){
+  const m=S.month,pm=prevM(m),st=activeStaff(),b=S.config.eff,dis=S.canWrite?'':'disabled',auto=m>=PV_FROM;
+  const rows=st.map(s=>({s,e:effOf(m,s.id)})).sort((a,c)=>c.e.score-a.e.score);const dist={};rows.forEach(r=>{if(r.e.has)dist[r.e.rank]=(dist[r.e.rank]||0)+1});
+  const mx=Math.max(1.4,...rows.map(r=>r.e.score));const cuts=S.config.dCut||[];
+  const cell=(s,e,k)=>{if(auto&&/^td/.test(k)){const l=(e.e._td&&e.e._td.list[k])||[];return `<td class="r num pv-auto" title="${l.length?esc(l.join(', ')):'Tự đếm từ Hồ sơ tuyển dụng'}">${e.e[k]||'·'}</td>`}
+    if(auto&&/^hs/.test(k)&&e.e._rt)return `<td class="r num pv-auto" title="Tự đếm từ bảng thường quy">${e.e[k]||'·'}</td>`;
+    return `<td class="r"><input class="num" type="number" step="any" min="0" id="ef-${s.id}-${k}" data-eff="${s.id}" data-k="${k}" value="${esc(e.e[k]||'')}" ${dis}></td>`};
+  let h=head('Phân công & xếp hạng hiệu suất D',`${fmtM(m)} · Điểm = Σ số lượng × điểm cơ sở${auto?' · số nhà, tuyển dụng, thường quy tự tính':''}`,monthPicker()+(S.dl?`<button class="btn" data-act="csv-eff">Xuất CSV</button>`:''));
+  h+=`<div class="pv-dist">${['D1','D2','D3','D4','D5','D6'].map(d=>`<div class="pv-dd ${d}"><b>${dist[d]||0}</b><span>${d}</span></div>`).join('')}<p class="note">Ngưỡng: ${cuts.map((t,i)=>'D'+(i+2)+' ≥ '+String(t).replace('.',',')).join(' · ')}</p></div>`;
+  h+=`<div class="tbl-wrap eff pv-eff"><table><thead>
+    <tr><th rowspan="2">Nhân sự</th><th class="r grp">NT</th><th class="r">VP</th>${EFF_KEYS.map(([k,l],i)=>`<th class="r${i===0||i===4?' grp':''}">${l}</th>`).join('')}<th class="grp">Tổng điểm</th><th>Hạng</th><th>Hiện hữu</th></tr>
+    <tr><th class="base r grp">${nf(b.nt)}</th><th class="base r">${nf(b.vp)}</th>${EFF_KEYS.map(([k],i)=>`<th class="base r${i===0||i===4?' grp':''}">${nf(b[k])}</th>`).join('')}<th class="base grp"></th><th class="base"></th><th class="base"></th></tr></thead><tbody>
+    ${rows.map(({s,e})=>`<tr><td><b>${esc(s.name)}</b><div class="note">${esc(s.title||'')}</div></td><td class="r num grp pv-auto">${e.nt||'·'}</td><td class="r num pv-auto">${e.vp||'·'}</td>${EFF_KEYS.map(([k],i)=>cell(s,e,k).replace('<td class="r','<td class="r'+(i===0||i===4?' grp':''))).join('')}
+      <td class="grp"><div class="pv-sc"><span class="pv-bar"><i class="${e.rank}" style="width:${Math.min(100,e.score/mx*100).toFixed(1)}%"></i>${cuts.map(t=>`<b style="left:${(t/mx*100).toFixed(1)}%"></b>`).join('')}</span><b class="num">${nf(e.score)}</b></div></td>
+      <td>${e.has?rankPill(e.rank):'—'} ${dCompare(s.dCurrent,e.rank)}</td><td>${s.dCurrent?rankPill(s.dCurrent):'—'}</td></tr>`).join('')}
+  </tbody></table></div>
+  ${auto?`<p class="note">Ô nền xám là số tự tính: <b>NT</b> theo phân công tỉnh và ngoại lệ bên dưới · <b>Tuyển</b> = người đi làm thực tế trong tháng theo Hồ sơ tuyển dụng (rê chuột để xem vị trí) · <b>HS</b> = số việc được đánh dấu ở bảng Thường quy${rtMap(m)?'':' (tháng này chưa đánh dấu nên vẫn nhập tay)'}.</p>`:''}`;
+  /* Tabs */
+  const U=pvUniverse(),tabs=[['prov','Phân công theo tỉnh'],['ex','Ngoại lệ theo nhà thuốc'],['rt','Thường quy'],['vp','Văn phòng']];
+  h+=`<div class="pv-tabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" role="tab" data-act="pv-tab" data-id="${k}" aria-selected="${S.pvTab===k}">${l}</button>`).join('')}<span class="pv-cnt">${st.map(s=>`<span class="pill">${esc(shortName(s.id))}: ${pvActive(m)?pvShopsOf(m,s.id).length:shopsOf(m,s.id,'nt').length}</span>`).join('')}</span></div>`;
+  const opts=(cur,blank)=>`<option value="">${blank}</option>`+st.map(s=>`<option value="${s.id}" ${cur===s.id?'selected':''}>${esc(s.name)}</option>`).join('');
+  if(S.pvTab==='prov'){
+    const g={};U.forEach(x=>{const k=x.prov||'Chưa xác định';(g[k]??=[]).push(x)});
+    const provs=Object.keys(g).sort((a,c)=>a.localeCompare(c,'vi'));const none=provs.filter(p=>!(pvProvOwner(m,p)||{}).v).length;
+    h+=`<div class="panel pv-p"><h2>Phân công theo tỉnh · ${fmtM(m)} <small>${U.length} nhà · ${provs.length} tỉnh${none?` · <span class="bad">${none} tỉnh chưa giao</span>`:''}</small></h2>
+      <p class="note">Chọn người phụ trách cho từng tỉnh, mọi nhà thuốc trong tỉnh tự nhận theo. Tháng chưa chọn tự giữ người của tháng trước. Danh sách nhà lấy từ sheet Theo dõi nhà mới (gồm nhà chưa mở bán, bỏ nhà đóng điểm).</p>
+      <div class="tbl-wrap"><table class="pv-t"><thead><tr><th>Tỉnh</th><th class="r">Nhà</th><th class="r">Chưa mở</th><th class="r">Ngoại lệ</th><th>Phụ trách ${fmtM(m)}</th><th>${fmtM(pm)}</th></tr></thead><tbody>
+      ${provs.map(p=>{const cur=pvProvOwner(m,p),prv=pvProvOwner(pm,p);const exN=g[p].filter(x=>(pvGet('x',m,x.code)||{}).v).length;const inh=cur&&cur.from!==m;
+        return `<tr><td><b>${esc(p)}</b></td><td class="r num">${g[p].length}</td><td class="r num">${g[p].filter(x=>x.st==='soon').length||''}</td><td class="r num">${exN||''}</td>
+        <td><select class="pv-q" data-pvp="${esc(p)}" ${dis}>${opts(cur?cur.v:'','— Chưa giao —')}</select>${inh?`<span class="mini"> giữ từ ${fmtM(cur.from)}</span>`:''}</td><td class="mini">${prv&&prv.v?esc(staffName(prv.v)):'—'}</td></tr>`}).join('')}
+      </tbody></table></div></div>`}
+  else if(S.pvTab==='ex'){
+    const provs=[...new Set(U.map(x=>x.prov||'Chưa xác định'))].sort((a,c)=>a.localeCompare(c,'vi'));const q=normName(S.pf.q);
+    const L=U.map(x=>({x,o:pvOwner(m,x),p:pvProvOwner(m,x.prov)})).filter(r=>(S.pf.all||r.o.ex)&&(!S.pf.prov||(r.x.prov||'Chưa xác định')===S.pf.prov)&&(!q||normName(r.x.code+' '+dcNT(r.x.code)).includes(q)));
+    h+=`<div class="panel pv-p"><h2>Ngoại lệ theo nhà thuốc · ${fmtM(m)} <small>${U.filter(x=>pvOwner(m,x).ex).length} nhà giao khác người phụ trách tỉnh</small></h2>
+      <p class="note">Chỉ chọn ở nhà nào giao khác với người phụ trách tỉnh. Chọn “Theo tỉnh” để bỏ ngoại lệ. Ngoại lệ tự giữ sang tháng sau.</p>
+      <div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px"><input class="pv-q" id="pfQ" placeholder="Tìm mã nhà, vd 175" value="${esc(S.pf.q)}" style="max-width:200px"><select id="pfProv"><option value="">Mọi tỉnh</option>${provs.map(p=>`<option ${S.pf.prov===p?'selected':''}>${esc(p)}</option>`).join('')}</select>
+        <label class="row note"><input type="checkbox" id="pfAll" ${S.pf.all?'checked':''}> Hiện tất cả nhà để thêm ngoại lệ</label></div>
+      <div class="tbl-wrap" style="max-height:560px;overflow:auto"><table class="pv-t"><thead><tr><th>Nhà</th><th>Tỉnh</th><th>Trạng thái</th><th>Theo tỉnh</th><th>Ngoại lệ ${fmtM(m)}</th></tr></thead><tbody>
+      ${L.length?L.map(({x,o,p})=>`<tr class="${o.ex?'pv-ex':''}"><td><b>${esc(dcNT(x.code))}</b> <span class="mini">${esc(x.code)}</span></td><td>${esc(x.prov||'—')}</td><td>${x.st==='soon'?'<span class="pill warn">Chưa mở bán</span>':'<span class="pill ok">Mở bán</span>'}</td><td class="mini">${p&&p.v?esc(staffName(p.v)):'—'}</td>
+        <td><select class="pv-q" data-pvx="${esc(x.code)}" ${dis}>${opts(o.ex?o.sid:'','— Theo tỉnh —')}</select></td></tr>`).join(''):`<tr><td colspan="5" class="note">${S.pf.all?'Không có nhà khớp bộ lọc.':'Chưa có ngoại lệ. Tích “Hiện tất cả nhà” để thêm.'}</td></tr>`}
+      </tbody></table></div></div>`}
+  else if(S.pvTab==='rt'){
+    const T=rtTasks(),r=rtMap(m),cur=r?r.v:{};const tiers=[...new Set(T.map(t=>t.tier))];
+    h+=`<div class="panel pv-p"><h2>Thường quy · ${fmtM(m)} <small>${r?(r.from===m?'đã đánh dấu tháng này':'giữ từ '+fmtM(r.from)):'chưa đánh dấu'}</small></h2>
+      <p class="note">Tích vào ô người làm việc đó. Số việc theo từng hệ số tự cộng vào bảng xếp hạng. Tháng sau tự giữ như tháng này, chỉ sửa khi có thay đổi. Thêm hoặc bỏ việc ở cuối bảng.</p>
+      ${T.length?`<div class="tbl-wrap"><table class="pv-t pv-rt"><thead><tr><th>Việc thường quy</th>${st.map(s=>`<th class="c">${esc(shortName(s.id))}</th>`).join('')}</tr></thead><tbody>
+      ${tiers.map(t=>`<tr class="pv-tier"><td colspan="${st.length+1}">${esc(t.toUpperCase().replace('HS','Hệ số '))} · ${nf(b[t])} điểm/việc</td></tr>`+T.filter(x=>x.tier===t).map(x=>`<tr><td>${esc(x.name)}${S.canWrite?` <button class="pv-del" data-act="pv-deltask" data-id="${esc(x.key)}" title="Bỏ việc này khỏi danh mục" aria-label="Bỏ việc">✕</button>`:''}</td>${st.map(s=>`<td class="c"><input type="checkbox" class="pv-ck" data-rt="${esc(x.key)}" data-sid="${s.id}" ${(cur[x.key]||[]).includes(s.id)?'checked':''} ${dis} aria-label="${esc(x.name)} – ${esc(s.name)}"></td>`).join('')}</tr>`).join('')).join('')}
+      ${S.canWrite?`<tr class="pv-add"><td colspan="${st.length+1}"><input class="pv-q" id="rtNew" placeholder="Tên việc thường quy mới" style="max-width:280px"> <select id="rtTier">${['hs1','hs2','hs3','hs4','hs5'].map(k=>`<option value="${k}">Hệ số ${k.slice(2)} (${nf(b[k])})</option>`).join('')}</select> <button class="btn sm" data-act="pv-addtask">+ Thêm việc</button></td></tr>`:''}
+      <tr class="pv-sum"><td>Tổng điểm thường quy</td>${st.map(s=>{const c=rtCount(m,s.id);return `<td class="c num">${c?nf(Object.entries(c).reduce((a,[k,v])=>a+v*(+b[k]||0),0)):'—'}</td>`}).join('')}</tr>
+      </tbody></table></div>`:'<div class="empty">Chưa có danh mục việc thường quy.</div>'}</div>`}
+  else{
+    const V=S.shops.map((x,i)=>({...x,i})).filter(x=>x.type==='vp');
+    h+=`<div class="panel pv-p"><h2>Phân công văn phòng · ${fmtM(m)}</h2><div class="row" style="margin-bottom:10px">${S.canWrite?`<button class="btn" data-act="copy-prev">Chép từ ${fmtM(pm)} cho ô trống</button><button class="btn" data-act="add-shop">+ Thêm điểm</button>`:''}</div>
+      <div class="tbl-wrap"><table class="pv-t"><thead><tr><th>Văn phòng</th><th>Phụ trách ${fmtM(m)}</th><th>${fmtM(pm)}</th><th></th></tr></thead><tbody>
+      ${V.map(x=>`<tr><td><b>${esc(x.code)}</b></td><td><select id="sh-${x.i}" data-shop="${x.i}" ${dis}>${opts((x.m||{})[m]||'','— Chưa giao —')}</select></td><td class="mini">${(x.m||{})[pm]?esc(staffName(x.m[pm])):'—'}</td><td>${S.canWrite?`<button class="btn sm ghost" data-act="edit-shop" data-i="${x.i}">Sửa</button>`:''}</td></tr>`).join('')}
+      </tbody></table></div></div>`}
+  const tiersAll=Object.entries(S.hsRef||{});
+  return h;
+}
+document.addEventListener('change',e=>{const t=e.target;if(S.view!=='phan-cong')return;
+  if(t.dataset.pvp!=null){pvSet('p',S.month,t.dataset.pvp,t.value||'').then(()=>toast('Đã lưu phân công tỉnh '+t.dataset.pvp)).catch(()=>{});t.blur();render()}
+  else if(t.dataset.pvx!=null){const pr=pvProvOwner(S.month,(pvUniverse().find(x=>x.code===t.dataset.pvx)||{}).prov||'');const v=t.value;
+    pvSet('x',S.month,t.dataset.pvx,v&&!(pr&&pr.v===v)?v:'').then(()=>toast('Đã lưu ngoại lệ '+dcNT(t.dataset.pvx))).catch(()=>{});t.blur();render()}
+  else if(t.dataset.rt!=null){rtToggle(S.month,t.dataset.rt,t.dataset.sid,t.checked).catch(()=>{});render()}
+  else if(t.id==='pfProv'){S.pf.prov=t.value;render()}else if(t.id==='pfAll'){S.pf.all=t.checked;render()}});
+document.addEventListener('input',e=>{if(e.target.id==='pfQ'&&S.view==='phan-cong'){S.pf.q=e.target.value;clearTimeout(window._pfT);window._pfT=setTimeout(()=>{render();const i=document.getElementById('pfQ');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act^="pv-"]');if(!b)return;const a=b.dataset.act;
+  if(a==='pv-tab'){S.pvTab=b.dataset.id;render();return}
+  if(!S.canWrite)return;const ref=JSON.parse(JSON.stringify(rtRef()));
+  if(a==='pv-addtask'){const n=(document.getElementById('rtNew').value||'').trim(),t=document.getElementById('rtTier').value;if(!n){toast('Nhập tên việc');return}(ref[t]=ref[t]||[]);if(!ref[t].includes(n))ref[t].push(n);write('catalog/hs',{tiers:ref,updatedAt:new Date().toISOString()}).then(()=>toast('Đã thêm việc '+n)).catch(()=>{})}
+  else if(a==='pv-deltask'){const [t,...rest]=b.dataset.id.split('|');const n=rest.join('|');if(b.dataset.arm!=='1'){b.dataset.arm='1';b.textContent='Bỏ?';return}ref[t]=(ref[t]||[]).filter(x=>x!==n);write('catalog/hs',{tiers:ref,updatedAt:new Date().toISOString()}).then(()=>toast('Đã bỏ việc '+n)).catch(()=>{})}});
+document.head.insertAdjacentHTML('beforeend',`<style>
+.pv-dist{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.pv-dist .note{margin:0 0 0 8px}
+.pv-dd{display:flex;flex-direction:column;align-items:center;min-width:62px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:var(--surface)}.pv-dd b{font-size:22px;line-height:1.1}.pv-dd span{font-size:12px;color:var(--muted);font-weight:600}
+.pv-dd.D1{border-color:#f0b4aa}.pv-dd.D2{border-color:#f4cf98}.pv-dd.D3{border-color:#e8dd8c}.pv-dd.D4{border-color:#bfe0b4}.pv-dd.D5{border-color:#8fd0a8}.pv-dd.D6{border-color:#4fae7b}
+.pv-eff td.pv-auto{background:var(--sunken);color:var(--fg)}.pv-eff .grp{border-left:2px solid var(--line)}
+.pv-sc{display:flex;align-items:center;gap:8px;min-width:130px}.pv-eff td:first-child{min-width:150px}.pv-eff td:first-child b{white-space:nowrap}.pv-eff td:first-child .note{display:none}.pv-eff td,.pv-eff th{padding-left:6px;padding-right:6px}.pv-eff td.pv-auto{background:var(--sunken)}.pv-sc>b{min-width:44px;text-align:right}
+.pv-bar{position:relative;flex:1;height:10px;border-radius:99px;background:var(--sunken);overflow:hidden}.pv-bar i{position:absolute;inset:0 auto 0 0;border-radius:99px;background:var(--accent)}.pv-bar>b{position:absolute;top:0;bottom:0;width:1px;background:var(--muted);opacity:.45}
+.pv-bar i.D1{background:#d9604c}.pv-bar i.D2{background:#e59a3a}.pv-bar i.D3{background:#cbb53a}.pv-bar i.D4{background:#7cbf6e}.pv-bar i.D5{background:#3fa06a}.pv-bar i.D6{background:#1f7a4c}
+.pv-tabs{display:flex;gap:4px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:18px 0 12px}.pv-tabs button{border:0;background:none;padding:9px 12px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;font:inherit;font-weight:600}
+.pv-tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}.pv-cnt{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;padding-bottom:6px}
+.pv-p h2 small{font-weight:400}.pv-t td,.pv-t th{vertical-align:middle}.pv-t select{max-width:240px}
+.pv-ex td{background:var(--warn-soft)}.pv-rt th.c,.pv-rt td.c{text-align:center;width:70px}.pv-rt input.pv-ck{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}.pv-rt #rtNew{width:280px}
+.pv-del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px}.pv-del:hover{color:var(--bad)}.pv-add td{background:var(--sunken)}
+.pv-tier td{background:var(--sunken);font-weight:700;font-size:12.5px;color:var(--muted)}.pv-sum td{font-weight:700;border-top:2px solid var(--line)}
+</style>`);
+
 </script>
 </body>
 </html>
