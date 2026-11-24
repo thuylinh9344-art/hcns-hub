@@ -1094,6 +1094,7 @@ const REC_SHEET='1Rdbf388QNJ_JXGbbDueoT9EDkMUW0ZvwGrXwgEuhduY',REC_TAB='Hồ sơ
 const REC_GRP=['Bán hàng & học việc','Văn phòng & kho','CHT / QLKV'],REC_TTF=[15,15,45];
 const REC_EXCL=['UP000762','UP001620','UP000164'];/* Nguyễn Phúc Tân, Kiều Thu Phương, Nguyễn Trọng Vinh */
 const REC_ALIAS={'Hưng Yên':['Thái Bình'],'Ninh Bình':['Nam Định','Hà Nam'],'Đà Nẵng':['Quảng Nam'],'Hồ Chí Minh':['Bình Dương','Bà Rịa'],'Bắc Ninh':['Bắc Giang'],'Phú Thọ':['Vĩnh Phúc','Hòa Bình'],'Quảng Trị':['Quảng Bình'],'Gia Lai':['Bình Định'],'Khánh Hòa':['Ninh Thuận'],'Đắk Lắk':['Phú Yên','Đắc Lắc'],'Lâm Đồng':['Đắk Nông','Bình Thuận'],'An Giang':['Kiên Giang'],'Cần Thơ':['Sóc Trăng','Hậu Giang'],'Thái Nguyên':['Bắc Kạn'],'Hải Phòng':['Hải Dương'],'Quảng Ngãi':['Kon Tum'],'Huế':['Thừa Thiên Huế']};
+const CVL_FROM='2026-11-01',CVL_SHEET='16VVYm5eqddU0Lr6fMwUmRClRrHKxJQNBJykHVxp2_ok';
 const REC_PV1=['Đã hẹn PV vòng 1','Đồng ý PV vòng 1'],REC_PV2=['PV vòng 1 đã đạt','Đã hẹn PV vòng 2','Đồng ý PV vòng 2'];
 const REC_W={ontime:25,ttf:15,conv:25,ret:15,data:20};
 const recGrp=p=>{p=(p||'').toLowerCase();if(p.includes('cửa hàng trưởng')||/^quản lý/.test(p.trim()))return 2;if(p.includes('bán hàng')||p.includes('học việc'))return 0;return 1};
@@ -1155,10 +1156,13 @@ function recRows(){
     x.q90b=start&&start<=addDays(TODAY,-90);x.q90=x.q90b&&quit&&diffDays(start,quit)<=90;
     /* Hồ sơ treo: chỉ xét hồ sơ nộp trong 3 tháng gần nhất */
     x.recent=sub>=addDays(TODAY,-91);x.stale='';x.due='';
-    if(x.recent){
-      if(st==='Mới tạo'){x.due=addDays(sub,7);if(TODAY>x.due)x.stale='Mới tạo quá 7 ngày'}
-      else if(REC_PV1.includes(st)){x.due=v1||addWd(sub,3);if(TODAY>x.due)x.stale='PV vòng 1 quá hạn'}
-      else if(REC_PV2.includes(st)){x.due=v2||addWd(v1||sub,3);if(TODAY>x.due)x.stale='PV vòng 2 quá hạn'}
+    /* Hạn xử lý (từ hồ sơ nộp 01/11/2026): Mới tạo 48h (+24h nếu có Chủ nhật) · Chuyển BP/Nhóm → hẹn PV1 72h · PV1 → hẹn PV2 5 ngày */
+    if(x.recent&&sub>=CVL_FROM){
+      const d48=()=>{let d=addDays(sub,2);for(let t=sub;t<=d;t=addDays(t,1))if(pd(t).getDay()===0){d=addDays(d,1);break}return d};
+      if(st==='Mới tạo'){x.due=d48();x.stale='Mới tạo quá 48h'}
+      else if(st==='Chuyển Bộ phận/Nhóm'||(REC_PV1.includes(st)&&!v1)){x.due=addDays(d48(),3);x.stale='Chưa hẹn PV1 quá 72h'}
+      else if(REC_PV1.includes(st)&&v1&&!v2){x.due=addDays(v1,5);x.stale='Sau PV1 quá 5 ngày'}
+      if(x.stale&&!(TODAY>x.due)){x.stale='';x.due=''}
     }
     x.over=x.stale?diffDays(x.due,TODAY):0;return x});
   _recCache={src:R,d};return d;
@@ -1185,7 +1189,7 @@ function recFilter(){const f=S.recF;const all=recRows().filter(x=>x.o&&x.o!=='x'
 const recCls=(v,good,bad,rev)=>v==null?'':rev?(v<=good?'ok':v>bad?'bad':'warn'):(v>=good?'ok':v<bad?'bad':'warn');
 const recPill=(v,good,bad,rev,suf='%')=>v==null?'<span class="note">—</span>':`<span class="pill ${recCls(v,good,bad,rev)}">${String(v).replace('.',',')}${suf}</span>`;
 function recStaleText(list){const by={};list.forEach(x=>(by[x.o]??=[]).push(x));
-  return `HỒ SƠ TUYỂN DỤNG ĐANG TREO – ${fmtDY(TODAY)}\n(chỉ xét hồ sơ nộp trong 3 tháng gần nhất)\n`+Object.entries(by).sort((a,b)=>b[1].length-a[1].length).map(([o,xs])=>`\n@${staffName(o)}: ${xs.length} hồ sơ\n`+xs.sort((a,b)=>b.over-a.over).map(x=>`- ${x.code} · ${x.p} · ${x.ar}: ${x.stale.toLowerCase()} ${x.over} ngày (trạng thái "${x.st}")`).join('\n')).join('\n')}
+  return `HỒ SƠ TUYỂN DỤNG ĐANG TREO – ${fmtDY(TODAY)}\n(xét hồ sơ nộp từ 01/11/2026)\n`+Object.entries(by).sort((a,b)=>b[1].length-a[1].length).map(([o,xs])=>`\n@${staffName(o)}: ${xs.length} hồ sơ\n`+xs.sort((a,b)=>b.over-a.over).map(x=>`- ${x.code} · ${x.p} · ${x.ar}: ${x.stale.toLowerCase()} ${x.over} ngày (trạng thái "${x.st}")`).join('\n')).join('\n')}
 async function recTasks(list){const by={};list.forEach(x=>(by[x.o]??=[]).push(x));let n=0,skip=0;
   for(const [o,xs] of Object.entries(by)){const key='rec:'+o+':'+TODAY;if(S.tasks.some(t=>t.sysKey===key)){skip++;continue}
     await write('tasks/'+newId('tasks'),{title:`Dọn ${xs.length} hồ sơ tuyển dụng đang treo`,owner:o,module:'Tuyển dụng',priority:'cao',status:'todo',start:TODAY,due:addWd(TODAY,2),progress:0,
@@ -3217,7 +3221,7 @@ function vAssign(){
     h+=`<div class="panel pv-p"><h2>Thường quy · ${fmtM(m)} <small>${r?(r.from===m?'đã đánh dấu tháng này':'giữ từ '+fmtM(r.from)):'chưa đánh dấu'}</small></h2>
       <p class="note">Tích vào ô người làm việc đó. Số việc theo từng hệ số tự cộng vào bảng xếp hạng. Tháng sau tự giữ như tháng này, chỉ sửa khi có thay đổi. Thêm hoặc bỏ việc ở cuối bảng.</p>
       ${T.length?`<div class="tbl-wrap"><table class="pv-t pv-rt"><thead><tr><th>Việc thường quy</th>${st.map(s=>`<th class="c">${esc(shortName(s.id))}</th>`).join('')}</tr></thead><tbody>
-      ${tiers.map(t=>`<tr class="pv-tier"><td colspan="${st.length+1}">${esc(t.toUpperCase().replace('HS','Hệ số '))} · ${nf(b[t])} điểm/việc</td></tr>`+T.filter(x=>x.tier===t).map(x=>`<tr><td>${esc(x.name)}${S.canWrite?` <button class="pv-del" data-act="pv-deltask" data-id="${esc(x.key)}" title="Bỏ việc này khỏi danh mục" aria-label="Bỏ việc">✕</button>`:''}</td>${st.map(s=>`<td class="c"><input type="checkbox" class="pv-ck" data-rt="${esc(x.key)}" data-sid="${s.id}" ${(cur[x.key]||[]).includes(s.id)?'checked':''} ${dis} aria-label="${esc(x.name)} – ${esc(s.name)}"></td>`).join('')}</tr>`).join('')).join('')}
+      ${tiers.map(t=>`<tr class="pv-tier"><td colspan="${st.length+1}">${esc(t.toUpperCase().replace('HS','Hệ số '))} · ${nf(b[t])} điểm/việc</td></tr>`+T.filter(x=>x.tier===t).map(x=>`<tr><td>${S.rtEdit===x.key?`<span class="pv-ed"><input class="pv-q" id="rtEdName" value="${esc(x.name)}" aria-label="Tên việc"><select class="pv-q" id="rtEdTier">${['hs1','hs2','hs3','hs4','hs5'].map(k=>`<option value="${k}" ${k===x.tier?'selected':''}>Hệ số ${k.slice(2)}</option>`).join('')}</select><button class="btn sm pri" data-act="pv-savetask" data-id="${esc(x.key)}">Lưu</button><button class="btn sm ghost" data-act="pv-canceltask">Hủy</button></span>`:`${esc(x.name)}${S.canWrite?` <button class="pv-edit" data-act="pv-edittask" data-id="${esc(x.key)}" title="Sửa tên hoặc hệ số">✎ Sửa</button><button class="pv-del" data-act="pv-deltask" data-id="${esc(x.key)}" title="Bỏ việc này khỏi danh mục" aria-label="Bỏ việc">✕</button>`:''}`}</td>${st.map(s=>`<td class="c"><input type="checkbox" class="pv-ck" data-rt="${esc(x.key)}" data-sid="${s.id}" ${(cur[x.key]||[]).includes(s.id)?'checked':''} ${dis} aria-label="${esc(x.name)} – ${esc(s.name)}"></td>`).join('')}</tr>`).join('')).join('')}
       ${S.canWrite?`<tr class="pv-add"><td colspan="${st.length+1}"><input class="pv-q" id="rtNew" placeholder="Tên việc thường quy mới" style="max-width:280px"> <select id="rtTier">${['hs1','hs2','hs3','hs4','hs5'].map(k=>`<option value="${k}">Hệ số ${k.slice(2)} (${nf(b[k])})</option>`).join('')}</select> <button class="btn sm" data-act="pv-addtask">+ Thêm việc</button></td></tr>`:''}
       <tr class="pv-sum"><td>Tổng điểm thường quy</td>${st.map(s=>{const c=rtCount(m,s.id);return `<td class="c num">${c?nf(Object.entries(c).reduce((a,[k,v])=>a+v*(+b[k]||0),0)):'—'}</td>`}).join('')}</tr>
       </tbody></table></div>`:'<div class="empty">Chưa có danh mục việc thường quy.</div>'}</div>`}
@@ -3240,6 +3244,14 @@ document.addEventListener('input',e=>{if(e.target.id==='pfQ'&&S.view==='phan-con
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act^="pv-"]');if(!b)return;const a=b.dataset.act;
   if(a==='pv-tab'){S.pvTab=b.dataset.id;render();return}
   if(!S.canWrite)return;const ref=JSON.parse(JSON.stringify(rtRef()));
+  if(a==='pv-edittask'){S.rtEdit=b.dataset.id;render();setTimeout(()=>{const i=document.getElementById('rtEdName');if(i){i.focus();i.select()}},30);return}
+  if(a==='pv-canceltask'){S.rtEdit='';render();return}
+  if(a==='pv-savetask'){const [t0,...rest]=b.dataset.id.split('|');const n0=rest.join('|');const n=(document.getElementById('rtEdName').value||'').trim(),t=document.getElementById('rtEdTier').value;
+    if(!n){toast('Nhập tên việc');return}const nk=t+'|'+n;if(nk===b.dataset.id){S.rtEdit='';render();return}
+    if((ref[t]||[]).includes(n)){toast('Đã có việc này ở hệ số '+t.slice(2));return}
+    const i0=(ref[t0]||[]).indexOf(n0);ref[t0]=(ref[t0]||[]).filter(x=>x!==n0);(ref[t]=ref[t]||[]);if(t===t0&&i0>=0)ref[t].splice(i0,0,n);else ref[t].push(n);
+    const d=JSON.parse(JSON.stringify(S.rt||{m:{}}));let moved=false;Object.values(d.m||{}).forEach(mm=>{if(mm&&mm[b.dataset.id]){mm[nk]=mm[b.dataset.id];delete mm[b.dataset.id];moved=true}});
+    S.rtEdit='';Promise.all([write('catalog/hs',{tiers:ref,updatedAt:new Date().toISOString()}),moved?(d.updatedAt=new Date().toISOString(),S.rt=d,write('assign/routine',d)):null]).then(()=>toast('Đã sửa việc '+n)).catch(()=>{});render();return}
   if(a==='pv-addtask'){const n=(document.getElementById('rtNew').value||'').trim(),t=document.getElementById('rtTier').value;if(!n){toast('Nhập tên việc');return}(ref[t]=ref[t]||[]);if(!ref[t].includes(n))ref[t].push(n);write('catalog/hs',{tiers:ref,updatedAt:new Date().toISOString()}).then(()=>toast('Đã thêm việc '+n)).catch(()=>{})}
   else if(a==='pv-deltask'){const [t,...rest]=b.dataset.id.split('|');const n=rest.join('|');if(b.dataset.arm!=='1'){b.dataset.arm='1';b.textContent='Bỏ?';return}ref[t]=(ref[t]||[]).filter(x=>x!==n);write('catalog/hs',{tiers:ref,updatedAt:new Date().toISOString()}).then(()=>toast('Đã bỏ việc '+n)).catch(()=>{})}});
 document.head.insertAdjacentHTML('beforeend',`<style>
@@ -3254,7 +3266,7 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .pv-tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent)}.pv-cnt{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;padding-bottom:6px}
 .pv-p h2 small{font-weight:400}.pv-t td,.pv-t th{vertical-align:middle}.pv-t select{max-width:240px}
 .pv-ex td{background:var(--warn-soft)}.pv-rt th.c,.pv-rt td.c{text-align:center;width:70px}.pv-rt input.pv-ck{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}.pv-rt #rtNew{width:280px}
-.pv-del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px}.pv-del:hover{color:var(--bad)}.pv-add td{background:var(--sunken)}
+.pv-edit{border:0;background:none;color:var(--accent);cursor:pointer;font-size:12px;font-weight:600;padding:0 6px}.pv-edit:hover{text-decoration:underline}.pv-ed{display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}.pv-ed #rtEdName{width:240px}.pv-del{border:0;background:none;color:var(--muted);cursor:pointer;font-size:12px;padding:0 4px}.pv-del:hover{color:var(--bad)}.pv-add td{background:var(--sunken)}
 .pv-tier td{background:var(--sunken);font-weight:700;font-size:12.5px;color:var(--muted)}.pv-sum td{font-weight:700;border-top:2px solid var(--line)}
 </style>`);
 
@@ -3425,6 +3437,57 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 .ov-att{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.ov-att li{padding:7px 10px;border-radius:8px;background:var(--sunken);font-size:13.5px;border-left:3px solid var(--line)}.ov-att li.bad{border-left-color:var(--bad)}.ov-att li.warn{border-left-color:var(--warn)}
 </style>`);
 
+/* CV xử lý chậm → trừ KPI: nguồn là file "Nhật ký CV chậm xử lý - HCNS 2026" (mỗi thứ Hai ghi thêm các hồ sơ chậm, −1đ/hồ sơ/tuần).
+   Web cộng dồn theo tháng + người → kadj/cvl_<YYYY-MM>_<staffId> (lũy kế trong tháng, cập nhật lại mỗi lần đồng bộ). */
+async function cvlSync(silent){
+  if(!S.mcp||!S.canWrite||S.role==='staff'||S.cvlBusy)return;S.cvlBusy=true;S.cvlTried=Date.now();
+  try{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:CVL_SHEET,range:'A2:L'},{cache:false,silent:!!silent});const V=(res.payload&&res.payload.values)||[];
+    const by={};const ids={};allStaff().forEach(s=>{ids[normName(s.name)]=s.id});let miss=new Set();
+    V.forEach(r=>{const scan=String(r[0]||''),mo=String(r[1]||''),who=normName(r[2]),pts=+r[10]||0,note=String(r[11]||'');if(!who||!pts||/test/i.test(note))return;
+      const mm=mo.match(/(\d{1,2})\/(\d{4})/);if(!mm)return;const ym=mm[2]+'-'+mm[1].padStart(2,'0');const sid=ids[who];if(!sid){miss.add(r[2]);return}
+      const k=ym+'|'+sid;const o=by[k]=by[k]||{ym,sid,n:0,pts:0,scans:new Set()};o.n++;o.pts+=pts;o.scans.add(scan)});
+    let n=0;for(const o of Object.values(by)){const id='cvl_'+o.ym+'_'+o.sid;const sc=[...o.scans].sort((a,b)=>a.split('/').reverse().join('').localeCompare(b.split('/').reverse().join('')));
+      const body={staffId:o.sid,month:o.ym,pts:o.pts,reason:`Chậm xử lý hồ sơ tuyển dụng ${fmtM(o.ym)}: ${o.n} lượt (lũy kế đến ${sc[sc.length-1]})`,meetingId:'',date:TODAY,src:'cvlate',scans:sc.length};
+      const cur=S.kadj.find(a=>a.id===id);if(cur&&cur.pts===body.pts&&cur.reason===body.reason)continue;await write('kadj/'+id,{...body,updatedAt:new Date().toISOString()});n++}
+    for(const a of S.kadj.filter(a=>a.src==='cvlate'&&!by[a.month+'|'+a.staffId]))await del('kadj/'+a.id);
+    S.cvlAt=Date.now();if(!silent)toast(n?`Đã cập nhật trừ KPI CV chậm cho ${n} người`:'Điểm trừ CV chậm đã khớp');if(miss.size&&!silent)toast('Không khớp tên: '+[...miss].join(', '))
+  }catch(e){if(!silent)toast('Chưa đọc được file Nhật ký CV chậm xử lý')}finally{S.cvlBusy=false}}
+setInterval(()=>{if(S.mcp&&S.db&&S.loaded&&S.canWrite&&S.role!=='staff'&&!S.cvlBusy&&(!S.cvlTried||Date.now()-S.cvlTried>30*60e3))cvlSync(true)},15e3);
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act="cvl-sync"]');if(b)cvlSync(false)});
+document.head.insertAdjacentHTML('beforeend',`<style>
+/* Giao diện xanh (24/11/2026) – thanh trái xanh đậm, thẻ số liệu màu, khối bo tròn có bóng */
+:root{--bg:#EEF4EF;--line:#DCE7DD;--r:14px;--side1:#16984D;--side2:#0B7437;--shadow:0 1px 2px rgba(15,60,30,.05),0 6px 18px rgba(15,60,30,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B120D;--side1:#0F5A2E;--side2:#0A3F20;--shadow:0 1px 2px rgba(0,0,0,.3)}}
+:root[data-theme="dark"]{--bg:#0B120D;--side1:#0F5A2E;--side2:#0A3F20;--shadow:0 1px 2px rgba(0,0,0,.3)}
+nav.side{background:linear-gradient(180deg,var(--side1),var(--side2));border-right:0;color:#fff;box-shadow:2px 0 14px rgba(11,80,40,.18)}
+.brand{border-image:none;border-bottom:1px solid rgba(255,255,255,.18)}
+.brand img{background:#fff;border-radius:12px;padding:4px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.brand b{color:#fff}.brand b em{color:#FFD08A}.brand span{color:rgba(255,255,255,.75)}
+.navlist{gap:3px}
+.navlist a{color:rgba(255,255,255,.93);border-radius:10px;padding:9px 12px;font-weight:500;transition:background .15s}
+.navlist a:hover{background:rgba(255,255,255,.13)}
+.navlist a[aria-current="page"]{background:#fff;color:#0E7A3B;font-weight:700;box-shadow:0 3px 10px rgba(0,0,0,.14)}
+.navlist .cnt{background:rgba(255,255,255,.22);color:#fff}.navlist a[aria-current="page"] .cnt{background:var(--bad-soft);color:var(--bad)}
+.side-foot{color:rgba(255,255,255,.8)}.side-foot .btn,nav.side .btn{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.28);color:#fff}
+.head h1{border-left:4px solid var(--accent);padding-left:10px;line-height:1.2}
+.panel{border-color:var(--line);box-shadow:var(--shadow)}
+.btn{border-radius:8px}.btn.pri{background:linear-gradient(180deg,#19A355,#0F8A42);border-color:#0F8A42;box-shadow:0 2px 6px rgba(15,138,66,.25)}
+input,select,textarea{border-radius:8px}
+.stats{gap:12px;border:0;background:transparent;border-radius:0}
+.stats .stat{border:1px solid var(--line)!important;border-radius:14px;background:var(--surface);box-shadow:var(--shadow);position:relative;overflow:hidden}
+.stats .stat:nth-child(1){background:linear-gradient(135deg,#1BA457,#0C7A3B);border-color:#0C7A3B!important;color:#fff}
+.stats .stat:nth-child(1) .k,.stats .stat:nth-child(1) .s,.stats .stat:nth-child(1) .v{color:#fff!important}
+.stats .stat:nth-child(2){background:linear-gradient(135deg,#E3F6EC,#C8EEDB)}
+.stats .stat:nth-child(3){background:linear-gradient(135deg,#F1F4F7,#DDE4EC)}
+.stats .stat:nth-child(4){background:linear-gradient(135deg,#FFF6DC,#F8E2A4)}
+.stats .stat:nth-child(5){background:linear-gradient(135deg,#ECEBFF,#D7D8FB)}
+.stats .stat:nth-child(6){background:linear-gradient(135deg,#E1F6FB,#BDE9F4)}
+.stats .stat:nth-child(n+7){background:linear-gradient(135deg,#FDECEA,#F9D5D0)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .stats .stat:not(:first-child){background:var(--surface)}}
+:root[data-theme="dark"] .stats .stat:not(:first-child){background:var(--surface)}
+th{background:#E7F1E9}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) th{background:var(--sunken)}}
+</style>`);
 </script>
 </body>
 </html>
