@@ -406,7 +406,7 @@ function dueInfo(t){
 }
 function perfOf(sid,range){const mine=S.tasks.filter(t=>t.owner===sid);const done=mine.filter(t=>isDone(t)&&inR(t.doneAt,range));const onTime=done.filter(t=>!t.due||t.doneAt<=t.due).length;
   return {open:mine.filter(t=>!isDone(t)).length,over:mine.filter(overdue).length,done:done.length,rate:done.length?Math.round(onTime/done.length*100):null}}
-function okrProgress(o){const krs=(o.krs||[]).filter(k=>+k.target>0);if(!krs.length)return 0;return Math.round(krs.reduce((a,k)=>a+Math.min((+k.current||0)/(+k.target),1),0)/krs.length*100)}
+function okrProgress(o){if(typeof okrLiveObj==='function')o=okrLiveObj(o);const krs=(o.krs||[]).filter(k=>+k.target>0);if(!krs.length)return 0;return Math.round(krs.reduce((a,k)=>a+(typeof okrKp==='function'?okrKp(k):Math.min(Math.round((+k.current||0)/(+k.target)*100),100)),0)/krs.length)}
 
 /* ===================== Ghi dữ liệu ===================== */
 const chains={};
@@ -960,7 +960,7 @@ function vOkr(){
   (list.length?`<div class="stack">${list.map(o=>{const p=okrProgress(o);const linked=S.tasks.filter(t=>t.okrId===o.id);const st=p>=elapsed?['ok','Đúng tiến độ']:p>=elapsed-20?['warn','Cần theo dõi']:['bad','Chậm tiến độ'];
     return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>${esc(o.objective)}</b><div class="note">${esc(o.owner?staffName(o.owner):'Toàn phòng')} · ${linked.length} việc liên kết (${linked.filter(isDone).length} xong)</div></div><div class="row"><span class="pill ${st[0]}">${st[1]}</span><b class="num" style="font-size:18px">${p}%</b><button class="btn sm" data-act="edit-okr" data-id="${o.id}">Sửa</button></div></div>
     <div class="bar"><i class="${st[0]}" style="width:${p}%"></i></div>
-    ${(o.krs||[]).map((k,i)=>{const kp=+k.target>0?Math.min(Math.round((+k.current||0)/(+k.target)*100),100):0;return `<div class="kr"><span>${esc(k.title)}</span><div class="bar"><i style="width:${kp}%"></i></div><div class="vals"><input class="num" type="number" step="any" id="kr-${o.id}-${i}" data-kr="${o.id}" data-i="${i}" value="${esc(k.current??0)}" ${S.canWrite?'':'disabled'}><span class="note num">/ ${esc(k.target)} ${esc(k.unit||'')}</span></div></div>`}).join('')}
+    ${(okrLiveObj(o).krs||[]).map((k,i)=>{const kp=okrKp(k);return `<div class="kr"><span>${esc(k.title)}${k._src?`<div class="mini">${k._wait?'tự động · đang chờ dữ liệu':'tự động · '+esc(k._txt||'')}${k._low?' · càng thấp càng tốt':''}</div>`:''}</span><div class="bar"><i style="width:${kp}%"></i></div><div class="vals">${k._src&&!k._wait?`<b class="num">${nf(k.current)}</b>`:`<input class="num" type="number" step="any" id="kr-${o.id}-${i}" data-kr="${o.id}" data-i="${i}" value="${esc(k.current??0)}" ${S.canWrite?'':'disabled'}>`}<span class="note num">/ ${esc(k.target)} ${esc(k.unit||'')}</span></div></div>`}).join('')}
     </div>`}).join('')}</div>`:`<div class="empty">Chưa có OKR cho ${fmtQ(S.okrQ)}. Bấm “+ Thêm mục tiêu”.</div>`);
 }
 
@@ -991,7 +991,7 @@ function buildReport(){
     if(type==='thang'){const m=months[0];sec.push({h:'VII. KPI và hiệu suất '+fmtM(m),table:{cols:['Nhân sự','Ngày BC','Điểm thực','Trừ lỗi','KPI','Loại','Điểm HS','Hạng D'],rows:staff.map(s=>{const k=kpiOf(m,s.id),e=effOf(m,s.id);return [s.name,k.days,k.has?nf(k.raw):'—',k.pen?nf(k.pen):'',k.has?nf(k.val):'—',k.grade,e.has?nf(e.score):'—',e.has?e.rank:'—']})}})}
     else sec.push({h:'VII. KPI và hạng D theo tháng',table:{cols:['Nhân sự',...months.map(m=>'KPI '+fmtM(m)),'KPI TB','Loại',...months.map(m=>'D '+fmtM(m))],rows:staff.map(s=>{const v=months.map(m=>kpiOf(m,s.id));const ok=v.filter(k=>k.has);const avg=ok.length?r1(ok.reduce((a,k)=>a+k.val,0)/ok.length):null;return [s.name,...v.map(k=>k.has?nf(k.val):'—'),avg==null?'—':nf(avg),avg==null?'—':gradeOf(avg/(+S.config.kpiMax||1000)*100),...months.map(m=>{const e=effOf(m,s.id);return e.has?e.rank:'—'})]})}});
     const q=qOf(r[0]);const okrs=S.okrs.filter(o=>o.quarter===q);
-    sec.push({h:'VIII. Tiến độ OKR '+fmtQ(q),lines:okrs.length?okrs.flatMap(o=>[`${o.objective}: ${okrProgress(o)}%`,...(o.krs||[]).map(k=>`   • ${k.title}: ${k.current??0}/${k.target} ${k.unit||''}`)]):['Chưa có OKR cho quý này']});
+    sec.push({h:'VIII. Tiến độ OKR '+fmtQ(q),lines:okrs.length?okrs.map(okrLiveObj).flatMap(o=>[`${o.objective}: ${okrProgress(o)}%`,...(o.krs||[]).map(k=>`   • ${k.title}: ${k.current??0}/${k.target} ${k.unit||''}`)]):['Chưa có OKR cho quý này']});
   }
   return sec;
 }
@@ -1086,7 +1086,7 @@ function okrDlg(o){const isNew=!o;o=o||{quarter:S.okrQ,objective:'',owner:'',krs
     <label>Phụ trách chính<select name="owner"><option value="">Toàn phòng</option>${activeStaff().map(s=>`<option value="${s.id}" ${o.owner===s.id?'selected':''}>${esc(s.name)}</option>`).join('')}</select></label>
     <div class="full" style="grid-column:1/-1"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): tên · chỉ tiêu · đơn vị</b><div id="krRows">${(o.krs||[]).map(krRow).join('')}</div><button type="button" class="btn sm" data-act="add-kr">+ Thêm KR</button></div>
   </div>`,`<div>${!isNew?delBtn('del-okr',o.id,'Xóa mục tiêu'):''}</div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="submit" class="btn pri" data-act="save-okr" data-id="${isNew?'':o.id}">Lưu</button></div>`)}
-const krRow=k=>`<div class="modrow3" data-cur="${esc(k.current??0)}"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt"><input data-kg class="num" type="number" step="any" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="rm-row" title="Bỏ">✕</button></div>`;
+const krRow=k=>`<div class="modrow3" data-cur="${esc(k.current??0)}"><input data-kt value="${esc(k.title||'')}" placeholder="Kết quả then chốt"><input data-kg class="num" type="number" step="any" value="${esc(k.target??'')}" placeholder="Chỉ tiêu"><input data-ku value="${esc(k.unit||'')}" placeholder="Đơn vị"><button type="button" class="btn sm ghost" data-act="rm-row" title="Bỏ">✕</button><select data-ks aria-label="Nguồn số liệu" style="grid-column:1/-1;margin:-2px 0 8px">${OKR_SRC.map(([v,l])=>`<option value="${v}" ${(k.src||'auto')===v?'selected':''}>Số liệu: ${l}</option>`).join('')}</select></div>`;
 
 /* ===================== Hồ sơ tuyển dụng (Member) ===================== */
 const REC_SHEET='1Rdbf388QNJ_JXGbbDueoT9EDkMUW0ZvwGrXwgEuhduY',REC_TAB='Hồ sơ tuyển dụng';
@@ -1306,7 +1306,7 @@ document.addEventListener('click',async e=>{
     case 'add-kr':$('#krRows').insertAdjacentHTML('beforeend',krRow({}));break;
     case 'rm-row':el.parentElement.remove();break;
     case 'save-okr':{e.preventDefault();const f=$('#dlgForm');if(!f.reportValidity())break;const fd=Object.fromEntries(new FormData(f));
-      const krs=[...dlg.querySelectorAll('.modrow3')].map(r=>({title:r.querySelector('[data-kt]').value.trim(),target:+r.querySelector('[data-kg]').value||0,unit:r.querySelector('[data-ku]').value.trim(),current:+r.dataset.cur||0})).filter(k=>k.title);
+      const krs=[...dlg.querySelectorAll('.modrow3')].map(r=>{const ks=r.querySelector('[data-ks]');const o={title:r.querySelector('[data-kt]').value.trim(),target:+r.querySelector('[data-kg]').value||0,unit:r.querySelector('[data-ku]').value.trim(),current:+r.dataset.cur||0};if(ks&&ks.value!=='auto')o.src=ks.value;return o}).filter(k=>k.title);
       const old=id?S.okrs.find(x=>x.id===id):null;const body={...(old?clean(old):{}),objective:fd.objective.trim(),quarter:fd.quarter.trim()||S.okrQ,owner:fd.owner,krs};if(!old)body.order=S.okrs.length+1;
       write('okrs/'+(id||newId('okrs')),body).then(()=>toast('Đã lưu OKR')).catch(()=>{});closeDlg();break}
     case 'rep-type':S.rep.type=el.dataset.v;render();break;
@@ -3324,6 +3324,27 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act="bb-sa
 document.head.insertAdjacentHTML('beforeend',`<style>.bb-t td{vertical-align:top}.bb-t textarea{width:100%;min-width:320px;font:inherit;font-size:13px}.bb-pp{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.bb-pp{flex-direction:row}.bb-pp label.chip{display:inline-flex!important;flex-direction:row!important;width:auto!important;gap:5px;align-items:center;cursor:pointer;padding:3px 10px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;color:var(--fg);margin:0}.bb-pp input,.bb-t td:first-child input{width:auto!important;margin:0}.bb-t td:first-child{width:34px;text-align:center}.bb-t td:last-child input{width:150px}#dlg:has(.bb-t){width:min(980px,96vw);max-width:96vw}.bb-off td{opacity:.45}
 .rec-so{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.rec-so button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 12px;text-align:left;cursor:pointer;font:inherit;min-width:150px}.rec-so button b{display:block;font-size:20px;color:var(--bad)}.rec-so button span{font-size:12px;color:var(--muted)}.rec-so button[aria-pressed="true"]{border-color:var(--bad);background:var(--bad-soft)}
 .op-wbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.op-wbar .pill{font-size:13px}</style>`);
+
+/* ===== OKR phòng: KR tự cập nhật từ dữ liệu nhân sự (Linh chốt 24/11/2026) =====
+   k.src: 'ret' giữ chân người mới · 'quit90' tỷ lệ nghỉ ≤90 ngày (càng thấp càng tốt) · 'cov-all' / 'cov-new' / 'cov-old' độ phủ nhân sự nhà thuốc (nhà có từ 2 người)
+   'manual' = nhập tay; không có src → tự nhận theo tên KR/mục tiêu. */
+const OKR_SRC=[['auto','Tự nhận theo tên KR'],['manual','Nhập tay'],['ret','Giữ chân người mới (% người vào làm trong quý còn làm việc)'],['quit90','Tỷ lệ nghỉ trong 90 ngày đầu (càng thấp càng tốt)'],['cov-all','Độ phủ nhân sự toàn hệ thống nhà thuốc (% nhà có từ 2 người)'],['cov-new','Độ phủ nhân sự nhà mới (NT ≥ 171)'],['cov-old','Độ phủ nhân sự nhà cũ (NT ≤ 170)']];
+function okrGuess(k,o){const t=normName((k.title||'')+' '+((o&&o.objective)||''));const kt=normName(k.title||'');
+  if(/giữ chân|giữ người|ở lại/.test(kt))return 'ret';if(/nghỉ.{0,20}(90|3 tháng|2 tháng|tháng đầu)/.test(kt))return 'quit90';
+  if(/(đáp ứng|độ phủ|đủ nhân sự)/.test(kt)&&/nhà mới/.test(kt))return 'cov-new';
+  if(/(đáp ứng|độ phủ|đủ nhân sự)/.test(kt)&&/(nhà thuốc|hệ thống|cuối năm)/.test(kt))return 'cov-all';
+  if(/giữ chân/.test(t)&&/(tỷ lệ|%)/.test(kt))return 'ret';if(/đáp ứng nhân sự/.test(t)&&/(%|tỷ lệ|độ phủ|nhà)/.test(kt))return 'cov-all';return ''}
+const okrSrcOf=(k,o)=>k.src==='manual'?'':(k.src&&k.src!=='auto'?k.src:okrGuess(k,o));
+let _okC={};
+function okrVal(src,q,k){const key=src+'|'+q;const c=_okC[key];if(c&&c.sys===S.sys&&c.dc===S.dcShops&&c.op===S.openShops&&c.t===Date.now()/6e4|0)return c.v;let v=null;
+  try{if(src==='ret'||src==='quit90'){const [a,b]=quarterRange(q);const e=b<TODAY?b:TODAY;const H=sysRows().filter(r=>r.start&&inR(r.start,[a,e]));
+      if(src==='ret'){const st=H.filter(r=>r.status!=='Nghỉ việc').length;v={pct:H.length?Math.round(st/H.length*1000)/10:0,n:st,of:H.length,txt:`${st}/${H.length} người vào làm từ ${fmtD(a)} còn làm việc`}}
+      else{const q9=H.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<=90).length;v={pct:H.length?Math.round(q9/H.length*1000)/10:0,n:q9,of:H.length,txt:`${q9}/${H.length} người vào làm từ ${fmtD(a)} đã nghỉ trong 90 ngày đầu`,low:true}}}
+    else if(/^cov-/.test(src)&&typeof dcCalc==='function'&&S.dcLoaded){const C=dcCalc().C;const g=src==='cov-all'?C.all:src==='cov-new'?C.nw:C.old;if(g&&g.tot)v={pct:g.cov,n:g.done,of:g.tot,txt:`${g.done}/${g.tot} nhà có từ 2 nhân sự${src==='cov-all'?' (nhà cũ + nhà mới)':src==='cov-new'?' (NT ≥ 171)':' (NT ≤ 170)'}, thiếu ${g.lack} người`}}}catch(_){v=null}
+  _okC[key]={sys:S.sys,dc:S.dcShops,op:S.openShops,t:Date.now()/6e4|0,v};return v}
+function okrLiveObj(o){if(!o)return o;return {...o,krs:(o.krs||[]).map(k=>{const src=okrSrcOf(k,o);if(!src)return k;const v=okrVal(src,o.quarter,k);if(!v)return {...k,_src:src,_wait:true};
+  const usePct=/%/.test(k.unit||'')||!(+k.target>100)||/^cov-|quit90/.test(src);return {...k,current:usePct?v.pct:v.n,_src:src,_txt:v.txt,_low:!!v.low}})}}
+function okrKp(k){if(!(+k.target>0))return 0;const c=+k.current||0;if(k._low)return c<=+k.target?100:Math.max(0,Math.round(+k.target/c*100));return Math.min(Math.round(c/(+k.target)*100),100)}
 </script>
 </body>
 </html>
