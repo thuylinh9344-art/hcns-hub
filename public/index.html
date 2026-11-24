@@ -1220,9 +1220,9 @@ function vRec(){
     <div class="stat ${stale.length?'bad':'ok'}"><div class="k">Hồ sơ treo</div><div class="v">${nf(stale.length)}</div><div class="s">trong 3 tháng gần nhất</div></div>
   </div>
   <div class="panel mt" style="border-color:${stale.length?'var(--bad)':'var(--line)'}"><h2 style="color:${stale.length?'var(--bad)':'inherit'}">Cảnh báo xử lý chậm <small>${stale.length} hồ sơ treo · ${types.map(t=>t+': '+stale.filter(x=>x.stale===t).length).join(' · ')}</small></h2>
-    ${ages.length?`<div class="dist" style="margin-bottom:10px">${ages.map(([o,xs])=>`<div style="border-color:var(--bad);background:var(--bad-soft)"><b style="color:var(--bad)">${xs.length}</b><span class="mini">${esc(shortName(o))}</span></div>`).join('')}</div>
+    ${ages.length?`<div class="rec-so">${ages.map(([o,xs])=>`<button type="button" data-act="rec-so" data-id="${esc(o)}" aria-pressed="${S.recStaleO===o}"><b>${xs.length}</b><span><strong style="color:var(--fg)">${esc(shortName(o))}</strong> · trễ lâu nhất ${Math.max(...xs.map(x=>x.over))} ngày<br>${types.map(t=>{const n=xs.filter(x=>x.stale===t).length;return n?esc(t)+': '+n:''}).filter(Boolean).join(' · ')}</span></button>`).join('')}</div>${S.recStaleO?`<p class="note">Đang lọc: <b>${esc(staffName(S.recStaleO))}</b> · bấm lại thẻ để xem tất cả.</p>`:''}
     <div class="tbl-wrap" style="max-height:420px;overflow:auto"><table class="recbad"><thead><tr><th>Người phụ trách</th><th>Mã hồ sơ</th><th>Vị trí</th><th>Địa bàn</th><th>Trạng thái</th><th>Ngày nộp</th><th>Hạn xử lý</th><th>Cảnh báo</th></tr></thead><tbody>
-    ${stale.slice(0,300).map(x=>`<tr><td><b>${esc(shortName(x.o))}</b>${x.src?'':'<div class="mini">gán theo vùng</div>'}</td><td class="num">${esc(x.code)}</td><td>${esc(x.p)}</td><td>${esc(x.ar)}</td><td>${esc(x.st)}</td><td class="num">${fmtD(x.sub)}</td><td class="num">${fmtD(x.due)}</td><td><span class="pill bad">${esc(x.stale)} · ${x.over} ngày</span></td></tr>`).join('')}
+    ${stale.filter(x=>!S.recStaleO||x.o===S.recStaleO).slice(0,300).map(x=>`<tr><td><b>${esc(shortName(x.o))}</b>${x.src?'':'<div class="mini">gán theo vùng</div>'}</td><td class="num">${esc(x.code)}</td><td>${esc(x.p)}</td><td>${esc(x.ar)}</td><td>${esc(x.st)}</td><td class="num">${fmtD(x.sub)}</td><td class="num">${fmtD(x.due)}</td><td><span class="pill bad">${esc(x.stale)} · ${x.over} ngày</span></td></tr>`).join('')}
     </tbody></table></div>${stale.length>300?`<p class="note">Hiển thị 300/${stale.length} hồ sơ quá hạn lâu nhất.</p>`:''}
     <div class="row mt"><button class="btn" data-act="rec-copy">Sao chép tin nhắc</button></div>`:'<div class="empty">Không có hồ sơ treo. Tốt lắm!</div>'}
   </div>
@@ -2212,7 +2212,7 @@ document.addEventListener('click',e=>{if(e.target.closest('[data-act="sf-clear"]
    Dữ liệu: collection "dcshop" (mỗi nhà mới 1 bản ghi) và "dcmove" (mỗi người đề xuất điều 1 bản ghi; chỉ lưu Mã NV, họ tên lấy từ DSNS khi hiển thị).
    Nguyên tắc: nhà cũ giữ tối thiểu 1 CHT + 2 NVBH (chưa có CHT: 3 NVBH); nhà sắp mở định biên 2 NVBH; PA A < 20 km (nội bộ), PA B ≥ 20 km theo chính sách điều động. */
 S.dcShops={};S.dcMoves={};S.dcF={prov:'',mgr:'',st:'',q:''};S.dcOpen={};S.dcSub=false;
-(function dcSub(){const go=()=>{if(S.dcSub||!S.db||S.role==='staff')return;S.dcSub=true;
+(function dcSub(){const go=()=>{if(S.dcSub||!S.db)return;S.dcSub=true;
   S.db.collection('dcshop').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcShops=o;const _f=!S.dcLoaded;S.dcLoaded=true;if(_f)setTimeout(dcFixRestore,300);if(S.view==='dieu-chuyen'&&!(document.activeElement&&(document.activeElement.type==='date'||document.activeElement.dataset.date)&&document.activeElement.closest('.dc-shop')))render()},()=>{});
   S.db.collection('dcmove').onSnapshot(s=>{const o={};s.docs.forEach(d=>o[d.id]=d.data());S.dcMoves=o;if(!S.dcMvLoaded){S.dcMvLoaded=true;setTimeout(dcSeedReg,600)}if(S.view==='dieu-chuyen')render()},()=>{})};
   const t=setInterval(()=>{if(S.db){go();clearInterval(t)}},400)})();
@@ -2605,7 +2605,7 @@ function opMembersPanel(st,mem){
 
 function opPerson(sid,tools){
   const staff=S.role==='staff',q=S.opQ;const s=S.staff.find(x=>x.id===sid)||{id:sid,name:staffName(sid)};
-  const d=opDoc(q,sid);const doc=opLive(d)||opBlank(q,sid);const E=opEntries(sid,q);const st=OP_ST[doc.status||'draft'];const ed=opEditable(d)&&S.canWrite;
+  const d=opDoc(q,sid);const doc=opLive(d)||opBlank(q,sid);const E=opEntries(sid,q);const st=OP_ST[doc.status||'draft'];const ed=S.canWrite&&(opEditable(d)||!staff);
   const p=opPct(doc);const qr=monthRange(q);const elapsed=Math.max(0,Math.min(100,Math.round(diffDays(qr[0],TODAY)/diffDays(qr[0],qr[1])*100)));
   const deptOkr=S.okrs.filter(o=>o.quarter===qOf(q+'-01'));
   const objs=(doc.objectives||[]);
@@ -2615,7 +2615,7 @@ function opPerson(sid,tools){
     :`<div class="panel"><h2>Duyệt OKR</h2><textarea id="opRevNote" rows="2" placeholder="Nhận xét (bắt buộc nếu trả lại)" style="width:100%"></textarea><div class="row" style="margin-top:8px;gap:8px"><button class="btn pri" data-act="op-approve">Duyệt</button><button class="btn" data-act="op-return">Trả lại để sửa</button></div></div>`;
   if(doc.status==='approved')bar=`<div class="wk-state ok">OKR đã duyệt${doc.review&&doc.review.at?' ngày '+fmtDY(doc.review.at.slice(0,10)):''}${doc.review&&doc.review.note?' · '+esc(doc.review.note):''}${!staff&&S.canWrite?` <button class="btn sm" data-act="op-reopen">Mở lại để sửa</button>`:''}</div>`;
   const objHtml=objs.length?objs.map((o,i)=>{const op=objPct(o);const link=deptOkr.find(x=>x.id===o.okrId);
-    return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b><div class="note">${o.area&&OP_AREAS.includes(o.area)?`<span class="pill">${esc(o.area)}</span> `:'<span class="pill bad">Chưa chọn mảng</span> '}${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
+    return `<div class="panel okr"><div class="obj"><div style="min-width:0"><b>O${i+1}. ${esc(o.title)}</b> <span class="pill ${+o.w?'':'bad'}">${+o.w?nf(o.w)+'đ':'chưa có tỷ trọng'}</span><div class="note">${o.area&&OP_AREAS.includes(o.area)?`<span class="pill">${esc(o.area)}</span> `:'<span class="pill bad">Chưa chọn mảng</span> '}${link?'Gắn OKR phòng: '+esc(link.objective):'Không gắn OKR phòng'}</div></div><div class="row"><b class="num" style="font-size:18px">${op}%</b>${ed?`<button class="btn sm" data-act="op-edit-obj" data-id="${esc(o.id)}">Sửa</button>`:''}</div></div>
       <div class="bar"><i class="${op>=elapsed?'ok':op>=elapsed-20?'':'warn'}" style="width:${op}%"></i></div>
       ${(()=>{if(o.area===OP_RK_AREA){const rk=d?opRkOf(d):null;return rk?`<div class="mini">KPI tuyển dụng ${fmtM(q)} (theo quy ước KPI tuyển dụng, không tính nhật ký): thực tuyển ${nf(rk.real)} người (3 học việc lên NVBH = 1) · ${nf(rk.kpi)} điểm KPI</div>`:''}const xs=E.filter(e=>opAreaOf(e.code)===o.area);return o.area?`<div class="mini">Nhật ký ${fmtM(q)} mảng ${esc(o.area)} (cập nhật trực tiếp): ${xs.filter(opDone).length} việc hoàn thành · ${nf(Math.round(xs.reduce((t,e)=>t+entPts(e),0)))} điểm</div>`:''})()}
       ${(o.krs||[]).map((k,j)=>`<div class="kr"><span>KR${j+1}. ${esc(k.title)}<div class="mini">${esc(opSrcLbl(k,o.area))}</div></span><div class="bar"><i style="width:${krPct(k)}%"></i></div><div class="vals"><span class="num"><b>${nf(k.current||0)}</b> / ${nf(k.target)} ${esc(k.unit||'')}</span></div></div>`).join('')}
@@ -2623,7 +2623,8 @@ function opPerson(sid,tools){
   const editTools=ed?`<div class="row" style="gap:8px;margin-top:4px">${objs.length<5?`<button class="btn" data-act="op-new-obj">+ Thêm mục tiêu</button>`:''}${objs.length?`<button class="btn pri" data-act="op-submit">Gửi chị Linh duyệt</button>`:''}<span class="note">Tối đa 5 mục tiêu, mỗi mục tiêu thuộc 1 mảng công việc chính và có 1–5 kết quả then chốt (KR) đo được bằng số.</span></div>`
     :(staff&&doc.status==='submitted'&&S.canWrite?`<div class="row" style="margin-top:4px"><button class="btn" data-act="op-withdraw">Rút lại để sửa</button></div>`:'');
   const sub=`${esc(s.name)} · ${fmtM(q)} · <span class="pill ${st[0]}">${d?st[1]:'Chưa lập'}</span> · tiến độ ${p}% · thời gian tháng đã qua ${elapsed}%`;
-  return head(staff?'OKR cá nhân của tôi':'OKR cá nhân',sub,tools)+bar+`<div class="stack">${objHtml}${editTools}</div>`+(doc.status==='approved'?opCheckin(doc,staff):'');
+  const wS=opWSum(objs);const wBar=`<div class="op-wbar"><span class="pill ok">Báo cáo nhật ký: ${OP_AUTOW}đ · tự động</span><span class="pill ${wS>OP_MAXW?'bad':wS===OP_MAXW?'ok':'warn'}">Mục tiêu OKR: ${nf(wS)}/${OP_MAXW}đ</span><span class="note">Tổng tỷ trọng các mục tiêu tối đa ${OP_MAXW} điểm${!staff&&doc.status==='approved'?' · chị sửa trực tiếp được, không cần mở lại':''}</span></div>`;
+  return head(staff?'OKR cá nhân của tôi':'OKR cá nhân',sub,tools)+bar+wBar+`<div class="stack">${objHtml}${editTools}</div>`+(doc.status==='approved'?opCheckin(doc,staff):'');
 }
 
 function opCheckin(doc,staff){
@@ -2671,6 +2672,7 @@ function opObjDlg(doc,o){const isNew=!o;o=o||{id:opRid(),title:'',okrId:'',krs:[
   opObjDlg._row=row;
   openDlg(isNew?'Thêm mục tiêu OKR cá nhân':'Sửa mục tiêu OKR cá nhân',`<div class="form">
     <label class="full">Mảng công việc chính<select name="area" required><option value="">— Chọn mảng —</option>${OP_AREAS.map(a=>`<option ${o.area===a?'selected':''}>${esc(a)}</option>`).join('')}</select></label>
+    <label>Tỷ trọng (điểm)<input name="w" type="number" min="1" max="${OP_MAXW}" step="1" required value="${esc(o.w||'')}" placeholder="còn ${OP_MAXW-opWSum(doc.objectives,o.id)}đ"></label>
     <label class="full">Mục tiêu (Objective)<input name="title" required value="${esc(o.title)}" placeholder="VD: Ổn định nhân sự các nhà thuốc khu vực phụ trách"></label>
     <label class="full">Gắn với OKR phòng<select name="okrId"><option value="">— Không gắn —</option>${dept.map(x=>`<option value="${esc(x.id)}" ${o.okrId===x.id?'selected':''}>${esc(x.objective)}</option>`).join('')}</select></label>
     <div class="full" style="grid-column:1/-1"><b style="font-size:13px;display:block;margin-bottom:6px">Kết quả then chốt (KR): nội dung · chỉ tiêu (số) · đơn vị · nguồn số liệu</b><div id="opKrRows">${(opObjDlg._area=o.area||'',(o.krs||[]).map(row).join(''))}</div><p class="mini" style="margin:4px 0 8px">Chọn mã việc để KR tự tính từ nhật ký công việc hằng tháng (cập nhật trực tiếp). Chọn "Nhập tay" nếu KR không có mã việc tương ứng.</p><button type="button" class="btn sm" data-act="op-add-kr">+ Thêm KR</button></div>
@@ -2683,7 +2685,7 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="op-
   if(a==='op-back'){S.opSid='';render();return}
   if(S.role!=='staff'&&!needWrite())return;
   const d=opCur();
-  if(a==='op-new-obj'){if(opEditable(opDoc(d.quarter,d.staffId)))opObjDlg(d,null);return}
+  if(a==='op-new-obj'){if(opEditable(opDoc(d.quarter,d.staffId))||S.role!=='staff')opObjDlg(d,null);return}
   if(a==='op-edit-obj'){opObjDlg(d,(d.objectives||[]).find(o=>o.id===id));return}
   if(a==='op-rm-kr'){e.preventDefault();el.closest('.op-krrow').remove();return}
   if(a==='op-add-kr'){e.preventDefault();if($('#opKrRows').children.length<5)$('#opKrRows').insertAdjacentHTML('beforeend',opObjDlg._row({}));else toast('Tối đa 5 KR');return}
@@ -2693,11 +2695,12 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act^="op-
     if(krs.some(k=>k.src&&(fd.area===OP_RK_AREA?!k.src.startsWith('rk-'):(k.src.startsWith('rk-')||(k.src!=='all'&&opAreaOf(k.src)!==fd.area))))){toast('Nguồn số liệu của KR phải thuộc mảng đã chọn');return}
     krs.forEach(k=>{if(k.src&&k.src.startsWith('rk-'))k.meas=''});
     if(!krs.length){toast('Cần ít nhất 1 KR');return}if(krs.some(k=>!(k.target>0))){toast('Mỗi KR cần chỉ tiêu là số lớn hơn 0');return}
-    const objs=[...(d.objectives||[])];if(!OP_AREAS.includes(fd.area)){toast('Chọn mảng công việc chính');return}const o={id,area:fd.area,title:fd.title.trim(),okrId:fd.okrId||'',krs};const i=objs.findIndex(x=>x.id===id);if(i>=0)objs[i]=o;else objs.push(o);
-    opSave(d,{objectives:objs,status:d.status==='returned'?'returned':'draft'}).then(()=>toast('Đã lưu mục tiêu')).catch(()=>{});closeDlg();return}
+    const objs=[...(d.objectives||[])];if(!OP_AREAS.includes(fd.area)){toast('Chọn mảng công việc chính');return}const w=Math.round(+fd.w||0);if(!(w>0)){toast('Nhập tỷ trọng (điểm) cho mục tiêu');return}if(opWSum(objs,id)+w>OP_MAXW){toast(`Tổng tỷ trọng vượt ${OP_MAXW} điểm: còn ${OP_MAXW-opWSum(objs,id)} điểm`);return}
+    const o={id,area:fd.area,title:fd.title.trim(),okrId:fd.okrId||'',w,krs};const i=objs.findIndex(x=>x.id===id);if(i>=0)objs[i]=o;else objs.push(o);
+    opSave(d,{objectives:objs,status:S.role!=='staff'&&d.status==='approved'?'approved':S.role!=='staff'&&d.status==='submitted'?'submitted':d.status==='returned'?'returned':'draft'}).then(()=>toast('Đã lưu mục tiêu')).catch(()=>{});closeDlg();return}
   if(a==='op-del-obj'){e.preventDefault();if(opArmed!==id){opArmed=id;el.textContent='Bấm lần nữa để xóa';setTimeout(()=>{if(opArmed===id)opArmed=null},4000);return}
     opSave(d,{objectives:(d.objectives||[]).filter(o=>o.id!==id)}).then(()=>toast('Đã xóa mục tiêu')).catch(()=>{});closeDlg();return}
-  if(a==='op-submit'){if(!(d.objectives||[]).length)return;if((d.objectives||[]).some(o=>!OP_AREAS.includes(o.area))){toast('Mỗi mục tiêu cần chọn mảng công việc chính (bấm Sửa)');return}opSave(d,{status:'submitted',submittedAt:new Date().toISOString()}).then(()=>toast('Đã gửi chị Linh duyệt')).catch(()=>{});return}
+  if(a==='op-submit'){if(!(d.objectives||[]).length)return;if((d.objectives||[]).some(o=>!(+o.w>0))){toast('Mỗi mục tiêu cần có tỷ trọng (bấm Sửa)');return}if(opWSum(d.objectives)>OP_MAXW){toast(`Tổng tỷ trọng vượt ${OP_MAXW} điểm`);return}if((d.objectives||[]).some(o=>!OP_AREAS.includes(o.area))){toast('Mỗi mục tiêu cần chọn mảng công việc chính (bấm Sửa)');return}opSave(d,{status:'submitted',submittedAt:new Date().toISOString()}).then(()=>toast('Đã gửi chị Linh duyệt')).catch(()=>{});return}
   if(a==='op-withdraw'){opSave(d,{status:'draft'}).then(()=>toast('Đã rút lại, có thể sửa tiếp')).catch(()=>{});return}
   if(a==='op-approve'){const note=($('#opRevNote')||{}).value||'';opSave(d,{status:'approved',review:{at:new Date().toISOString(),note:note.trim()}}).then(()=>toast('Đã duyệt OKR')).catch(()=>{});return}
   if(a==='op-return'){const note=(($('#opRevNote')||{}).value||'').trim();if(!note){toast('Ghi nhận xét để nhân viên biết cần sửa gì');$('#opRevNote')?.focus();return}
@@ -2730,7 +2733,7 @@ document.addEventListener('change',e=>{const t=e.target;if(t.id==='opQ'){S.opQ=t
 /* Chế độ nhân viên: chỉ tải dữ liệu của chính mình (Firestore Rules cũng chặn phần còn lại). */
 async function initStaff(db,mem,email){
   S.role='staff';S.me=mem.staffId;S.myEmail=email;
-  VIEWS.splice(0,VIEWS.length,['kpi','KPI & nhật ký'],['phan-cong','Phân công & hạng D'],['okr-ca-nhan','OKR cá nhân'],['bc-nhan-su','Báo cáo nhân sự']);
+  VIEWS.splice(0,VIEWS.length,['kpi','KPI & nhật ký'],['phan-cong','Phân công & hạng D'],['dieu-chuyen','Điều chuyển nhà mới'],['okr-ca-nhan','OKR cá nhân']);
   S.canWrite=false;
   if(!VIEWS.some(v=>v[0]===S.view)){S.view='kpi';S.kpiTab='me';try{history.replaceState(null,'','#kpi')}catch(_){}}
   const me0=[{id:mem.staffId,name:mem.name||email,status:'active'}];
@@ -3157,7 +3160,7 @@ function effAuto(m,sid,e){if(m<PV_FROM)return e;const o={...e};const t=tdAuto(m,
 function pvSeed(){if(!S.canWrite||S.role==='staff')return;const st=allStaff();const byLast={};st.forEach(s=>{const w=String(s.name||'').trim().split(/\s+/).pop();if(w)byLast[normName(w)]=s.id});
   const m={};Object.entries(PV_SEED).forEach(([ym,v])=>{const p={},x={};Object.entries(v.p).forEach(([pr,n])=>{const id=byLast[normName(n)];if(id)p[pr]=id});Object.entries(v.x).forEach(([c,n])=>{const id=byLast[normName(n)];if(id)x[c]=id});m[ym]={p,x}});
   if(Object.values(m).some(v=>Object.keys(v.p).length))write('assign/prov',{m,updatedAt:new Date().toISOString(),seeded:'Excel Phân công xếp hạng D HCNS 2026'}).catch(()=>{})}
-(function pvSub(){const t=setInterval(()=>{if(!S.db||S.role==='staff')return;clearInterval(t);
+(function pvSub(){const t=setInterval(()=>{if(!S.db)return;clearInterval(t);
   S.db.doc('assign/prov').onSnapshot(s=>{S.pv=s.exists?s.data():null;const f=!S.pvLoaded;S.pvLoaded=true;_pvU=null;if(f&&!s.exists)setTimeout(()=>{if(!S.pv&&allStaff().length)pvSeed()},2500);if(S.view==='phan-cong'&&!pvBusy())render()},()=>{S.pvLoaded=true});
   S.db.doc('assign/routine').onSnapshot(s=>{S.rt=s.exists?s.data():null;if(S.view==='phan-cong'&&!pvBusy())render()},()=>{})},400)})();
 const pvBusy=()=>{const a=document.activeElement;return !!(a&&a.closest&&a.closest('.pv-q'))};
@@ -3257,11 +3260,70 @@ document.head.insertAdjacentHTML('beforeend',`<style>
 
 /* ===== KPI & nhật ký: một mục, 2 tab ===== */
 function vKpiTabs(){if(!S.kpiTab)S.kpiTab=S.role==='staff'?'me':'all';
-  const tabs=S.role==='staff'?[['me','Nhật ký & KPI của tôi'],['all','KPI cả phòng']]:[['all','KPI cả phòng'],['me','Nhật ký từng người']];
+  const tabs=S.role==='staff'?[['me','Nhật ký & KPI của tôi']]:[['all','KPI cả phòng'],['me','Nhật ký từng người'],['mt','Biên bản họp → nhắc việc']];if(!tabs.some(t=>t[0]===S.kpiTab))S.kpiTab=tabs[0][0];
   const bar=`<div class="kt-tabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" role="tab" data-act="kpi-tab" data-id="${k}" aria-selected="${S.kpiTab===k}">${l}</button>`).join('')}</div>`;
-  return bar+(S.kpiTab==='me'?vMe():vKpi())}
+  if(S.kpiTab==='mt')return bar+(S.canWrite?`<div class="panel bb-up"><h2>Tải biên bản họp <small>Word (.docx) hoặc .txt · web lọc ra ý chính, người thực hiện, hạn → tạo nhắc việc cho từng người</small></h2><div class="row" style="gap:8px"><label class="btn pri" style="cursor:pointer">Chọn file biên bản<input type="file" id="bbFile" accept=".docx,.txt" hidden></label><button class="btn" data-act="bb-paste">Dán nội dung biên bản</button></div></div>`:'')+vMeet();
+  return bar+(S.kpiTab==='me'?recLateMine(S.me)+vMe():vKpi())}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act="kpi-tab"]');if(!b)return;S.kpiTab=b.dataset.id;render()});
 document.head.insertAdjacentHTML('beforeend','<style>.kt-tabs{display:inline-flex;gap:4px;background:var(--sunken);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:14px}.kt-tabs button{border:0;background:transparent;border-radius:9px;padding:7px 16px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}.kt-tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}</style>');
+
+/* ===================== Phân quyền nhân viên · OKR tỷ trọng · biên bản họp → nhắc việc (Linh chốt 24/11/2026) ===================== */
+const OP_MAXW=50,OP_AUTOW=50;
+const opWSum=(objs,skip)=>(objs||[]).filter(o=>o.id!==skip).reduce((a,o)=>a+(+o.w||0),0);
+/* Cảnh báo CV xử lý trễ của chính nhân viên (hiện trong KPI & nhật ký) */
+function recLateMine(sid){if(!S.rec||!S.rec.rowsJson)return '';let L=[];try{L=recRows().filter(x=>x.o===sid&&x.stale).sort((a,b)=>b.over-a.over)}catch(_){return ''}
+  if(!L.length)return `<div class="wk-state ok" style="margin-bottom:12px">Không có hồ sơ tuyển dụng xử lý trễ.</div>`;
+  return `<div class="panel" style="border-color:var(--bad);margin-bottom:12px"><h2 style="color:var(--bad)">${L.length} hồ sơ tuyển dụng xử lý trễ <small>trễ lâu nhất ${L[0].over} ngày · cập nhật trạng thái trên sheet Hồ sơ tuyển dụng</small></h2>
+    <div class="tbl-wrap" style="max-height:260px;overflow:auto"><table><thead><tr><th>Mã hồ sơ</th><th>Vị trí</th><th>Địa bàn</th><th>Trạng thái</th><th>Hạn xử lý</th><th>Trễ</th></tr></thead><tbody>
+    ${L.slice(0,60).map(x=>`<tr><td class="num">${esc(x.code)}</td><td>${esc(x.p)}</td><td>${esc(x.ar)}</td><td>${esc(x.st)}</td><td class="num">${fmtD(x.due)}</td><td><span class="pill bad">${esc(x.stale)} · ${x.over} ngày</span></td></tr>`).join('')}</tbody></table></div></div>`}
+/* Biên bản họp (Word .docx / .txt / dán chữ) → ý chính → nhắc việc từng người */
+let _jsz=null;function loadZip(){return _jsz||(_jsz=new Promise((ok,no)=>{if(window.JSZip)return ok(window.JSZip);const sc=document.createElement('script');sc.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';sc.onload=()=>ok(window.JSZip);sc.onerror=()=>{_jsz=null;no(new Error('Không tải được bộ đọc file Word'))};document.head.appendChild(sc)}))}
+async function bbText(file){const n=file.name.toLowerCase();if(n.endsWith('.txt'))return (await file.text()).split(/\r?\n/);
+  if(!n.endsWith('.docx'))throw new Error('Chỉ nhận file Word (.docx) hoặc .txt');const Z=await loadZip();const z=await Z.loadAsync(file);const xml=await z.file('word/document.xml').async('string');
+  const doc=new DOMParser().parseFromString(xml,'application/xml');const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main';const out=[];
+  const txt=el=>[...el.getElementsByTagNameNS(W,'t')].map(t=>t.textContent).join('').trim();
+  const body=doc.getElementsByTagNameNS(W,'body')[0];
+  [...body.children].forEach(el=>{if(el.localName==='p'){const t=txt(el);if(t)out.push(t)}else if(el.localName==='tbl'){[...el.getElementsByTagNameNS(W,'tr')].forEach(tr=>{const cells=[...tr.getElementsByTagNameNS(W,'tc')].map(txt).filter(Boolean);if(cells.length)out.push(cells.join(' | '))})}});return out}
+const BB_SKIP=/^(.{0,25},\s*ngày\s*\d|biên bản|thời gian|địa điểm|thành phần|chủ trì|thư ký|người ghi|kết thúc|cộng hòa|độc lập|stt\b|nội dung\s*\|)/i;
+const BB_AREA=[[/tuyển|cv\b|ứng viên|phỏng vấn/i,'Tuyển dụng'],[/lương|thưởng|c&b|chấm công/i,'C&B'],[/bhxh|bảo hiểm|thai sản/i,'BHXH'],[/pháp lý|đkkd|giấy phép|hồ sơ nhà/i,'Hồ sơ pháp lý/giấy tờ'],[/công đoàn/i,'Công đoàn'],[/nhà thuốc|điều chuyển|khu vực|nhà mới/i,'HCNS phụ trách khu vực'],[/đồng phục|vpp|hành chính|xe/i,'Hành chính']];
+function bbParse(lines,dateGuess){const st=activeStaff();const y=(dateGuess||TODAY).slice(0,4);
+  const pats=st.map(s=>{const w=String(s.name||'').trim().split(/\s+/);const keys=[s.name,w.slice(-2).join(' '),w.slice(-1)[0]].filter(k=>k&&k.length>1);return {id:s.id,re:new RegExp('(^|[^\\p{L}])('+[...new Set(keys)].map(k=>k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')+')(?![\\p{L}])','iu')}});
+  let date='';const items=[];
+  lines.forEach(raw=>{const t=raw.replace(/^[\s•●▪◦\-–*+·\d.)]+/,'').replace(/\s+/g,' ').trim();if(!t)return;
+    if(!date){const dm=raw.match(/ngày\s*(\d{1,2})\s*(?:tháng|\/|-|\.)\s*(\d{1,2})\s*(?:năm|\/|-|\.)\s*(\d{4})/i);if(dm)date=`${dm[3]}-${String(dm[2]).padStart(2,'0')}-${String(dm[1]).padStart(2,'0')}`}
+    if(t.length<8||BB_SKIP.test(t))return;
+    const people=pats.filter(p=>p.re.test(t)).map(p=>p.id);const all=/tất cả|cả phòng|toàn phòng|các bạn|mọi người/i.test(t);
+    let dl='';const d=t.match(/(?:hạn|deadline|trước|trong ngày|hoàn thành)\D{0,12}(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?/i)||t.match(/(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{4}))?\s*$/);
+    if(d){const yy=d[3]?(d[3].length===2?'20'+d[3]:d[3]):y;const mm=+d[2],dd=+d[1];if(mm>=1&&mm<=12&&dd>=1&&dd<=31)dl=`${yy}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`}
+    const area=(BB_AREA.find(([re])=>re.test(t))||[,'Khác'])[1];
+    items.push({id:'i'+(items.length+1),topic:t.slice(0,300),area,people:all?['all']:people,deadline:dl,keep:people.length>0||all||!!dl})});
+  return {date:date||dateGuess||TODAY,items}}
+function bbPreview(res,fname){S._bb=res;const st=activeStaff();
+  const rows=res.items.map((it,i)=>`<tr class="${it.keep?'':'bb-off'}"><td><input type="checkbox" data-bbk="${i}" ${it.keep?'checked':''} aria-label="Giữ ý này"></td>
+    <td><textarea data-bbt="${i}" rows="2">${esc(it.topic)}</textarea><div class="bb-pp">${st.map(s=>`<label class="chip sm"><input type="checkbox" data-bbp="${i}" value="${s.id}" ${(it.people.includes('all')||it.people.includes(s.id))?'checked':''}> ${esc(shortName(s.id))}</label>`).join('')}</div></td>
+    <td><input type="date" data-bbd="${i}" value="${esc(it.deadline)}"></td></tr>`).join('');
+  openDlg('Ý chính từ biên bản họp',`<p class="note">File: ${esc(fname)} · ${res.items.length} ý, đã chọn sẵn ${res.items.filter(x=>x.keep).length} ý có người phụ trách hoặc hạn. Sửa lại nội dung, người làm, hạn rồi bấm “Tạo nhắc việc”. Mỗi người được tích sẽ nhận một nhắc việc trong tab Nhật ký.</p>
+    <div class="form" style="grid-template-columns:200px 1fr;margin-bottom:10px"><label>Ngày họp<input type="date" id="bbDate" value="${esc(res.date)}"></label><label>Tiêu đề<input id="bbTitle" value="P.TCHC"></label></div>
+    <div class="tbl-wrap" style="max-height:56vh;overflow:auto"><table class="bb-t"><thead><tr><th></th><th>Ý chính / việc cần làm · người thực hiện</th><th>Hạn</th></tr></thead><tbody>${rows||'<tr><td colspan="3">Không đọc được nội dung.</td></tr>'}</tbody></table></div>`,
+    `<div></div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="button" class="btn pri" data-act="bb-save">Tạo nhắc việc</button></div>`)}
+async function bbSave(){const R=S._bb;if(!R)return;const date=$('#bbDate').value||TODAY;const title=$('#bbTitle').value.trim()||'P.TCHC';
+  const items=[];R.items.forEach((it,i)=>{if(!dlg.querySelector(`[data-bbk="${i}"]`).checked)return;const ppl=[...dlg.querySelectorAll(`[data-bbp="${i}"]:checked`)].map(x=>x.value);
+    const topic=dlg.querySelector(`[data-bbt="${i}"]`).value.trim();if(!topic)return;items.push({id:'i'+(items.length+1),area:it.area,topic,goal:'',deadline:dlg.querySelector(`[data-bbd="${i}"]`).value||'',status:'doing',people:ppl.length===activeStaff().length?['all']:ppl,details:[]})});
+  if(!items.length){toast('Chưa chọn ý nào');return}
+  let id='mt_'+date;if(S.meetings.some(m=>m.id===id))id+='_'+Date.now().toString(36).slice(-4);
+  const mt={id,date,title,note:'Tạo từ file biên bản',items};
+  try{await write('meetings/'+id,{...clean(mt),updatedAt:new Date().toISOString()});await mtSync(mt);S.mtSel=id;closeDlg();toast(`Đã tạo ${items.length} ý, ${items.reduce((a,x)=>a+(x.people.includes('all')?activeStaff().length:x.people.length),0)} nhắc việc`);render()}catch(e){toast('Chưa lưu được biên bản')}}
+document.addEventListener('change',async e=>{const t=e.target;
+  if(t.id==='bbFile'&&t.files&&t.files[0]){if(!needWrite())return;const f=t.files[0];t.value='';try{toast('Đang đọc biên bản…');const L=await bbText(f);bbPreview(bbParse(L,TODAY),f.name)}catch(err){toast((err&&err.message)||'Không đọc được file')}}
+  else if(t.dataset&&t.dataset.bbk!=null){t.closest('tr').classList.toggle('bb-off',!t.checked)}});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act="bb-save"],[data-act="bb-paste"],[data-act="bb-paste-go"],[data-act="rec-so"]');if(!b)return;const a=b.dataset.act;
+  if(a==='bb-save'){e.preventDefault();bbSave()}
+  else if(a==='bb-paste'){if(!needWrite())return;openDlg('Dán nội dung biên bản họp',`<textarea id="bbPasteTx" rows="16" style="width:100%" placeholder="Dán toàn bộ nội dung biên bản (mỗi ý một dòng)"></textarea>`,`<div></div><div class="row"><button type="button" class="btn" data-act="close">Hủy</button><button type="button" class="btn pri" data-act="bb-paste-go">Lọc ý chính</button></div>`)}
+  else if(a==='bb-paste-go'){e.preventDefault();const tx=($('#bbPasteTx')||{}).value||'';if(!tx.trim()){toast('Chưa có nội dung');return}bbPreview(bbParse(tx.split(/\r?\n/),TODAY),'nội dung dán')}
+  else if(a==='rec-so'){S.recStaleO=S.recStaleO===b.dataset.id?'':b.dataset.id;render()}});
+document.head.insertAdjacentHTML('beforeend',`<style>.bb-t td{vertical-align:top}.bb-t textarea{width:100%;min-width:320px;font:inherit;font-size:13px}.bb-pp{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}.bb-pp{flex-direction:row}.bb-pp label.chip{display:inline-flex!important;flex-direction:row!important;width:auto!important;gap:5px;align-items:center;cursor:pointer;padding:3px 10px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;color:var(--fg);margin:0}.bb-pp input,.bb-t td:first-child input{width:auto!important;margin:0}.bb-t td:first-child{width:34px;text-align:center}.bb-t td:last-child input{width:150px}#dlg:has(.bb-t){width:min(980px,96vw);max-width:96vw}.bb-off td{opacity:.45}
+.rec-so{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}.rec-so button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 12px;text-align:left;cursor:pointer;font:inherit;min-width:150px}.rec-so button b{display:block;font-size:20px;color:var(--bad)}.rec-so button span{font-size:12px;color:var(--muted)}.rec-so button[aria-pressed="true"]{border-color:var(--bad);background:var(--bad-soft)}
+.op-wbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.op-wbar .pill{font-size:13px}</style>`);
 </script>
 </body>
 </html>

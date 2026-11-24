@@ -51,6 +51,13 @@ service cloud.firestore {
     match /hcns_hub/main/assign/{id} {
       allow get: if hubStaff();
     }
+    // Điều chuyển nhà mới: nhân viên chỉ được xem.
+    match /hcns_hub/main/dcshop/{id} {
+      allow read: if hubStaff();
+    }
+    match /hcns_hub/main/dcmove/{id} {
+      allow read: if hubStaff();
+    }
     match /hcns_hub/main/effort/{id} {
       allow read: if hubStaff() && resource.data.staffId == mySid();
     }
