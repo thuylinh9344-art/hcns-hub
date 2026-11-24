@@ -7,7 +7,7 @@
 <link rel="icon" type="image/png" href="logo-mark.png">
 <title>HCNS Upharma</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap">
 <style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}img{max-width:100%}[hidden]{display:none!important}.dc-dt{position:relative;display:flex;align-items:center;width:100%}.dc-dt .dc-dtx{flex:1;min-width:0;padding-right:34px}.dc-dt .dc-dtp{position:absolute;right:6px;bottom:0;width:1px;height:1px;opacity:0;pointer-events:none;border:0;padding:0}.dc-dt .dc-dtb{position:absolute;right:4px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:15px;padding:2px 4px;line-height:1}.dc-dt .dc-dtb:disabled{opacity:.4;cursor:default}
 .dc-cov{margin-bottom:12px}.dc-cov-h{margin-bottom:10px}.dc-cov-g{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.dc-cov-g>div{background:var(--bg2,#f6f8f5);border-radius:10px;padding:10px 12px}.dc-cov-g .k{font-size:12px;color:var(--mut,#667);text-transform:uppercase;letter-spacing:.03em}.dc-cov-g .v{font-size:26px;font-weight:700;margin:2px 0}.dc-cov-g .v .u{font-size:13px;font-weight:500;color:var(--mut,#667)}.dc-cov-g .v.ok{color:#1f8a4c}.dc-cov-g .v.warn{color:#c47a12}.dc-cov-g .v.bad{color:#c0392b}.dc-cov-g .s{font-size:12px;color:var(--mut,#667)}.dc-cov-g .bar{position:relative;height:6px;background:#e3e8e1;border-radius:3px;margin:4px 0}.dc-cov-g .bar i{position:absolute;left:0;top:0;bottom:0;background:#1f8a4c;border-radius:3px}.dc-cov-g .bar b{position:absolute;top:-3px;width:2px;height:12px;background:#333}@media(max-width:760px){.dc-cov-g{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .dc-done{display:inline-flex;align-items:center;gap:3px;background:#1f8a4c;color:#fff;font-weight:700;font-size:12px;border-radius:999px;padding:2px 9px;margin-left:6px}.dc-done.sm{font-size:11px;padding:1px 7px;margin-left:0}
@@ -450,10 +450,11 @@ async function init(){
   S.dl=await window.claude.use('downloads');render();
 }
 function readHash(){const h=location.hash.replace('#','');if(VIEWS.some(v=>v[0]===h))S.view=h}
-window.addEventListener('hashchange',()=>{readHash();render()});
+window.addEventListener('hashchange',()=>{readHash();render();const m=document.getElementById('main');if(m){m.classList.remove('enter');void m.offsetWidth;m.classList.add('enter');clearTimeout(window._entT);window._entT=setTimeout(()=>m.classList.remove('enter'),900)}});
 
 /* ===================== Khung render ===================== */
 function render(){
+  try{document.body.classList.toggle('not-linh',!S.isLinh)}catch(_){}
   /* Nhật ký cá nhân gộp vào mục KPI (Linh chốt 24/11/2026) */if(S.view==='ca-nhan'){S.view='kpi';S.kpiTab='me';try{history.replaceState(null,'','#kpi')}catch(_){}}
   /* OKR phòng gộp vào cuối mục OKR (Linh chốt 24/11/2026) */if(S.view==='okr'){S.view='okr-ca-nhan';try{history.replaceState(null,'','#okr-ca-nhan')}catch(_){}}
   const ae=document.activeElement;const fid=ae&&ae.id&&!$('#dlg').contains(ae)?ae.id:null;let sel=null;try{sel=fid?[ae.selectionStart,ae.selectionEnd]:null}catch(_){}
@@ -3454,6 +3455,36 @@ async function cvlSync(silent){
   }catch(e){if(!silent)toast('Chưa đọc được file Nhật ký CV chậm xử lý')}finally{S.cvlBusy=false}}
 setInterval(()=>{if(S.mcp&&S.db&&S.loaded&&S.canWrite&&S.role!=='staff'&&!S.cvlBusy&&(!S.cvlTried||Date.now()-S.cvlTried>30*60e3))cvlSync(true)},15e3);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act="cvl-sync"]');if(b)cvlSync(false)});
+document.head.insertAdjacentHTML('beforeend',`<style>
+/* Phông & hiệu ứng (24/11/2026) */
+:root{--f-body:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--f-head:"Plus Jakarta Sans","Inter",system-ui,sans-serif;--f-num:"Inter",system-ui,sans-serif}
+body{font-family:var(--f-body);font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased;letter-spacing:-.005em}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
+h1,h2,h3,.brand b,.stat .v,.navlist a{font-family:var(--f-head)}
+.head h1{font-weight:800;letter-spacing:-.02em}.panel h2{font-weight:700;letter-spacing:-.01em}.stat .v{font-weight:800;letter-spacing:-.02em}
+.btn{font-weight:600;transition:transform .12s ease,box-shadow .2s ease,border-color .2s,background .2s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(15,60,30,.10)}.btn:active{transform:translateY(0) scale(.98)}
+.btn.pri{position:relative;overflow:hidden}.btn.pri::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);transform:translateX(-120%);transition:transform .7s ease}.btn.pri:hover::after{transform:translateX(120%)}
+.panel,.stats .stat{transition:transform .2s ease,box-shadow .25s ease}
+.panel:hover{box-shadow:0 2px 4px rgba(15,60,30,.05),0 12px 28px rgba(15,60,30,.09)}
+.stats .stat:hover{transform:translateY(-3px);box-shadow:0 10px 24px rgba(15,60,30,.14)}
+.stats .stat:nth-child(1)::after{content:"";position:absolute;right:-30px;top:-30px;width:110px;height:110px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.28),transparent 70%)}
+.navlist a{position:relative;transition:background .2s,color .2s,transform .15s}.navlist a:hover{transform:translateX(3px)}
+.navlist a[aria-current="page"]{animation:navIn .35s ease}
+@keyframes navIn{from{transform:translateX(-6px);opacity:.6}to{transform:none;opacity:1}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+main.enter .head{animation:rise .35s ease both}
+main.enter .stats .stat,main.enter .panel,main.enter .empty{animation:rise .45s cubic-bezier(.2,.7,.2,1) both}
+main.enter .stats .stat:nth-child(2){animation-delay:.04s}main.enter .stats .stat:nth-child(3){animation-delay:.08s}main.enter .stats .stat:nth-child(4){animation-delay:.12s}main.enter .stats .stat:nth-child(5){animation-delay:.16s}main.enter .stats .stat:nth-child(6){animation-delay:.2s}
+main.enter .panel:nth-of-type(2){animation-delay:.08s}main.enter .panel:nth-of-type(3){animation-delay:.14s}main.enter .panel:nth-of-type(n+4){animation-delay:.2s}
+tbody tr{transition:background .15s}tbody tr:hover td{background:rgba(19,146,74,.045)}
+.pill{transition:transform .15s}.pill:hover{transform:scale(1.04)}
+nav.side::before{content:"";position:absolute;inset:auto -40px -60px auto;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.12),transparent 70%);pointer-events:none}
+nav.side{overflow:hidden}
+/* Nút thao tác ở đầu trang: chỉ tài khoản chị Linh thấy */
+body.not-linh .head .tools .btn,body.not-linh .head .tools label.btn{display:none!important}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>`);
 document.head.insertAdjacentHTML('beforeend',`<style>
 /* Giao diện xanh (24/11/2026) – thanh trái xanh đậm, thẻ số liệu màu, khối bo tròn có bóng */
 :root{--bg:#EEF4EF;--line:#DCE7DD;--r:14px;--side1:#16984D;--side2:#0B7437;--shadow:0 1px 2px rgba(15,60,30,.05),0 6px 18px rgba(15,60,30,.06)}
