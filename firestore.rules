@@ -69,9 +69,16 @@ service cloud.firestore {
     }
     match /hcns_hub/main/tasks/{id} {
       allow read: if hubStaff() && resource.data.owner == mySid();
-      // Nhân viên tự tích hoàn thành việc của mình (chỉ đổi trạng thái).
+      // Nhân viên tự tạo nhắc việc cho chính mình từ biên bản họp.
+      allow create: if hubStaff()
+        && request.resource.data.owner == mySid()
+        && request.resource.data.createdBy == mySid()
+        && request.resource.data.src == 'bb-self';
+      // Nhân viên tích hoàn thành / tự báo cáo tiến độ việc của mình.
       allow update: if hubStaff() && resource.data.owner == mySid()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'progress', 'doneAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'progress', 'doneAt', 'reports']);
+      // Xóa việc do chính mình tự tạo.
+      allow delete: if hubStaff() && resource.data.owner == mySid() && resource.data.get('src', '') == 'bb-self';
     }
     match /hcns_hub/main/kadj/{id} {
       allow read: if hubStaff() && resource.data.staffId == mySid();
