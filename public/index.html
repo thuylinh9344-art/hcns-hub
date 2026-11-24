@@ -463,7 +463,7 @@ function render(){
   const m=$('#main');
   if(S.dbState==='none'||S.dbState==='err'){m.innerHTML=window.HUB_STANDALONE?`<div class="empty">Tài khoản ${esc(window.HUB_USER_EMAIL||'')} chưa đọc được dữ liệu HCNS${window.HUB_LAST_ERROR&&window.HUB_LAST_ERROR.code?' (mã lỗi: '+esc(window.HUB_LAST_ERROR.code)+')':''}. Nếu mã lỗi là permission-denied: kiểm tra email này đã có trong Firestore Rules và rules đã Publish, đợi 1 phút rồi tải lại trang.</div>`:`<div class="empty">Trang chưa kết nối được kho dữ liệu dùng chung. Hãy mở trang khi đã đăng nhập claude.ai, rồi tải lại.</div>`;return}
   if(S.loaded.size<COLS.length){m.innerHTML=`<div class="empty">Đang tải dữ liệu phòng HCNS…</div>`;return}
-  const fn={'tong-quan':vOverview,'ca-nhan':vMe,'cong-viec':vTasks,'bien-ban':vMeet,'kpi':()=>vKpiTabs(),'phan-cong':vAssign,'he-thong':vSys,'dieu-chuyen':vDc,'cht':vCht,'nghi-viec':vNv,'bc-nhan-su':vHr,'tuyen-dung':vRec,'okr':vOkr,'okr-ca-nhan':()=>vOkrP()+`<div class="okr-dept" id="okr-phong">${vOkr().replace('<h1>OKR phòng HCNS</h1>','<h2 style="margin:0;font-size:20px">OKR phòng HCNS</h2>')}</div>`,'bao-cao':vReport,'bao-cao-tuan':vWeekly,'cau-hinh':vConfig}[S.view];
+  const fn={'tong-quan':()=>vOverview2(),'ca-nhan':vMe,'cong-viec':vTasks,'bien-ban':vMeet,'kpi':()=>vKpiTabs(),'phan-cong':vAssign,'he-thong':vSys,'dieu-chuyen':vDc,'cht':vCht,'nghi-viec':vNv,'bc-nhan-su':vHr,'tuyen-dung':vRec,'okr':vOkr,'okr-ca-nhan':()=>vOkrP()+`<div class="okr-dept" id="okr-phong">${vOkr().replace('<h1>OKR phòng HCNS</h1>','<h2 style="margin:0;font-size:20px">OKR phòng HCNS</h2>')}</div>`,'bao-cao':vReport,'bao-cao-tuan':vWeekly,'cau-hinh':vConfig}[S.view];
   m.innerHTML=(S.canWrite||S.role==='staff'?'':`<div class="banner">Bạn đang ở chế độ chỉ xem. Chủ trang có thể nâng quyền lên Contributor để bạn cập nhật.</div>`)+fn();
   if(fid){const el=document.getElementById(fid);if(el){el.focus();try{sel&&el.setSelectionRange(sel[0],sel[1])}catch(_){}}}
 }
@@ -3351,6 +3351,80 @@ function okrLiveObj(o){if(!o)return o;return {...o,krs:(o.krs||[]).map(k=>{const
 function okrKp(k){if(!(+k.target>0))return 0;const c=+k.current||0;if(k._low)return c<=+k.target?100:Math.max(0,Math.round(+k.target/c*100));return Math.min(Math.round(c/(+k.target)*100),100)}
 
 document.head.insertAdjacentHTML('beforeend','<style>.okr-dept{margin-top:28px;padding-top:20px;border-top:2px solid var(--line)}</style>');
+
+/* ===================== Tổng quan phòng: KPI · hạng D · OKR · phân công qua các tháng (Linh chốt 24/11/2026) ===================== */
+S.ovN=S.ovN||6;S.ovMet=S.ovMet||'kpi';
+function ovMonths(n){const out=[];let m=ymOf(TODAY);for(let i=0;i<n;i++){out.unshift(m);m=prevM(m)}return out}
+const ovArrow=(a,b)=>a==null||b==null?'':b>a?'<span class="up" title="Tăng so với tháng trước">▲</span>':b<a?'<span class="down" title="Giảm so với tháng trước">▼</span>':'';
+function ovCell(met,m,sid,prev){
+  if(met==='kpi'){const k=kpiOf(m,sid);if(!k.has)return {h:'<span class="ov-na">—</span>',v:null};const p=prev?kpiOf(prev,sid):null;return {h:`<b class="num">${nf(k.val)}</b> <span class="grade ${k.grade}">${k.grade}</span>${ovArrow(p&&p.has?p.val:null,k.val)}`,v:k.val}}
+  if(met==='d'){const e=effOf(m,sid);if(!e.has)return {h:'<span class="ov-na">—</span>',v:null};const p=prev?effOf(prev,sid):null;return {h:`${rankPill(e.rank)} <span class="mini num">${nf(e.score)}</span>${ovArrow(p&&p.has?dNum(p.rank):null,dNum(e.rank))}`,v:dNum(e.rank)}}
+  if(met==='okr'){const d=typeof opDoc==='function'?opDoc(m,sid):null;if(!d)return {h:'<span class="ov-na">Chưa lập</span>',v:null};const st=OP_ST[d.status||'draft'];const p=opPct(opLive(d));
+    return {h:d.status==='approved'?`<b class="num">${p}%</b> <span class="mini">${nf(opWSum(d.objectives))}đ</span>`:`<span class="pill ${st[0]}">${st[1]}</span>`,v:d.status==='approved'?p:null}}
+  const e=effOf(m,sid);const n=e.nt||0;const td=['tdNT','tdCHT','tdQLKV','tdVP'].reduce((a,k)=>a+(+e.e[k]||0),0),tq=['hs1','hs2','hs3','hs4','hs5'].reduce((a,k)=>a+(+e.e[k]||0),0);
+  return {h:n||td||tq?`<span class="num">${n} NT</span><span class="mini"> · TD ${nf(td)} · TQ ${nf(tq)}</span>`:'<span class="ov-na">—</span>',v:n}}
+function ovLine(ms,vals,max,fmt){const W=520,H=150,pl=36,pr=12,pt=14,pb=26;const pts=vals.map((v,i)=>v==null?null:[pl+(ms.length>1?i*(W-pl-pr)/(ms.length-1):0),pt+(H-pt-pb)*(1-v/max)]);
+  const ok=pts.filter(Boolean);const path=ok.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const grid=[0,.5,1].map(f=>{const y=pt+(H-pt-pb)*(1-f);return `<line x1="${pl}" x2="${W-pr}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${pl-6}" y="${y+4}" text-anchor="end" font-size="10" fill="var(--muted)">${fmt(max*f)}</text>`}).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" class="ov-svg" role="img" aria-label="Xu hướng">${grid}${ok.length>1?`<path d="${path} L${ok[ok.length-1][0]} ${H-pb} L${ok[0][0]} ${H-pb} Z" fill="var(--accent-soft)" opacity=".6"/><path d="${path}" fill="none" stroke="var(--accent)" stroke-width="2.5"/>`:''}
+    ${pts.map((p,i)=>p?`<circle cx="${p[0]}" cy="${p[1]}" r="${i===pts.length-1?4.5:3}" fill="var(--accent)"/><text x="${p[0]}" y="${p[1]-8}" text-anchor="middle" font-size="10.5" font-weight="700" fill="var(--fg)">${fmt(vals[i])}</text>`:'').join('')}
+    ${ms.map((m,i)=>`<text x="${pl+(ms.length>1?i*(W-pl-pr)/(ms.length-1):0)}" y="${H-8}" text-anchor="middle" font-size="10.5" fill="var(--muted)">T${+m.slice(5)}</text>`).join('')}</svg>`}
+function ovDBars(ms,st){const C={D1:'#d9604c',D2:'#e59a3a',D3:'#cbb53a',D4:'#7cbf6e',D5:'#3fa06a',D6:'#1f7a4c'};const W=520,H=150,pl=10,pb=26,pt=8;const bw=(W-pl*2)/ms.length;const N=Math.max(1,st.length);
+  return `<svg viewBox="0 0 ${W} ${H}" class="ov-svg" role="img" aria-label="Phân bố hạng D">${ms.map((m,i)=>{const cnt={};st.forEach(s=>{const e=effOf(m,s.id);if(e.has)cnt[e.rank]=(cnt[e.rank]||0)+1});let y=H-pb;const x=pl+i*bw+bw*.2,w=bw*.6;
+    return ['D1','D2','D3','D4','D5','D6'].map(d=>{const n=cnt[d]||0;if(!n)return '';const h=(H-pb-pt)*n/N;y-=h;return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${C[d]}"><title>T${+m.slice(5)} · ${d}: ${n} người</title></rect>${h>13?`<text x="${x+w/2}" y="${y+h/2+4}" text-anchor="middle" font-size="10" fill="#fff" font-weight="700">${n}</text>`:''}`}).join('')+`<text x="${x+w/2}" y="${H-8}" text-anchor="middle" font-size="10.5" fill="var(--muted)">T${+m.slice(5)}</text>`}).join('')}</svg>
+  <div class="ov-leg">${Object.entries(C).map(([d,c])=>`<span><i style="background:${c}"></i>${d}</span>`).join('')}</div>`}
+function vOverview2(){
+  const st=activeStaff(),ms=ovMonths(S.ovN),m=ms[ms.length-1],pm=prevM(m);
+  const kNow=st.map(s=>kpiOf(m,s.id)).filter(k=>k.has);const kAvg=kNow.length?Math.round(kNow.reduce((a,k)=>a+k.val,0)/kNow.length):null;
+  const eNow=st.map(s=>effOf(m,s.id)).filter(e=>e.has);const dHi=eNow.filter(e=>dNum(e.rank)>=4).length;
+  const opNow=st.map(s=>typeof opDoc==='function'?opDoc(m,s.id):null);const opAp=opNow.filter(d=>d&&d.status==='approved').length,opWait=opNow.filter(d=>d&&d.status==='submitted').length;
+  const q=qOf(TODAY);const okrs=S.okrs.filter(o=>o.quarter===q).sort((a,b)=>(a.order??99)-(b.order??99));const oAvg=okrs.length?Math.round(okrs.reduce((a,o)=>a+okrProgress(o),0)/okrs.length):null;
+  let late=[];try{late=S.rec&&S.rec.rowsJson?recRows().filter(x=>x.stale):[]}catch(_){}
+  const tools=`<div class="seg ov-seg" role="group" aria-label="Khoảng thời gian">${[3,6,12].map(n=>`<button type="button" data-act="ov-n" data-id="${n}" aria-pressed="${S.ovN===n}">${n} tháng</button>`).join('')}</div>`;
+  let h=head('Tổng quan phòng HCNS',`KPI · hạng D · OKR · phân công của từng người qua ${S.ovN} tháng gần nhất · ${fmtM(ms[0])} – ${fmtM(m)}`,tools);
+  h+=`<div class="stats">
+    <div class="stat"><div class="k">KPI TB ${fmtM(m)}</div><div class="v">${kAvg==null?'—':nf(kAvg)}</div><div class="s">${kNow.length}/${st.length} người có nhật ký</div></div>
+    <div class="stat ${dHi>=st.length/2?'ok':''}"><div class="k">Hạng D4 trở lên</div><div class="v">${dHi}/${eNow.length||st.length}</div><div class="s">${fmtM(m)}</div></div>
+    <div class="stat ${opWait?'warn':''}"><div class="k">OKR cá nhân đã duyệt</div><div class="v">${opAp}/${st.length}</div><div class="s">${opWait?opWait+' bản chờ chị duyệt':fmtM(m)}</div></div>
+    <div class="stat"><div class="k">OKR phòng ${fmtQ(q)}</div><div class="v">${oAvg==null?'—':oAvg+'%'}</div><div class="s">${okrs.length} mục tiêu</div></div>
+    <div class="stat ${late.length?'bad':'ok'}"><div class="k">Hồ sơ tuyển dụng trễ</div><div class="v">${late.length}</div><div class="s">${new Set(late.map(x=>x.o)).size} người có hồ sơ trễ</div></div>
+    <div class="stat ${S.tasks.filter(overdue).length?'bad':''}"><div class="k">Việc quá hạn</div><div class="v">${S.tasks.filter(overdue).length}</div><div class="s">${S.tasks.filter(t=>!isDone(t)).length} việc đang mở</div></div></div>`;
+  /* Bảng chính */
+  const mets=[['kpi','KPI'],['d','Hạng D'],['okr','OKR cá nhân'],['pc','Phân công']];
+  const rows=st.map(s=>{const cells=ms.map((mm,i)=>ovCell(S.ovMet,mm,s.id,i?ms[i-1]:prevM(mm)));return {s,cells}});
+  h+=`<div class="panel ov-main"><div class="ov-mh"><h2>Theo từng người qua các tháng</h2><div class="seg" role="tablist">${mets.map(([k,l])=>`<button type="button" data-act="ov-met" data-id="${k}" aria-pressed="${S.ovMet===k}">${l}</button>`).join('')}</div></div>
+    <div class="tbl-wrap"><table class="ov-t"><thead><tr><th>Nhân sự</th>${ms.map(mm=>`<th class="c${mm===m?' cur':''}">${fmtM(mm)}</th>`).join('')}</tr></thead><tbody>
+    ${rows.map(({s,cells})=>`<tr><td><b>${esc(s.name)}</b></td>${cells.map((c,i)=>`<td class="c${ms[i]===m?' cur':''}">${c.h}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div>
+    <p class="note">${S.ovMet==='kpi'?'KPI tháng theo nhật ký công việc (A/B/C/D theo ngưỡng cấu hình) · ▲▼ so với tháng trước.':S.ovMet==='d'?'Hạng hiệu suất D1–D6 và điểm khối lượng phụ trách · ▲▼ so với tháng trước.':S.ovMet==='okr'?'Tiến độ OKR cá nhân đã duyệt và tổng tỷ trọng (tối đa 50đ + 50đ báo cáo tự động); chưa duyệt thì hiện trạng thái.':'Số nhà thuốc phụ trách · TD = số người tuyển được · TQ = số việc thường quy.'} <a href="#${S.ovMet==='kpi'?'kpi':S.ovMet==='okr'?'okr-ca-nhan':'phan-cong'}">Mở mục chi tiết</a></p></div>`;
+  /* Biểu đồ */
+  const kSeries=ms.map(mm=>{const ks=st.map(s=>kpiOf(mm,s.id)).filter(k=>k.has);return ks.length?Math.round(ks.reduce((a,k)=>a+k.val,0)/ks.length):null});
+  const kMax=Math.max(1050,...kSeries.filter(v=>v!=null));
+  h+=`<div class="grid2 ov-charts"><div class="panel"><h2>KPI trung bình phòng</h2>${ovLine(ms,kSeries,kMax,v=>nf(Math.round(v)))}</div><div class="panel"><h2>Số người theo hạng D</h2>${ovDBars(ms,st)}</div></div>`;
+  /* OKR phòng + Cần chú ý */
+  const att=[];
+  st.forEach(s=>{const v=ms.slice(-3).map(mm=>{const k=kpiOf(mm,s.id);return k.has?k.val:null});if(v.every(x=>x!=null)&&v[2]<v[1]&&v[1]<v[0])att.push(['bad',`<b>${esc(s.name)}</b> KPI giảm 2 tháng liền (${v.map(x=>nf(x)).join(' → ')})`]);
+    const d=typeof opDoc==='function'?opDoc(m,s.id):null;if(!d)att.push(['warn',`<b>${esc(s.name)}</b> chưa lập OKR ${fmtM(m)}`]);else if(d.status==='submitted')att.push(['warn',`<b>${esc(s.name)}</b> có OKR ${fmtM(m)} đang chờ duyệt`]);
+    else if(d.status==='approved'&&!(d.checkins||{})[weekRange(TODAY)[0]])att.push(['',`<b>${esc(s.name)}</b> chưa check-in OKR tuần này`]);
+    const L=late.filter(x=>x.o===s.id);if(L.length)att.push(['bad',`<b>${esc(s.name)}</b> có ${L.length} hồ sơ tuyển dụng trễ (lâu nhất ${Math.max(...L.map(x=>x.over))} ngày)`]);
+    const ov=S.tasks.filter(t=>t.owner===s.id&&overdue(t)).length;if(ov)att.push(['bad',`<b>${esc(s.name)}</b> có ${ov} việc quá hạn`])});
+  att.sort((a,b)=>(a[0]==='bad'?0:a[0]==='warn'?1:2)-(b[0]==='bad'?0:b[0]==='warn'?1:2));
+  h+=`<div class="grid2"><div class="panel"><h2>OKR phòng ${fmtQ(q)} <small><a href="#okr-ca-nhan">Chi tiết</a></small></h2>${okrs.length?okrs.map(o=>{const p=okrProgress(o);return `<div class="ov-okr"><div><b>${esc(o.objective)}</b><span class="num">${p}%</span></div><div class="bar"><i class="${p>=70?'ok':p>=40?'':'warn'}" style="width:${p}%"></i></div></div>`}).join(''):'<p class="note">Chưa có OKR phòng quý này.</p>'}</div>
+    <div class="panel"><h2>Cần chú ý <small>${att.length} mục</small></h2>${att.length?`<ul class="ov-att">${att.slice(0,14).map(([c,t])=>`<li class="${c}">${t}</li>`).join('')}</ul>${att.length>14?`<p class="note">và ${att.length-14} mục khác.</p>`:''}`:'<p class="note">Không có gì cần chú ý. Tốt lắm!</p>'}</div></div>`;
+  return h}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act="ov-n"],[data-act="ov-met"]');if(!b)return;if(b.dataset.act==='ov-n')S.ovN=+b.dataset.id;else S.ovMet=b.dataset.id;render()});
+document.head.insertAdjacentHTML('beforeend',`<style>
+.ov-seg,.ov-main .seg{display:inline-flex;background:var(--sunken);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.ov-seg button,.ov-main .seg button{border:0;background:transparent;border-radius:7px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.ov-seg button[aria-pressed="true"],.ov-main .seg button[aria-pressed="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.ov-main{margin-bottom:16px}.ov-mh{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}.ov-mh h2{margin:0}
+.ov-t th.c,.ov-t td.c{text-align:center;white-space:nowrap}.ov-t td.cur,.ov-t th.cur{background:var(--accent-soft)}.ov-t td:first-child{white-space:nowrap}
+.ov-na{color:var(--muted);font-size:12px}.ov-t .up{color:var(--ok);margin-left:3px;font-size:11px}.ov-t .down{color:var(--bad);margin-left:3px;font-size:11px}
+.ov-charts{margin-bottom:16px}.ov-svg{width:100%;height:auto;display:block}.ov-leg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:6px}.ov-leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.ov-okr{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}.ov-okr>div:first-child{display:flex;justify-content:space-between;gap:10px}.ov-okr b{font-weight:600}
+.ov-att{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}.ov-att li{padding:7px 10px;border-radius:8px;background:var(--sunken);font-size:13.5px;border-left:3px solid var(--line)}.ov-att li.bad{border-left-color:var(--bad)}.ov-att li.warn{border-left-color:var(--warn)}
+</style>`);
+
 </script>
 </body>
 </html>
