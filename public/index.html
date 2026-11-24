@@ -441,7 +441,7 @@ async function init(){
   db.doc('rec/cv').onSnapshot(s=>{S.rec=s.exists?s.data():{};_recCache=null;render()},()=>{});
   db.doc('cht/meta').onSnapshot(s=>{S.chtMeta=s.exists?s.data():{};render()},()=>{});
   db.collection('meetings').onSnapshot(snap=>{S.meetings=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
-  db.collection('kadj').onSnapshot(snap=>{S.kadj=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
+  db.collection('kadj').onSnapshot(snap=>{S.kadj=snap.docs.map(d=>({id:d.id,...d.data()}));S.kadjLoaded=true;render()},()=>{});
   db.collection('okrp').onSnapshot(snap=>{S.okrp=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('members').onSnapshot(snap=>{S.members=snap.docs.map(d=>({id:d.id,...d.data()}));render()},()=>{});
   db.collection('chtplan').onSnapshot(snap=>{const o={};snap.docs.forEach(d=>{o[d.id]=d.data()});S.chtPlan=o;render();setTimeout(chtMigrate,800)},()=>{});
@@ -2793,7 +2793,7 @@ const kbGrade=(v,c)=>v==null?'':v>=c.tA?'A':v>=c.tB?'B':v>=c.tC?'C':'D';
 function kbRows(m){const c=kbCfg(),D=kbDoc(m),ov=D.rows||{};
   return allStaff().filter(s=>(s.status||'active')!=='quit').sort((a,b)=>String(a.code||'').localeCompare(String(b.code||''))).map(s=>{const o=ov[s.id]||{};const k=kpiOf(m,s.id);
     const st=o.st||kbSt(s);const auto=k.has?Math.round(Math.min(k.raw,k.max)):null;const f=o.f!=null&&o.f!==''?+o.f:auto;
-    const minus=o.minus!=null&&o.minus!==''?+o.minus:(+k.pen||0);const plus=+o.plus||0;const xet=st==='CT'&&f!=null;
+    const minus=o.minus!=null&&o.minus!==''?+o.minus:((+k.pen||0)-(+k.mtMinus||0));const plus=+o.plus||0;const xet=st==='CT'&&f!=null;
     const v=xet?f-minus+plus:null;const g=xet?kbGrade(v,c):'';const amt=xet?(c[g]||0):0;
     const pn=(logDoc(m,s.id)||{}).penaltyNote||'';const note=o.note!=null?o.note:(st==='TV'?'Thử việc chưa xét':st==='TS'?'Nghỉ thai sản':pn);
     return {s,st,auto,f,minus,plus,v,g,amt,note,o}})}
@@ -2998,7 +2998,7 @@ async function mtImport(j){const byCode={};S.staff.forEach(s=>{if(s.code)byCode[
 /* ---------- KPI: cộng/trừ theo biên bản họp vào KPI tháng ---------- */
 const _kpiMt=kpiOf;
 kpiOf=function(m,sid){const k=_kpiMt(m,sid);const a=kadjSum(m,sid);if(!a.minus&&!a.plus)return k;const val=Math.max(0,r1(k.val-a.minus+a.plus));
-  return {...k,has:true,val,mtMinus:a.minus,mtPlus:a.plus,mtWhy:a.why,pct:r1(val/k.max*100),grade:gradeOf(val/k.max*100)}};
+  return {...k,has:true,val,pen:r1((+k.pen||0)+a.minus),mtMinus:a.minus,mtPlus:a.plus,mtWhy:a.why,pct:r1(val/k.max*100),grade:gradeOf(val/k.max*100)}};
 /* Bảng xét thưởng: điểm trừ/cộng mặc định gồm cả biên bản họp */
 const _kbRowsMt=kbRows;
 kbRows=function(m){const c=kbCfg();return _kbRowsMt(m).map(r=>{const a=kadjSum(m,r.s.id);if(!a.minus&&!a.plus)return r;const o=r.o;
@@ -3453,6 +3453,14 @@ async function cvlSync(silent){
     for(const a of S.kadj.filter(a=>a.src==='cvlate'&&!by[a.month+'|'+a.staffId]))await del('kadj/'+a.id);
     S.cvlAt=Date.now();if(!silent)toast(n?`Đã cập nhật trừ KPI CV chậm cho ${n} người`:'Điểm trừ CV chậm đã khớp');if(miss.size&&!silent)toast('Không khớp tên: '+[...miss].join(', '))
   }catch(e){if(!silent)toast('Chưa đọc được file Nhật ký CV chậm xử lý')}finally{S.cvlBusy=false}}
+/* Điểm trừ CV chậm đã chốt (khi web chưa đọc được file nhật ký, vd trên hcnsupharma.web.app) – chỉ ghi nếu tháng đó chưa có */
+const CVL_SEED={'2026-11':{at:'24/11/2026',p:{'Vũ Ngọc Minh':7,'Đặng Minh Ngọc':6,'Nguyễn Phương Anh':4,'Nguyễn Minh Phương':2,'Đinh Diệu Trinh':1}}};
+function cvlSeed(){if(S._cvlSeeded||!S.db||!S.kadjLoaded||!S.canWrite||S.role==='staff'||!allStaff().length)return;S._cvlSeeded=true;
+  const ids={};allStaff().forEach(s=>{ids[normName(s.name)]=s.id});
+  Object.entries(CVL_SEED).forEach(([ym,v])=>{if(S.kadj.some(a=>a.src==='cvlate'&&a.month===ym))return;
+    Object.entries(v.p).forEach(([nm,n])=>{const sid=ids[normName(nm)];if(!sid)return;
+      write('kadj/cvl_'+ym+'_'+sid,{staffId:sid,month:ym,pts:-n,reason:`Chậm xử lý hồ sơ tuyển dụng ${fmtM(ym)}: ${n} lượt (lũy kế đến ${v.at})`,meetingId:'',date:TODAY,src:'cvlate',scans:1,updatedAt:new Date().toISOString()}).catch(()=>{})})})}
+setInterval(cvlSeed,4e3);
 setInterval(()=>{if(S.mcp&&S.db&&S.loaded&&S.canWrite&&S.role!=='staff'&&!S.cvlBusy&&(!S.cvlTried||Date.now()-S.cvlTried>30*60e3))cvlSync(true)},15e3);
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act="cvl-sync"]');if(b)cvlSync(false)});
 document.head.insertAdjacentHTML('beforeend',`<style>
