@@ -3173,7 +3173,7 @@ function pvUniverse(){
   Object.entries(S.dcShops||{}).forEach(([id,s])=>{if(s.removed||o[id])return;o[id]={code:id,prov:s.prov||'',st:s.sheetSt==='Mở bán'?'open':'soon'}});
   const v=Object.values(o).filter(x=>!(typeof dcClosed==='function'&&dcClosed(x.code))).sort((a,b)=>a.code.localeCompare(b.code));
   _pvU={key,src:S.openShops,dc:S.dcShops,v};return v}
-function pvOwner(m,x){const e=pvGet('x',m,x.code);if(e&&e.v)return {sid:e.v,ex:true};const p=pvProvOwner(m,x.prov);return {sid:p?p.v:'',ex:false}}
+function pvOwner(m,x){/* Nhà chưa mở bán: chưa có HR phụ trách khu vực, mở bán thì tự nhận theo tỉnh (24/11/2026) */if(x.st==='soon')return {sid:'',ex:false,soon:true};const e=pvGet('x',m,x.code);if(e&&e.v)return {sid:e.v,ex:true};const p=pvProvOwner(m,x.prov);return {sid:p?p.v:'',ex:false}}
 function pvShopsOf(m,sid){return pvUniverse().filter(x=>pvOwner(m,x).sid===sid)}
 /* Thường quy */
 const RT_DEFAULT={hs1:['Vinh Quang','DSCM','Hành chính khác','ĐKKD','Chấm ăn CNHN','Bảng thưởng phát sinh/chi phí nhân sự'],hs2:['HĐLĐ','Công đoàn U','Điều xe CNHN','Đồng phục C'],hs3:['Đồng phục U, Data, VPP CCDC','Quản lý Data nhân sự','Thanh toán thuê nhà'],hs4:['Lương'],hs5:['BHXH']};
@@ -3224,7 +3224,7 @@ function vAssign(){
     const g={};U.forEach(x=>{const k=x.prov||'Chưa xác định';(g[k]??=[]).push(x)});
     const provs=Object.keys(g).sort((a,c)=>a.localeCompare(c,'vi'));const none=provs.filter(p=>!(pvProvOwner(m,p)||{}).v).length;
     h+=`<div class="panel pv-p"><h2>Phân công theo tỉnh · ${fmtM(m)} <small>${U.length} nhà · ${provs.length} tỉnh${none?` · <span class="bad">${none} tỉnh chưa giao</span>`:''}</small></h2>
-      <div class="row" style="gap:8px;margin-bottom:8px">${S.canWrite?`<button class="btn sm" data-act="pv-td-copy">Chép HR khu vực sang Tuyển dụng cho tỉnh còn trống</button>`:''}</div><p class="note"><b>HR khu vực</b>: phụ trách nhân sự các nhà thuốc trong tỉnh (tính điểm NT). <b>Tuyển dụng</b>: người tuyển cho tỉnh đó (hồ sơ chưa có người hẹn PV sẽ gán cho người này, tính điểm Tuyển). Chọn người phụ trách cho từng tỉnh, mọi nhà thuốc trong tỉnh tự nhận theo. Tháng chưa chọn tự giữ người của tháng trước. Danh sách nhà lấy từ sheet Theo dõi nhà mới (gồm nhà chưa mở bán, bỏ nhà đóng điểm).</p>
+      <div class="row" style="gap:8px;margin-bottom:8px">${S.canWrite?`<button class="btn sm" data-act="pv-td-copy">Chép HR khu vực sang Tuyển dụng cho tỉnh còn trống</button>`:''}</div><p class="note"><b>HR khu vực</b>: phụ trách nhân sự các nhà thuốc <b>đã mở bán</b> trong tỉnh (tính điểm NT); nhà chưa mở bán chưa giao HR, khi sheet Theo dõi nhà mới chuyển sang Mở bán thì tự nhận theo người phụ trách tỉnh. <b>Tuyển dụng</b>: người tuyển cho tỉnh đó (hồ sơ chưa có người hẹn PV sẽ gán cho người này, tính điểm Tuyển). Chọn người phụ trách cho từng tỉnh, mọi nhà thuốc trong tỉnh tự nhận theo. Tháng chưa chọn tự giữ người của tháng trước. Danh sách nhà lấy từ sheet Theo dõi nhà mới (gồm nhà chưa mở bán, bỏ nhà đóng điểm).</p>
       <div class="tbl-wrap"><table class="pv-t"><thead><tr><th>Tỉnh</th><th class="r">Nhà</th><th class="r">Chưa mở</th><th class="r">Ngoại lệ</th><th>HR khu vực ${fmtM(m)}</th><th>Tuyển dụng ${fmtM(m)}</th><th>${fmtM(pm)} (HR · TD)</th></tr></thead><tbody>
       ${provs.map(p=>{const cur=pvProvOwner(m,p),prv=pvProvOwner(pm,p),td=pvProvTD(m,p),ptd=pvProvTD(pm,p);const exN=g[p].filter(x=>(pvGet('x',m,x.code)||{}).v).length;const inh=cur&&cur.from!==m;
         return `<tr><td><b>${esc(p)}</b></td><td class="r num">${g[p].length}</td><td class="r num">${g[p].filter(x=>x.st==='soon').length||''}</td><td class="r num">${exN||''}</td>
@@ -3239,7 +3239,7 @@ function vAssign(){
         <label class="row note"><input type="checkbox" id="pfAll" ${S.pf.all?'checked':''}> Hiện tất cả nhà để thêm ngoại lệ</label></div>
       <div class="tbl-wrap" style="max-height:560px;overflow:auto"><table class="pv-t"><thead><tr><th>Nhà</th><th>Tỉnh</th><th>Trạng thái</th><th>Theo tỉnh</th><th>Ngoại lệ ${fmtM(m)}</th></tr></thead><tbody>
       ${L.length?L.map(({x,o,p})=>`<tr class="${o.ex?'pv-ex':''}"><td><b>${esc(dcNT(x.code))}</b> <span class="mini">${esc(x.code)}</span></td><td>${esc(x.prov||'—')}</td><td>${x.st==='soon'?'<span class="pill warn">Chưa mở bán</span>':'<span class="pill ok">Mở bán</span>'}</td><td class="mini">${p&&p.v?esc(staffName(p.v)):'—'}</td>
-        <td><select class="pv-q" data-pvx="${esc(x.code)}" ${dis}>${opts(o.ex?o.sid:'','— Theo tỉnh —')}</select></td></tr>`).join(''):`<tr><td colspan="5" class="note">${S.pf.all?'Không có nhà khớp bộ lọc.':'Chưa có ngoại lệ. Tích “Hiện tất cả nhà” để thêm.'}</td></tr>`}
+        <td>${o.soon?'<span class="mini">Chưa mở bán · chưa giao HR</span>':`<select class="pv-q" data-pvx="${esc(x.code)}" ${dis}>${opts(o.ex?o.sid:'','— Theo tỉnh —')}</select>`}</td></tr>`).join(''):`<tr><td colspan="5" class="note">${S.pf.all?'Không có nhà khớp bộ lọc.':'Chưa có ngoại lệ. Tích “Hiện tất cả nhà” để thêm.'}</td></tr>`}
       </tbody></table></div></div>`}
   else if(S.pvTab==='rt'){
     const T=rtTasks(),r=rtMap(m),cur=r?r.v:{};const tiers=[...new Set(T.map(t=>t.tier))];
