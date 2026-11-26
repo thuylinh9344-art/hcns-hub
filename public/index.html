@@ -413,7 +413,7 @@ const chains={};
 function write(path,body,mode='set'){
   if(!S.db){toast('Chưa kết nối được kho dữ liệu');return Promise.reject()}
   const run=()=>S.db.doc(path)[mode](body).catch(e=>{
-    if(e?.code==='invalid_argument'){S.canWrite=false;render();toast('Bạn chỉ có quyền xem trang này')}
+    if(e?.code==='invalid_argument'){if(S.role==='staff'){const fc=e.firestoreCode||e.code;openDlg('Chưa lưu được',`<p>Firebase từ chối ghi dữ liệu (<b>${esc(String(fc))}</b>) vào <code>${esc(path.split('/')[0])}</code>.</p><p class="note">Tài khoản: ${esc(S.myEmail||'')} · mã nhân sự: ${esc(S.me||'')}. Hãy chụp màn hình này gửi chị Linh: thường do Firestore Rules trên Firebase chưa phải bản mới nhất, hoặc email đăng nhập khác email chị Linh đã cấp.</p>`,`<div></div><div class="row"><button type="button" class="btn pri" data-act="close">Đóng</button></div>`)}else{S.canWrite=false;render();toast('Bạn chỉ có quyền xem trang này')}}
     else if(e?.code==='quota_exceeded')toast('Kho dữ liệu đã đầy, hãy xóa bớt dữ liệu cũ');
     else toast('Lưu chưa thành công, thử lại sau ít giây');throw e});
   chains[path]=(chains[path]||Promise.resolve()).catch(()=>{}).then(run);return chains[path];
