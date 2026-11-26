@@ -1729,7 +1729,7 @@ const lgNum=v=>{let s=String(v??'').trim();if(!s)return null;if(s.includes(',')&
 const lgDate=(v,ym)=>{const m=String(v||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(!m)return '';const a=+m[1],b=+m[2],tm=+ym.slice(5,7);let d,mo;if(b===tm){d=a;mo=b}else if(a===tm){d=b;mo=a}else if(a>12){d=a;mo=b}else{d=a;mo=b}return `${m[3]}-${pad(mo)}-${pad(d)}`};
 async function refreshLogs(silent){
   if(!S.mcp||S.logBusy)return;S.logBusy=true;_lgTried=Date.now();if(!silent)render();
-  try{const _sum=[],_miss=[];const _list=lgSheets();for(const [_mo,_sid] of _list){if(LOG_XLSX[_mo]&&window.HUB_STANDALONE){try{const res=await S.mcp.callTool('Google Drive','download',{fileId:LOG_XLSX[_mo]},{silent:!!silent});const r=await lgFromBuf(res.payload.buf);_sum.push(`${fmtM(r.ym)} (file Excel): ${nf(r.n)} dòng của ${r.ppl} người`);if(r.miss.length)_miss.push(`${fmtM(r.ym)} tab ${r.miss.join(', ')}`);(S.logOk??={})[_mo]=new Date().toISOString();if(S.logErr&&S.logErr[_mo])delete S.logErr[_mo];continue}catch(e){(S.logErr??={})[_mo]=(e&&e.code)||'error';if(!silent)_miss.push(`file Excel ${fmtM(_mo)} (${e&&e.code==='needs_reauth'?'bấm lại để cấp quyền đọc Drive':'chưa tải được'})`);/* Không đọc được file Excel: đọc bản Google Sheet (được sao chép từ file Excel định kỳ) */}}
+  try{const _sum=[],_miss=[];const _list=lgSheets();for(const [_mo,_sid] of _list){if(LOG_XLSX[_mo]&&window.HUB_STANDALONE){try{const res=await S.mcp.callTool('Google Drive','download',{fileId:LOG_XLSX[_mo]},{silent:!!silent});const r=await lgFromBuf(res.payload.buf);_sum.push(`${fmtM(r.ym)} (file Excel): ${nf(r.n)} dòng của ${r.ppl} người`);if(r.miss.length)_miss.push(`${fmtM(r.ym)} tab ${r.miss.join(', ')}`);(S.logOk??={})[_mo]=new Date().toISOString();if(S.logErr&&S.logErr[_mo])delete S.logErr[_mo];continue}catch(e){(S.logErr??={})[_mo]=(e&&e.code)||'error';if(!silent)_miss.push(`file Excel ${fmtM(_mo)} (${e&&e.code==='needs_reauth'?'bấm lại để cấp quyền đọc Drive':'chưa tải được'})`);/* File Excel là nguồn chính: không đọc lại bản Google Sheet cũ (đã ngừng cập nhật từ 20/11) để khỏi ghi đè nhật ký mới bằng dữ liệu cũ */continue}}
     try{const get=async rg=>{const res=await S.mcp.callTool('Google Sheets','get_values',{spreadsheetId:_sid,range:rg},{cache:false,silent:!!silent});return (res.payload&&res.payload.values)||[]};
     const k=await get("'Khung'!B3");const mm=String((k[0]||[])[0]||'').match(/(\d{1,2})\/(\d{4})/);const ym=mm?`${mm[2]}-${pad(+mm[1])}`:ymOf(TODAY);
     const byCode={};S.staff.forEach(s=>{if(s.code)byCode[String(s.code).trim().toUpperCase()]=s});let n=0,ppl=0;const miss=[];
@@ -3384,7 +3384,7 @@ function vKpiTabs(){if(!S.kpiTab)S.kpiTab=S.role==='staff'?'me':'all';
   const tabs=S.role==='staff'?[['me','Nhật ký & KPI của tôi']]:[['all','KPI cả phòng'],['me','Nhật ký từng người'],['mt','Biên bản họp → nhắc việc']];if(!tabs.some(t=>t[0]===S.kpiTab))S.kpiTab=tabs[0][0];
   const bar=`<div class="kt-tabs" role="tablist">${tabs.map(([k,l])=>`<button type="button" role="tab" data-act="kpi-tab" data-id="${k}" aria-selected="${S.kpiTab===k}">${l}</button>`).join('')}</div>`;
   if(S.kpiTab==='mt')return bar+(S.canWrite?`<div class="panel bb-up"><h2>Tải biên bản họp <small>Word (.docx) hoặc .txt · web lọc ra ý chính, người thực hiện, hạn → tạo nhắc việc cho từng người</small></h2><div class="row" style="gap:8px"><label class="btn pri" style="cursor:pointer">Chọn file biên bản<input type="file" id="bbFile" accept=".docx,.txt" hidden></label><button class="btn" data-act="bb-paste">Dán nội dung biên bản</button></div></div>`:'')+vMeet();
-  return bar+(S.kpiTab==='me'?(S.role==='staff'?mtWarn(S.me)+bbBoxSelf():'')+recLateMine(S.me)+vMe():vKpi())}
+  return bar+lgStale()+(S.kpiTab==='me'?(S.role==='staff'?mtWarn(S.me)+bbBoxSelf():'')+recLateMine(S.me)+vMe():vKpi())}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act="kpi-tab"]');if(!b)return;S.kpiTab=b.dataset.id;render()});
 document.head.insertAdjacentHTML('beforeend','<style>.kt-tabs{display:inline-flex;gap:4px;background:var(--sunken);border:1px solid var(--line);border-radius:12px;padding:4px;margin-bottom:14px}.kt-tabs button{border:0;background:transparent;border-radius:9px;padding:7px 16px;font:inherit;font-weight:600;color:var(--muted);cursor:pointer}.kt-tabs button[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.08)}</style>');
 
@@ -3701,6 +3701,12 @@ function opTeamView(qSel){const q=S.opQ;const P=opPubDoc(q);
     <td style="vertical-align:top">${r.lastCi?`${opWkLbl(r.lastCi)}${cf?` <span class="pill ${cf[0]}">${cf[1]}</span>`:''}`:'<span class="mini">Chưa check-in</span>'}</td></tr>`}).join('')}
   </tbody></table></div><p class="note">Bản chỉ xem để cả phòng cùng theo dõi. Bạn lập và check-in OKR của mình ở tab “OKR của tôi”.</p>`}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act="opv-tab"]');if(!b)return;S.opTab=b.dataset.id;render()});
+
+/* Nhắc cập nhật nhật ký: web chỉ tự đọc file Excel khi đã có quyền đọc Drive trong phiên đăng nhập này. */
+function lgStale(){if(!window.HUB_STANDALONE||S.role==='staff'||!S.canWrite||!S.mcp)return '';const m=S.month;const ts=S.logs.filter(l=>l.month===m).map(l=>l.updatedAt||'').filter(Boolean).sort();const last=ts[ts.length-1]||'';
+  const ok=S.logOk&&S.logOk[m];const err=S.logErr&&S.logErr[m];if(ok&&!err)return '';
+  const when=last?new Date(last).toLocaleString('vi-VN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';
+  return `<div class="wb-warn" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><span>Nhật ký ${fmtM(m)} cập nhật lần cuối <b>${when}</b>${err==='needs_reauth'?' · cần cấp quyền đọc Google Drive để đọc file Excel mới nhất':err?' · chưa tải được file Excel':''}.</span><button class="btn sm pri" data-act="lg-refresh" ${S.logBusy?'disabled':''}>${S.logBusy?'Đang đọc…':'Cập nhật nhật ký ngay'}</button></div>`}
 </script>
 </body>
 </html>
