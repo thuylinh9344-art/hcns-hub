@@ -382,9 +382,9 @@ const gCut=t=>{t=+t||0;return t>100?t/(+S.config.kpiMax||1000)*100:t};/* ngưỡ
 function gradeOf(p){const c=S.config;return p>=gCut(c.gradeA)?'A':p>=gCut(c.gradeB)?'B':p>=gCut(c.gradeC)?'C':'D'}
 function kpiOf(m,sid){
   const d=logDoc(m,sid);const es=d?.entries||[];const max=+S.config.kpiMax||1000;
-  const raw=es.reduce((a,e)=>a+entPts(e),0);const pen=+d?.penalty||0;const val=Math.max(0,Math.min(raw,max)-pen);
-  return {has:es.length>0,n:es.length,days:new Set(es.map(e=>e.d)).size,codes:new Set(es.map(e=>e.code).filter(Boolean)).size,raw:r1(raw),pen,val:r1(val),max,pct:r1(val/max*100),
-    grade:es.length?gradeOf(val/max*100):'—',over:raw>max,late:es.filter(e=>e.ontime==='Không').length,open:es.filter(e=>!isDoneLog(e)).length,noQty:es.filter(e=>isDoneLog(e)&&e.code&&!(+e.qty)).length,last:es.reduce((a,e)=>e.d>a?e.d:a,'')};
+  const raw=es.reduce((a,e)=>a+entPts(e),0);const capd=kpCapSum(es,kpAreaCap(m,sid));const pen=+d?.penalty||0;const val=Math.max(0,Math.min(capd,kpCapV())-pen);
+  return {has:es.length>0,n:es.length,days:new Set(es.map(e=>e.d)).size,codes:new Set(es.map(e=>e.code).filter(Boolean)).size,raw:r1(raw),okrCut:r1(raw-capd),pen,val:r1(val),max,pct:r1(val/max*100),
+    grade:es.length?gradeOf(val/max*100):'—',over:capd>kpCapV(),late:es.filter(e=>e.ontime==='Không').length,open:es.filter(e=>!isDoneLog(e)).length,noQty:es.filter(e=>isDoneLog(e)&&e.code&&!(+e.qty)).length,last:es.reduce((a,e)=>e.d>a?e.d:a,'')};
 }
 function areaPts(m,sid,range){const es=(logDoc(m,sid)?.entries||[]).filter(e=>!range||inR(e.d,range));const o={};es.forEach(e=>{const k=e.area||'Khác';o[k]=(o[k]||0)+entPts(e)});return Object.entries(o).sort((a,b)=>b[1]-a[1])}
 const shopsOf=(m,sid,type)=>type==='nt'&&typeof pvActive==='function'&&pvActive(m)?pvShopsOf(m,sid):S.shops.filter(s=>s.type===type&&s.m&&s.m[m]===sid);
@@ -1688,16 +1688,16 @@ function kpRk(m){if(_kpRk&&_kpRk.m===m&&_kpRk.rec===S.rec&&_kpRk.sys===S.sys&&_k
   _kpRk={m,rec:S.rec,sys:S.sys,cfg:S.config,v};return v}
 const kpIsRec=e=>/^01\./.test(String(e.code||''))||/^tuyển dụng$/i.test(String(e.area||'').trim());
 function kpCats(m,sid){const code=kpCode(sid);const p=rkPlan(m)[code];const max=+S.config.kpiMax||1000;const td=p?Math.min(max,(()=>{const tdp=(typeof kpPlanAll==='function'?(kpPlanAll(m)[code]||[]):[]).find(x=>x[0]==='Tuyển dụng');return tdp?tdp[1]:p[1]})()):0;
-  const es=(logDoc(m,sid)?.entries||[]).filter(e=>!isVoidLog(e));const other=es.filter(e=>!kpIsRec(e)).reduce((a,e)=>a+entPts(e),0),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
+  const es=(logDoc(m,sid)?.entries||[]).filter(e=>!isVoidLog(e));const other=kpCapSum(es.filter(e=>!kpIsRec(e)),kpAreaCap(m,sid)),recLog=es.filter(kpIsRec).reduce((a,e)=>a+entPts(e),0);
   const ov=((S.config.kpiPct||{})[m]||{})[code]||{};const cats=[];
-  if(td){const r=kpRk(m)[sid];const got=r?r.kpi:0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
+  if(td){const r=kpRk(m)[sid];const capT=kpAreaCap(m,sid)['Tuyển dụng'];const got=r?(capT!=null?Math.min(r.kpi,capT):r.kpi):0;cats.push({k:'Tuyển dụng',pts:td,pct:td?got/td:0,src:'Bảng KPI tuyển dụng (4 tiêu chí)',note:r?`${r.real}/${r.tgt} người · ${nf(got)}/${nf(td)} điểm`:'Chưa có dữ liệu',man:'',use:td?got/td:0,got,fixed:true})}
   const BC=50;cats.push({k:'Báo cáo',pts:BC,pct:1,src:'Tự cộng ngoài thang 1000',note:'Tự cộng 50 điểm cho mục báo cáo (tối đa 1050)',man:'',use:1,got:BC,fixed:true});
   const rest=max-td;const k='Công việc khác';const pct=rest?Math.min(1,other/rest):0;const man=ov[k];const use=man!=null&&man!==''?Math.min(1,Math.max(0,+man/100)):pct;
   cats.push({k,pts:rest,pct,src:'Điểm nhật ký công việc ngày, không tính các dòng tuyển dụng (mã 01.xx)',note:`${nf(r1(other))} điểm nhật ký${recLog?` · bỏ ${nf(r1(recLog))} điểm báo cáo tuyển dụng`:''}`,man:man??'',use,got:Math.round(Math.min(rest,rest*use))});
   return cats}
 const _kpiLog=kpiOf;
 kpiOf=function(m,sid){const L=_kpiLog(m,sid);const cats=kpCats(m,sid);if(!cats)return {...L,log:true};
-  const plan=cats.reduce((a,c)=>a+c.pts,0),got=cats.reduce((a,c)=>a+c.got,0);const val=Math.max(0,Math.min(got,plan)-L.pen);const max=Math.max(plan,1);
+  const plan=cats.reduce((a,c)=>a+c.pts,0),got=cats.reduce((a,c)=>a+c.got,0);const val=Math.max(0,Math.min(got,kpCapV())-L.pen);const max=+S.config.kpiMax||1000;
   return {...L,has:true,cats,plan,logRaw:L.raw,raw:got,val:r1(val),max,pct:r1(val/max*100),grade:gradeOf(val/max*100),over:false,alloc:true}};
 function kpDetail(s,m,k){if(!k.cats)return '';const dis=S.canWrite?'':'disabled';const code=kpCode(s.id);
   return `<div style="padding:6px 0 12px"><b style="font-size:13px">KPI ${fmtM(m)}: ${nf(k.raw)}/${nf(k.plan)} điểm</b>
@@ -3039,7 +3039,7 @@ async function mtImport(j){const byCode={};S.staff.forEach(s=>{if(s.code)byCode[
 
 /* ---------- KPI: cộng/trừ theo biên bản họp vào KPI tháng ---------- */
 const _kpiMt=kpiOf;
-kpiOf=function(m,sid){const k=_kpiMt(m,sid);const a=kadjSum(m,sid);if(!a.minus&&!a.plus)return k;const val=Math.max(0,r1(k.val-a.minus+a.plus));
+kpiOf=function(m,sid){const k=_kpiMt(m,sid);const a=kadjSum(m,sid);if(!a.minus&&!a.plus)return k;const val=Math.max(0,Math.min(kpCapV(),r1(k.val-a.minus+a.plus)));
   return {...k,has:true,val,pen:r1((+k.pen||0)+a.minus),mtMinus:a.minus,mtPlus:a.plus,mtWhy:a.why,pct:r1(val/k.max*100),grade:gradeOf(val/k.max*100)}};
 /* Bảng xét thưởng: điểm trừ/cộng mặc định gồm cả biên bản họp */
 const _kbRowsMt=kbRows;
@@ -3713,7 +3713,7 @@ function lgStale(){if(!window.HUB_STANDALONE||S.role==='staff'||!S.canWrite||!S.
    điểm đạt tự tính từ nhật ký (mảng Tuyển dụng: điểm KPI tuyển dụng tự tính), xếp loại theo ngưỡng A/B/C ở Cài đặt. */
 function opMain(){const seen=new Set();[...S.catalog].filter(c=>c.code).sort((a,b)=>String(a.code).localeCompare(String(b.code))).forEach(c=>{const a=opAreaOf(c.code)||c.area;if(a)seen.add(a)});return seen.size?[...seen]:OP_AREAS}
 function opGot(o,E,rk){if(!o.area)return null;if(o.area===OP_RK_AREA&&rk)return Math.round((+rk.kpi||0)*10)/10;return Math.round(E.filter(e=>(opAreaOf(e.code)||e.area)===o.area).reduce((t,e)=>t+entPts(e),0)*10)/10}
-function opGotSum(d){return ((d&&d.objectives)||[]).reduce((t,o)=>t+(+o.got||0),0)}
+function opGotSum(d){return Math.min(kpCapV(),((d&&d.objectives)||[]).reduce((t,o)=>t+(+o.got||0),0))}
 function okrGrade(pts){return gradeOf(pts/opMax()*100)}
 function okrCuts(){const c=S.config,m=opMax(),f=t=>nf(Math.round(gCut(t)*m/100));return `A ≥ ${f(c.gradeA)} · B ≥ ${f(c.gradeB)} · C ≥ ${f(c.gradeC)} · dưới là D`}
 document.addEventListener('click',e=>{const el=e.target.closest('[data-act="op-suggest"]');if(!el)return;const d=opCur();if((d.objectives||[]).length)return;
@@ -3723,6 +3723,11 @@ document.addEventListener('click',e=>{const el=e.target.closest('[data-act="op-s
   const M=opMax(),tot=A.reduce((t,[,v])=>t+v,0);const objs=A.map(([a,v])=>({id:opRid(),area:a,title:'Hoàn thành công việc mảng '+a,okrId:'',w:Math.max(10,Math.round(v/tot*M/10)*10),krs:[]}));
   const diff=M-objs.reduce((t,x)=>t+x.w,0);objs.sort((x,y)=>y.w-x.w);objs[0].w+=diff;
   opSave(d,{objectives:objs,status:d.status==='returned'?'returned':'draft'}).then(()=>toast(`Đã gợi ý ${objs.length} mục tiêu theo nhật ký ${fmtM(pm)}, bấm Sửa để điều chỉnh tên và điểm`)).catch(()=>{})});
+
+/* Chặn điểm (Linh chốt 27/11/2026): KPI và OKR tối đa 1.050 điểm; nhân viên đã lập OKR theo mảng thì điểm KPI của mảng đó tối đa bằng điểm mục tiêu OKR mảng đó. */
+function kpCapV(){return +(S.config&&S.config.kpiCap)||1050}
+function kpAreaCap(m,sid){const o={};try{const d=opDoc(m,sid);((d&&d.objectives)||[]).forEach(x=>{if(x.area&&+x.w>0)o[x.area]=(o[x.area]||0)+(+x.w)})}catch(_){}return o}
+function kpCapSum(es,caps){const by={};let free=0;es.forEach(e=>{if(isVoidLog(e))return;const p=entPts(e);const a=opAreaOf(e.code)||e.area||'';if(caps[a]!=null)by[a]=(by[a]||0)+p;else free+=p});return free+Object.entries(by).reduce((t,[a,v])=>t+Math.min(v,caps[a]),0)}
 </script>
 </body>
 </html>
