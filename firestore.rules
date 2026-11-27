@@ -66,7 +66,7 @@ service cloud.firestore {
     }
     // OKR cả phòng (bản tóm tắt chỉ xem do web quản trị chốt).
     match /hcns_hub/main/pub/{id} {
-      allow get: if hubStaff();
+      allow get: if hubStaff() || id == 'recOwn_6jJqE6BMGwDgYC2o';
     }
     match /hcns_hub/main/logs/{id} {
       allow read: if hubStaff() && resource.data.staffId == mySid();

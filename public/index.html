@@ -1159,12 +1159,11 @@ function recRows(){
     x.q90b=start&&start<=addDays(TODAY,-90);x.q90=x.q90b&&quit&&diffDays(start,quit)<=90;
     /* Hồ sơ treo: chỉ xét hồ sơ nộp trong 3 tháng gần nhất */
     x.recent=sub>=addDays(TODAY,-91);x.stale='';x.due='';
-    /* Hạn xử lý (từ hồ sơ nộp 01/11/2026): Mới tạo 48h (+24h nếu có Chủ nhật) · Chuyển BP/Nhóm → hẹn PV1 72h · PV1 → hẹn PV2 5 ngày */
+    /* Hạn xử lý (từ hồ sơ nộp 01/11/2026): hồ sơ phải được chuyển nhóm (rời trạng thái Mới tạo) trong 3 ngày làm việc */
     if(x.recent&&sub>=CVL_FROM){
       const d48=()=>{let d=addDays(sub,2);for(let t=sub;t<=d;t=addDays(t,1))if(pd(t).getDay()===0){d=addDays(d,1);break}return d};
-      if(st==='Mới tạo'){x.due=d48();x.stale='Mới tạo quá 48h'}
-      else if(st==='Chuyển Bộ phận/Nhóm'||(REC_PV1.includes(st)&&!v1)){x.due=addDays(d48(),3);x.stale='Chưa hẹn PV1 quá 72h'}
-      else if(REC_PV1.includes(st)&&v1&&!v2){x.due=addDays(v1,5);x.stale='Sau PV1 quá 5 ngày'}
+      /* Nguyên tắc chốt 27/11/2026: chỉ xét chuyển nhóm hồ sơ ≤ 3 ngày làm việc (T2–T7) kể từ ngày nộp */
+      if(st==='Mới tạo'){x.due=addWd(sub,3);x.stale='Chưa chuyển nhóm quá 3 ngày'}
       if(x.stale&&!(TODAY>x.due)){x.stale='';x.due=''}
     }
     x.over=x.stale?diffDays(x.due,TODAY):0;return x});
@@ -1252,7 +1251,7 @@ function vRec(){
   <details class="ref mt"><summary>Nguyên tắc tính (theo bàn giao Chất lượng xử lý hồ sơ T10.2026)</summary><ul>
     <li>Người phụ trách: người hẹn PV vòng 1 (mã NV khớp danh sách nhân sự phòng). Loại Nguyễn Phúc Tân, Kiều Thu Phương, Nguyễn Trọng Vinh. Hồ sơ chưa có người hẹn: CHT/QLKV gán người tuyển Quản lý, văn phòng & kho gán người phụ trách Khối văn phòng, bán hàng gán theo tỉnh trong mục “Địa bàn / phạm vi” của từng người (đã quy đổi tỉnh sau sáp nhập).</li>
     <li>Đúng hạn: số ngày làm việc (thứ 2 – thứ 7) từ ngày nộp đến ngày PV vòng 1 ≤ 3. Sheet không lưu ngày loại hồ sơ nên chỉ tính hồ sơ có lịch PV1.</li>
-    <li>Hồ sơ treo (chỉ hồ sơ nộp trong 3 tháng gần nhất): “Mới tạo” quá 7 ngày; đã hẹn/đồng ý PV vòng 1 mà ngày PV đã qua (chưa có ngày PV thì hạn là 3 ngày làm việc sau ngày nộp); đạt PV1 hoặc đã hẹn/đồng ý PV vòng 2 mà ngày PV2 đã qua (chưa có ngày thì hạn là 3 ngày làm việc sau PV1).</li>
+    <li>Hồ sơ chậm (hồ sơ nộp từ 01/11/2026, trong 3 tháng gần nhất): còn trạng thái “Mới tạo” quá 3 ngày làm việc (T2–T7) kể từ ngày nộp, tức chưa chuyển nhóm. Đây là nguyên tắc duy nhất, dùng chung cho cảnh báo, email CV chậm, điểm trừ KPI và tiêu chí Tuân thủ.</li>
     <li>Đi làm thực tế: ghép với DSNS U theo họ tên khi tên là duy nhất, ngày vào làm trong 120 ngày sau ngày nộp (cho phép lệch 3 ngày). DSNS chưa có SĐT nên chưa ghép theo 9 số cuối SĐT; học viên ở sheet TTS chưa được tính. Cập nhật DSNS ở mục Nhân sự hệ thống trước để số đi làm mới nhất.</li>
     <li>Thời gian tuyển: ngày nộp CV → ngày vào làm. Chuẩn: Bán hàng ≤ 15, Văn phòng & kho ≤ 15, CHT/QLKV ≤ 45 ngày. Nghỉ 90 ngày chỉ tính người vào làm từ 90 ngày trước trở về trước.</li>
     <li>Trang chỉ lưu mã hồ sơ, vị trí, địa bàn, trạng thái và các mốc ngày; không lưu họ tên, SĐT, CCCD hay mức lương của ứng viên.</li>
@@ -1627,9 +1626,9 @@ function rkData(m){
     const T=cv.filter(x=>x.o===s.id&&x.start&&x.start>=a&&x.start<=b&&!x.quit);
     const tOk=T.filter(x=>{const end=x.ac&&x.ac>=x.sub?x.ac:x.start;return diffDays(x.sub,end)<=RK_LIM[rkGrp(x.p)]}).length;
     const C=R.filter(r=>r.o===s.id&&r.start>=a&&r.start<=b);const cq=C.filter(r=>r.status==='Nghỉ việc'&&r.quit&&diffDays(r.start,r.quit)<30).length;
-    const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>x.v1&&x.v1>=x.sub);const fast=v1.filter(x=>wdBetween(x.sub,x.v1)<=3).length;const stale=CV.filter(x=>x.stale).length;
-    const fill=tgt?Math.min(1,realN/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=CV.length?1-stale/CV.length:null;
-    const f=alloc/500,mF=Math.round(300*f),mT=Math.round(50*f),mQ=Math.round(50*f),mC=alloc-mF-mT-mQ;const sF=Math.round(mF*fill),sT=ttf==null?0:Math.round(mT*ttf),sQ=q90==null?mQ:(q90<.4?mQ:0),sC=Math.round(mC*(.5*(p1??0)+.5*(p2??0)));const kpi=sF+sT+sQ+sC;const tot=alloc?kpi/alloc*500:0;
+    const CV=cv.filter(x=>x.o===s.id&&x.sub>=a&&x.sub<=b);const v1=CV.filter(x=>addWd(x.sub,3)<TODAY);const fast=v1.filter(x=>!recLateMove(x)).length;const stale=CV.filter(x=>x.stale).length;
+    const fill=tgt?Math.min(1,realN/tgt):0,ttf=T.length?tOk/T.length:null,q90=C.length?cq/C.length:null,p1=v1.length?fast/v1.length:null,p2=null;
+    const f=alloc/500,mF=Math.round(300*f),mT=Math.round(50*f),mQ=Math.round(50*f),mC=alloc-mF-mT-mQ;const sF=Math.round(mF*fill),sT=ttf==null?0:Math.round(mT*ttf),sQ=q90==null?mQ:(q90<.4?mQ:0),sC=Math.round(mC*(p1??1));const kpi=sF+sT+sQ+sC;const tot=alloc?kpi/alloc*500:0;
     const eff=Object.entries(cnt).reduce((t,[g,n])=>t+n*(S.config.eff[RK_BASE[g]]||0),0);
     out.push({hires:real.map(r=>({d:r.start,w:hvW(r)})),s,code,tgt,alloc,mF,mT,mQ,mC,real:realN,hv,heads:real.length,pend:pend.length,left,cnt,fill,sF,T:T.length,tOk,ttf,sT,C:C.length,cq,q90,sQ,CV:CV.length,v1:v1.length,fast,p1,stale,p2,sC,tot,kpi,eff})});
   return {rows:out,a,b,pm}}
@@ -1646,7 +1645,7 @@ function vRecKpi(m){
     <td class="r num">${nf(r.sF)}<span class="mini">/${r.mF}</span><div class="mini">${rkPct(r.fill)}</div></td>
     <td class="r num">${nf(r.sT)}<span class="mini">/${r.mT}</span><div class="mini">${r.T?`${r.tOk}/${r.T} · ${rkPct(r.ttf)}`:'chưa khớp hồ sơ'}</div></td>
     <td class="r num">${r.sQ}<span class="mini">/${r.mQ}</span><div class="mini">${r.C?`${r.cq}/${r.C} · ${rkPct(r.q90)}`:'chưa có dữ liệu'}</div></td>
-    <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">xử lý ≤3 ngày ${rkPct(r.p1)} · cập nhật ${rkPct(r.p2)}</div></td>
+    <td class="r num">${nf(r.sC)}<span class="mini">/${r.mC}</span><div class="mini">chuyển nhóm ≤3 ngày ${rkPct(r.p1)} (${nf(r.fast)}/${nf(r.v1)} hồ sơ)</div></td>
     <td class="r"><span class="grade ${r.tot>=425?'A':r.tot>=350?'B':r.tot>=300?'C':'D'}">${nf(r.kpi)}</span><div class="mini">/ ${nf(r.alloc)}</div></td>
     <td class="r num">${String(Math.round(r.eff*1000)/1000).replace('.',',')}</td></tr>`).join('')}
   <tr><td><b>Tổng</b></td><td class="r num"><b>${sum.tgt}</b></td><td></td><td class="r num"><b>${nf(Math.round(sum.real*100)/100)}</b></td><td colspan="6" class="mini">3 học việc lên NVBH = 1 chỉ tiêu · Lấp đầy chung ${rkPct(sum.tgt?sum.real/sum.tgt:null)}</td></tr>${teamTgt(m)&&S.isLinh?`<tr><td><b>Chỉ tiêu team</b></td><td class="r num"><b>${teamTgt(m)}</b></td><td></td><td class="r num"><b>${sum.real}</b></td><td colspan="6" class="mini">Đạt ${rkPct(sum.real/teamTgt(m))} chỉ tiêu team ${fmtM(m)} · chỉ tiêu từng người dùng để tính KPI cá nhân</td></tr>`:''}</tbody></table></div>
@@ -1655,7 +1654,7 @@ function vRecKpi(m){
     <li>Thực tuyển: tất cả người nhận việc trong tháng theo DSNS và sheet TTS, kể cả người đã nghỉ sau đó (việc nghỉ sớm đã chấm riêng ở tiêu chí nghỉ &lt;30 ngày). Học việc chỉ tính khi lên NVBH (ký HĐ thử việc) trong tháng: 3 học việc lên NVBH = 1 chỉ tiêu NVBH; học việc chưa ký HĐ thử việc chưa tính, gán cho người phụ trách vùng của nhà thuốc; CHT, QLKV gán cho người được giao Tuyển toàn quốc; khối văn phòng và kho gán cho người phụ trách khối văn phòng. CHT và QLKV tính ×2 so với NVBH (1 CHT hoặc 1 QLKV = 2 chỉ tiêu), người tuyển do chị giao ở mục Phân công › Tuyển toàn quốc.</li>
     <li>Trúng tuyển đúng hạn: từ ngày nộp CV đến ngày nhận việc trên Member (thiếu thì lấy ngày vào làm DSNS) ≤ NVBH 15 · CHT 20 · QLKV 30 · VP 15 ngày. Member chưa ghi ngày gửi thư mời nên đây là cách đo chặt hơn quy định.</li>
     <li>Chất lượng: nhóm vào làm trong tháng (${fmtM(m)}), tỷ lệ nghỉ trong 30 ngày đầu nhỏ hơn 40% được đủ điểm (10%); không có người vào làm thì để đủ điểm.</li>
-    <li>Tuân thủ: ½ × % hồ sơ có lịch PV vòng 1 trong vòng 3 ngày làm việc kể từ ngày nộp (quá 3 ngày là không đạt) + ½ × % hồ sơ không bị treo (thay cho "cập nhật Member đúng hạn" vì sheet chưa ghi thời điểm cập nhật).</li>
+    <li>Tuân thủ: % hồ sơ được chuyển nhóm (rời trạng thái "Mới tạo") trong 3 ngày làm việc kể từ ngày nộp. Hồ sơ còn "Mới tạo" quá 3 ngày, hoặc đã từng bị ghi nhận chậm chuyển nhóm, là không đạt. Cùng nguyên tắc với email CV chậm và điểm trừ KPI.</li>
     <li>Điểm tối đa từng tiêu chí = tỷ trọng × điểm phân bổ của người đó (ví dụ phân bổ 600: lấp đầy 360, trúng tuyển đúng hạn 60, nghỉ &lt;30 ngày 60, tuân thủ 120). KPI tuyển dụng = tổng điểm 4 tiêu chí. Điểm HS tuyển = số thực tuyển × điểm cơ sở (NVBH ${S.config.eff.tdNT} · CHT ${S.config.eff.tdCHT} · QLKV ${S.config.eff.tdQLKV} · VP ${S.config.eff.tdVP}), cộng vào hiệu suất D khi bấm "Ghi số tuyển".</li></ul></details></div>`}
 async function rkSetPlan(m,code,idx,val){const cur=JSON.parse(JSON.stringify(rkPlan(m)));if(!cur[code])cur[code]=[0,500];cur[code][idx]=val;const rp={...(S.config.recPlan||{}),[m]:cur};await write('config/main',{...S.config,recPlan:rp})}
 document.addEventListener('change',e=>{const t=e.target;if(t.dataset.oprt!=null){rkSetPlan(t.dataset.m,t.dataset.oprt,0,+t.value||0).then(()=>toast('Đã giao số cần tuyển')).catch(()=>{});return}if(t.dataset.rkt!=null)rkSetPlan(S.month,t.dataset.rkt,0,+t.value||0);else if(t.dataset.rka!=null)rkSetPlan(S.month,t.dataset.rka,1,+t.value||0)});
@@ -1866,10 +1865,10 @@ function wrBuild(){
       const wOf=sid=>wk.filter(x=>rkHireOwner(x,M)===sid).length;
       const day=+ref.slice(8,10),dim=+me.slice(8,10),exp=day/dim;
       const rs=[...rows].sort((a,b)=>b.real/Math.max(b.tgt,1)-a.real/Math.max(a.tgt,1));
-      const tot=rs.reduce((t,x)=>({tgt:t.tgt+x.tgt,real:t.real+x.real,w:t.w+wOf(x.s.id),cv:t.cv+x.CV,v1:t.v1+x.v1,st:t.st+x.stale}),{tgt:0,real:0,w:0,cv:0,v1:0,st:0});tot.ind=tot.tgt;{const tt=teamTgt(m);if(tt)tot.tgt=tt}
-            parts.push({table:{cols:['Phụ trách','Địa bàn','Đã tuyển','Trong tuần','Hồ sơ nhận','Đã PV vòng 1','Hồ sơ treo'],
-        rows:rs.map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.real),nf(wOf(x.s.id)),nf(x.CV),nf(x.v1),x.stale?nf(x.stale):'']),
-        foot:[`Tổng cộng (chỉ tiêu team ${nf(tot.tgt)})`,'',`${nf(tot.real)} · ${wrPct(tot.real,tot.tgt)}`,nf(tot.w),nf(tot.cv),nf(tot.v1),tot.st?nf(tot.st):'']}});
+      const tot=rs.reduce((t,x)=>({tgt:t.tgt+x.tgt,real:t.real+x.real,w:t.w+wOf(x.s.id),cv:t.cv+x.CV,v1:t.v1+x.v1,fa:(t.fa||0)+x.fast,st:t.st+x.stale}),{tgt:0,real:0,w:0,cv:0,v1:0,fa:0,st:0});tot.ind=tot.tgt;{const tt=teamTgt(m);if(tt)tot.tgt=tt}
+            parts.push({table:{cols:['Phụ trách','Địa bàn','Đã tuyển','Trong tuần','Hồ sơ nhận','Chuyển nhóm ≤3 ngày','Hồ sơ chậm chuyển nhóm'],
+        rows:rs.map(x=>[x.s.name,String(x.s.areas||'').split('·')[0].trim()||'—',nf(x.real),nf(wOf(x.s.id)),nf(x.CV),x.v1?`${nf(x.fast)}/${nf(x.v1)}`:'—',x.stale?nf(x.stale):'']),
+        foot:[`Tổng cộng (chỉ tiêu team ${nf(tot.tgt)})`,'',`${nf(tot.real)} · ${wrPct(tot.real,tot.tgt)}`,nf(tot.w),nf(tot.cv),tot.v1?`${nf(tot.fa)}/${nf(tot.v1)}`:'—',tot.st?nf(tot.st):'']}});
       const c=rs.reduce((t,x)=>{for(const k in x.cnt)t[k]=(t[k]||0)+x.cnt[k];return t},{});
       const slow=rs.filter(x=>x.tgt&&x.real/x.tgt<exp*.6);
       const L=[`Lũy kế tháng đạt ${tot.real}/${tot.tgt} người so với chỉ tiêu team (${wrPct(tot.real,tot.tgt)}), tiến độ thời gian ${Math.round(exp*100)}%. Theo vị trí: ${c.NVBH||0} NVBH, ${c.CHT||0} CHT, ${c.QLKV||0} QLKV, ${c.VP||0} khối văn phòng.`];
@@ -2651,7 +2650,7 @@ function opRecPlan(sid,m,staff){const s=S.staff.find(x=>x.id===sid);const code=S
   const W=[];let d=a;while(d<=b0){const st=d;let en=d;while(en<b0&&pd(en).getDay()!==0)en=addDays(en,1);let wd=0;for(let t=st;t<=en;t=addDays(t,1))if(pd(t).getDay()!==0)wd++;W.push({st,en,wd});d=addDays(en,1)}
   const totWd=W.reduce((t,w)=>t+w.wd,0)||1;let acc=0,cum=0;W.forEach(w=>{acc+=w.wd;w.goal=Math.round(tgt*acc/totWd);w.add=w.goal-cum;cum=w.goal;w.got=r?Math.round(r.hires.filter(h=>h.d>=a&&h.d<=w.en).reduce((t,h)=>t+h.w,0)*100)/100:0;w.past=w.en<TODAY;w.now=w.st<=TODAY&&TODAY<=w.en});
   const pc=v=>v==null?'—':Math.round(v*100)+'%';const k=r?r.kpi:0,al=r?r.alloc:(plan?plan[1]:0);
-  const crit=r?[['Lấp đầy',r.sF,r.mF,`${nf(r.real)}/${nf(r.tgt)} người`],['Trúng tuyển đúng hạn',r.sT,r.mT,r.T?`${r.tOk}/${r.T} hồ sơ`:'chưa có'],['Nghỉ <30 ngày',r.sQ,r.mQ,r.C?`${r.cq}/${r.C} nghỉ sớm`:'chưa có'],['Tuân thủ xử lý hồ sơ',r.sC,r.mC,`≤3 ngày ${pc(r.p1)} · không treo ${pc(r.p2)}`]]:[];
+  const crit=r?[['Lấp đầy',r.sF,r.mF,`${nf(r.real)}/${nf(r.tgt)} người`],['Trúng tuyển đúng hạn',r.sT,r.mT,r.T?`${r.tOk}/${r.T} hồ sơ`:'chưa có'],['Nghỉ <30 ngày',r.sQ,r.mQ,r.C?`${r.cq}/${r.C} nghỉ sớm`:'chưa có'],['Tuân thủ: chuyển nhóm ≤3 ngày',r.sC,r.mC,`${pc(r.p1)} · ${r.fast}/${r.v1} hồ sơ`]]:[];
   return `<div class="panel op-rec"><h2>Kế hoạch tuyển dụng ${fmtM(m)} <small>chị Linh giao số cần tuyển · hệ thống tự chia theo tuần và tự tính KPI</small></h2>
   <div class="op-rec-g"><div class="op-rec-t"><div class="k">Số cần tuyển</div>${isMgr?`<input class="num" type="number" min="0" id="oprt-${code}" data-oprt="${code}" data-m="${m}" value="${tgt}" aria-label="Số cần tuyển">`:`<div class="v num">${tgt}</div>`}<div class="s">người · ${fmtM(m)}</div></div>
     <div class="op-rec-t"><div class="k">Đã tuyển</div><div class="v num">${r?nf(r.real):0}</div><div class="s">${tgt?pc(Math.min(1,(r?r.real:0)/tgt)):'—'} kế hoạch${r&&r.hv?` · gồm ${r.hv} học việc (3 = 1)`:''}</div></div>
@@ -3167,7 +3166,7 @@ const WD2_CSS=`.page{padding:9mm 10mm 8mm}
 @media screen and (max-width:820px){.nv2 .gg{grid-template-columns:1fr}.wf{flex-wrap:wrap}.wf em{display:none}.wf .fl{flex:1 1 40%}.g2,.plan ol{grid-template-columns:1fr}.tl2{grid-auto-flow:row;grid-template-columns:1fr 1fr}.hd2{flex-wrap:wrap}}`;
 wdFile=function(d){return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Báo cáo tuần ${d.wk} – Phòng HCNS</title><style>${WD_CSS}${WD_TICK_CSS}${WD2_CSS}</style></head><body><div class="tool"><button onclick="window.print()">In / Lưu PDF</button></div><div class="page">${wdHtml(d)}</div></body></html>`};
 
-function opWaitN(){tkClean();opRkSync();opPubSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
+function opWaitN(){tkClean();opRkSync();opPubSync();recOwnPub();recLateSync();return S.role==='staff'?0:S.okrp.filter(o=>o.status==='submitted').length}
 init();
 
 /* ===================== Phân công theo tỉnh + ngoại lệ, tuyển dụng tự đếm, thường quy đánh dấu (Linh chốt 24/11/2026) =====================
@@ -3749,6 +3748,109 @@ function recAssign(x,ctx){if(x.o==='x')return '';const m=x.sub.slice(0,7);
   if(x.g===0){const shops=recShopsFor(x.ar,x.lc,ctx);const tm=ctx.tdn(m);for(const c of shops){const w=tm[dcKey(c)];if(w){x.shop=c;return w}}if(shops.length===1)x.shop=shops[0];return (pvProvTD(m,x.ar)||{}).v||''}
   if(x.g===1)return vpTDMain(m)||'';
   return pvTQ(m,/cửa hàng trưởng|phụ trách cửa hàng/i.test(x.p)?'CHT':'QLKV')||''}
+
+/* Người phụ trách hồ sơ theo phân công → công cụ email "CV chậm xử lý" và điểm trừ KPI dùng chung (27/11/2026).
+   Chỉ gồm mã hồ sơ → họ tên nhân viên HCNS (không có dữ liệu ứng viên); đọc được qua Firestore REST bằng đường dẫn bí mật. */
+const REC_OWN_DOC='pub/recOwn_6jJqE6BMGwDgYC2o';let _recOwnT=0,_recOwnLast='';
+function recOwnPub(){if(S.role==='staff'||!S.canWrite||!S.db||!S.rec||!S.rec.rowsJson||Date.now()-_recOwnT<120e3)return;_recOwnT=Date.now();
+  setTimeout(()=>{let L=[];try{L=recRows()}catch(_){return}const from=CVL_FROM>addDays(TODAY,-95)?CVL_FROM:addDays(TODAY,-95);const own={};
+    L.forEach(x=>{if(!x.code||!x.sub||x.sub<from||!x.o||x.o==='x')return;const s=S.staff.find(t=>t.id===x.o);if(s&&s.name)own[x.code]=s.name});
+    const js=JSON.stringify(own);if(js===_recOwnLast)return;_recOwnLast=js;write(REC_OWN_DOC,{json:js,n:Object.keys(own).length,at:new Date().toISOString()}).catch(()=>{_recOwnLast=''})},1500)}
+
+/* Ghi nhận hồ sơ từng chậm chuyển nhóm (>3 ngày làm việc còn "Mới tạo"): giữ lại dù sau đó đã chuyển, để tính Tuân thủ đúng. */
+S.recLate=S.recLate||null;let _recLateT=0;
+function recLateMove(x){return x.stale==='Chưa chuyển nhóm quá 3 ngày'||!!(S.recLate&&S.recLate[x.code])}
+function recLateSync(){if(S.role==='staff'||!S.canWrite||!S.db||!S.rec||!S.rec.rowsJson||Date.now()-_recLateT<120e3)return;_recLateT=Date.now();
+  if(S.recLate===null){S.recLate={};S.db.doc('rec/late').get().then(d=>{S.recLate=(d.exists&&d.data().codes)||{};_recLateT=0}).catch(()=>{});return}
+  let L=[];try{L=recRows()}catch(_){return}const add={};L.forEach(x=>{if(x.stale==='Chưa chuyển nhóm quá 3 ngày'&&!S.recLate[x.code])add[x.code]=TODAY});
+  if(Object.keys(add).length){S.recLate={...S.recLate,...add};write('rec/late',{codes:S.recLate,at:new Date().toISOString()}).catch(()=>{})}}
+
+/* ===================== Báo cáo tuần dashboard v3 (Linh yêu cầu 27/11/2026): bố cục gọn, khoa học — mục đánh số, mỗi mục = khối số liệu trên + ý chính dưới ===================== */
+const _wdData2=wdData;
+wdData=function(d){const lk=wkLock();if(lk&&lk.charts)return lk.charts;const o=_wdData2(d);
+  try{const {C}=dcCalc();const p=x=>({tot:x.tot,done:x.done,doneReal:x.doneReal,doneMv:x.doneMv,miss:x.miss,lack:x.lack,cov:x.cov,openN:x.openN,soonN:x.soonN});o.cov={all:{...C.all},nw:p(C.nw),old:p(C.old)}}catch(_){o.cov=null}
+  return o};
+const W3=v=>v==null?'—':String(r1(v)).replace('.',',')+'%';
+function w3Head(n,t,sub,s){const st=s&&s.sk?wbSt(s):'';return `<div class="s3h"><b class="no">${n}</b><h3>${esc(t)}</h3>${sub?`<small>${esc(sub)}</small>`:''}${st?`<span class="st ${st}">${WB_ST[st][0]}</span>`:''}</div>`}
+function w3Bul(lines,max){const L=lines.slice(0,max||lines.length);return L.length?`<ul class="pt3">${L.map(wd2Line).join('')}</ul>`:''}
+function w3Flow(F){if(!F)return '<p class="mu">Chưa có số liệu DSNS.</p>';const d=F.cur-F.start;
+  return `<div class="fl3"><div><span>Đầu tháng</span><b>${nf(F.start)}</b></div><div class="up"><span>Tuyển mới</span><b>+${nf(F.hires)}</b><small>tuần này +${nf(F.wh)}</small></div><div class="dn"><span>Nghỉ việc</span><b>−${nf(F.quits)}</b><small>${nf(F.early)} người &lt; 90 ngày</small></div><div class="cu"><span>Hiện hữu</span><b>${nf(F.cur)}</b><small>${d>=0?'+':''}${nf(d)} so với đầu tháng</small></div></div>`}
+function w3Short(L){if(!L||!L.length)return '<p class="mu">Không có tỉnh thiếu NVBH.</p>';const mx=Math.max(...L.map(x=>x.gap),1);
+  return `<div class="bars3">${L.slice(0,6).map(x=>`<div><span>${esc(x.a)}</span><i><u style="width:${Math.round(x.gap/mx*100)}%"></u></i><b>${x.gap}</b><small>${x.n} nhà</small></div>`).join('')}</div>`}
+function w3Nv(D){if(!D)return '<p class="mu">Chưa đủ dữ liệu.</p>';const c=(v,t)=>v==null?'':v>=t?'bad':v>=t*.75?'warn':'ok';
+  const row=(n,x)=>`<div class="nv3"><div class="nvh"><b>${n}</b><span class="${c(x.r90,D.th)}">${W3(x.r90)}</span></div><i><u class="${c(x.r90,D.th)}" style="width:${x.r90==null?0:Math.min(100,x.r90)}%"></u><em style="left:${D.th}%"></em></i><small>nghỉ &lt; 90 ngày ${x.c90}/${x.coh} · tỷ lệ nghỉ việc ${W3(x.rate)}</small></div>`;
+  return row('NVBH',D.n)+row('Kho',D.k)+`<p class="mu">Vạch đen: mục tiêu nghỉ &lt; 90 ngày dưới ${D.th}% · ${fmtD(D.a)}–${fmtD(D.b)}</p>`}
+function w3Rec(R,C){const p=R&&R.tgt?R.real/R.tgt:0,st=!R?'':p>=R.exp?'ok':p>=R.exp*.8?'warn':'bad';
+  const hero=R?`<div class="hr3">${wd2Ring(p,R.exp,st||'ok')}<div><b class="big">${nf(R.real)}<small>/${nf(R.tgt)}</small></b><span>người tuyển được trong tháng</span><div class="tags"><em class="${st}">${Math.round(p*100)}% chỉ tiêu</em><em>tiến độ thời gian ${Math.round(R.exp*100)}%</em><em class="ok">+${nf(R.w)} trong tuần</em></div></div></div>`:'<p class="mu">Chưa có kế hoạch tuyển dụng tháng.</p>';
+  const m=C?`<div class="mt3"><div><span>CV nhận</span><b>${nf(C.cv)}</b><small>đã xử lý ${nf(C.done)}</small></div><div><span>PV vòng 1</span><b>${nf(C.v1)}</b><small>${W3(C.rv1)} số CV</small></div><div class="ok"><span>CV → nhận việc</span><b>${W3(C.rate)}</b><small>${nf(C.conv)} người</small></div></div>`:'';
+  return hero+m}
+function w3Cv(C){if(!C)return '<p class="mu">Chưa có dữ liệu hồ sơ.</p>';const mx=Math.max(1,...C.weeks.map(w=>w.cv));const h=v=>Math.max(v?3:0,Math.round(v/mx*70));
+  return `<div class="cv3">${C.weeks.map((w,i)=>`<div class="cw"><div class="bars"><i class="b1" style="height:${h(w.cv)}px"><em>${w.cv||''}</em></i><i class="b2" style="height:${h(w.v1)}px"><em>${w.v1||''}</em></i><i class="b3" style="height:${h(w.nv)}px"><em>${w.nv||''}</em></i></div><span>Tuần ${i+1}</span><small>${fmtD(w.a)}–${fmtD(w.b)}</small></div>`).join('')}</div>
+  <div class="lg3"><span><i class="b1"></i>CV nhận</span><span><i class="b2"></i>PV vòng 1</span><span><i class="b3"></i>Nhận việc</span></div>`}
+function w3Cov(V){if(!V)return '<p class="mu">Chưa có dữ liệu nhà mới.</p>';const A=V.all,N=V.nw;const cl=v=>v>=80?'ok':v>=50?'warn':'bad';
+  const seg=(a,b,c,t)=>{const w=v=>t?v/t*100:0;return `<div class="sg3"><u class="g1" style="width:${w(a)}%"></u><u class="g2" style="width:${w(b)}%"></u><u class="g3" style="width:${w(c)}%"></u><em style="left:80%"></em></div>`};
+  return `<div class="cov3"><div class="cv-a"><span>Toàn hệ thống</span><b class="${cl(A.cov)}">${W3(A.cov)}</b><small>${nf(A.done)}/${nf(A.tot)} nhà đủ người · thiếu ${nf(A.lack)} người</small></div>
+  <div class="cv-n"><div class="cvt"><span>Nhà mới · NT ≥ 171 <small>${N.tot} nhà · ${N.openN||0} đã mở · ${N.soonN||0} chưa mở</small></span><b class="${cl(N.cov)}">${W3(N.cov)}</b></div>${seg(N.doneReal,N.doneMv,N.miss,N.tot)}
+    <div class="lg3 l"><span><i class="g1"></i>Đủ bằng nhân sự thực tế <b>${N.doneReal}</b></span><span><i class="g2"></i>Đủ nhờ điều động <b>${N.doneMv}</b></span><span><i class="g3"></i>Chưa đủ 2 người <b>${N.miss}</b></span><span>Mục tiêu 80% · cần thêm <b class="bad">${nf(N.lack)} người</b></span></div></div></div>`}
+wdHtml=function(d){const B=wbBrief(d),C=wdData(d);const by=wrNote('by')||S.who||'';const lk=wkLock();const sec=k=>B.secs.find(s=>s.k===k)||{h:'',n:'',sub:''};
+  const logo=(document.querySelector('.brand img')||{}).src||'';const s1=sec('b1'),s2=sec('b2'),s3=sec('b3'),s4=sec('b4'),s5=sec('b5');
+  const tiles=[...B.tiles.slice(0,3)];if(C.cov&&C.cov.nw){const N=C.cov.nw;tiles.push(['Nhà mới đủ người',W3(N.cov),`${N.done}/${N.tot} nhà · mục tiêu 80%`,N.cov>=80?'ok':N.cov>=50?'warn':'bad'])}
+  const L1=wbLines(s1).filter(l=>!/^Nghỉ 90 ngày gần nhất|^5 nhà thuốc thiếu/.test(l));
+  return `<header class="hd3">${logo?`<img src="${logo}" alt="">`:''}<div class="t"><small>CÔNG TY CỔ PHẦN UPHARMA · PHÒNG HÀNH CHÍNH – NHÂN SỰ</small><h1>Báo cáo tuần ${d.wk}</h1><p>${fmtDY(d.r[0])} – ${fmtDY(d.r[1])} · số liệu đến ${fmtDY(lk?lk.ref:d.ref)}</p></div><div class="by"><small>Người báo cáo</small><b>${esc(by)}</b></div></header>
+  <div class="k3">${tiles.map(([k,v,s,c])=>`<div class="${c}"><span>${esc(k)}</span><b>${esc(v)}</b><small>${esc(s)}</small></div>`).join('')}</div>
+  <section class="s3">${w3Head(1,s1.h,s1.sub,s1)}<div class="g3c"><div class="p3"><h4>Quân số trong tháng</h4>${w3Flow(C.flow)}</div><div class="p3"><h4>Thiếu NVBH theo tỉnh <small>NVBH · số nhà</small></h4>${w3Short(C.short)}</div><div class="p3"><h4>Nghỉ việc 90 ngày gần nhất</h4>${w3Nv(C.nv90)}</div></div>${w3Bul(L1,4)}</section>
+  <section class="s3">${w3Head(2,s2.h,s2.sub,s2)}<div class="g3c two"><div class="p3"><h4>Kết quả tháng</h4>${w3Rec(C.rec,C.cvw)}</div><div class="p3"><h4>Hồ sơ theo tuần</h4>${w3Cv(C.cvw)}</div></div>${w3Bul(wbLines(s2),4)}</section>
+  <section class="s3">${w3Head(3,'Nhân sự nhà mới & điều động','độ phủ: nhà có từ 2 NVBH trở lên',null)}${w3Cov(C.cov)}</section>
+  <div class="g3c two s3row"><section class="s3">${w3Head(4,s3.h,s3.sub,s3)}${w3Bul(wbLines(s3))}</section>
+    <section class="s3">${w3Head(5,s4.h,s4.sub,s4)}<div class="lgl">${wrNote('b4')&&!s4.locked?wd2LegalManual(wbLines(s4)):wdLegalHtml(wbLines(s4),C.legal||[],C.legalAll||[])}</div></section></div>
+  <section class="s3">${w3Head(6,s5.h||'Kế hoạch tuần tới','',null)}<ol class="pl3">${(wbLines(s5).length?wbLines(s5):['Chưa điền.']).map(l=>`<li><span>${wd2Num(l)}</span></li>`).join('')}</ol></section>
+  ${wrNote('adv')?`<section class="s3 adv">${w3Head('!','Đề xuất – kiến nghị','cần lãnh đạo cho ý kiến',null)}${w3Bul(wrNote('adv').split('\n').map(x=>x.replace(/^[-•+]\s*/,'').trim()).filter(Boolean))}</section>`:''}
+  <footer class="ft3">Số liệu: DSNS ${S.sys.updatedAt?fmtDY(S.sys.updatedAt.slice(0,10)):'—'} (gồm học việc sheet TTS) · hồ sơ tuyển dụng ${S.rec.updatedAt?fmtDY(S.rec.updatedAt.slice(0,10)):'—'} · Theo dõi nhà mới · nhật ký công việc phòng HCNS${lk?' · bản đã chốt':''}</footer>`};
+const WD3_CSS=`.page{padding:9mm 10mm 8mm;font-family:Inter,"Segoe UI",Roboto,Arial,sans-serif;color:#1d2420}
+.hd3{display:flex;align-items:center;gap:12px;background:#145f34;background:linear-gradient(120deg,#145f34,#1f8a4c);color:#fff;border-radius:10px;padding:10px 14px}
+.hd3 img{width:36px;height:36px;background:#fff;border-radius:9px;padding:4px;flex:none}.hd3 .t{flex:1}.hd3 small{display:block;font-size:7.3pt;opacity:.85;letter-spacing:.04em}
+.hd3 h1{margin:1px 0;font-size:18pt;text-transform:uppercase;letter-spacing:.01em}.hd3 p{margin:0;font-size:8.5pt;opacity:.92}.hd3 .by{text-align:right}.hd3 .by b{font-size:11pt}
+.k3{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:9px 0}
+.k3>div{border:1px solid #e3e8e4;border-left:4px solid #9aa59e;border-radius:8px;padding:7px 10px;background:#fff}
+.k3 span,.k3 small{display:block;font-size:7.5pt;color:#5b645e}.k3 b{display:block;font-size:17pt;line-height:1.15;margin:1px 0;font-variant-numeric:tabular-nums}
+.k3 .ok{border-left-color:#1f8a4c}.k3 .ok b{color:#17703c}.k3 .warn{border-left-color:#c98500}.k3 .warn b{color:#8a5f00}.k3 .bad{border-left-color:#c8372d}.k3 .bad b{color:#a52a21}
+.s3{border:1px solid #e3e8e4;border-radius:9px;padding:9px 11px 8px;margin-bottom:8px;background:#fff;break-inside:avoid;page-break-inside:avoid}
+.s3h{display:flex;align-items:center;gap:7px;margin:0 0 8px;padding-bottom:6px;border-bottom:1px solid #eef1ee}
+.s3h .no{flex:none;width:20px;height:20px;border-radius:6px;background:#1f8a4c;color:#fff;font-size:9pt;display:flex;align-items:center;justify-content:center}
+.s3h h3{margin:0;font-size:10.5pt;color:#111}.s3h small{color:#7b847e;font-size:7.6pt}
+.s3h .st{margin-left:auto;font-size:7.3pt;font-weight:700;border-radius:9px;padding:1px 8px}.st.ok{background:#e3f3e9;color:#17703c}.st.warn{background:#fdf1d6;color:#7a5600}.st.bad{background:#fbe3e1;color:#a52a21}
+.g3c{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}.g3c.two{grid-template-columns:1fr 1fr}.s3row{margin-bottom:0}.s3row>.s3{margin-bottom:8px}
+.p3{background:#f7f9f7;border-radius:7px;padding:7px 9px;min-width:0}.p3 h4{margin:0 0 6px;font-size:7.6pt;text-transform:uppercase;letter-spacing:.05em;color:#5b645e}.p3 h4 small{text-transform:none;letter-spacing:0;font-weight:400;color:#8a928c}
+.mu{margin:4px 0 0;font-size:7pt;color:#8a928c}
+.fl3{display:grid;grid-template-columns:1fr 1fr;gap:5px}.fl3>div{background:#fff;border-radius:6px;padding:4px 7px;border:1px solid #eaeeea}.fl3 span,.fl3 small{display:block;font-size:6.9pt;color:#6b746e}.fl3 b{display:block;font-size:13pt;line-height:1.2;font-variant-numeric:tabular-nums}
+.fl3 .up b{color:#17703c}.fl3 .dn b{color:#a52a21}.fl3 .cu b{color:#1f4f9c}
+.bars3>div{display:grid;grid-template-columns:70px minmax(0,1fr) 20px 34px;gap:5px;align-items:center;font-size:7.8pt;margin:3px 0}.bars3 span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bars3 i{height:7px;background:#e7ebe8;border-radius:4px;overflow:hidden}.bars3 u{display:block;height:100%;background:#c98500;border-radius:4px}.bars3 b{text-align:right}.bars3 small{color:#8a928c;font-size:7pt}
+.nv3{margin:0 0 6px}.nvh{display:flex;justify-content:space-between;align-items:baseline;font-size:8pt}.nvh span{font-size:12pt;font-weight:700}
+.nv3 i{display:block;position:relative;height:7px;background:#e7ebe8;border-radius:4px;margin:2px 0}.nv3 u{display:block;height:100%;border-radius:4px}.nv3 em{position:absolute;top:-3px;width:2px;height:13px;background:#111}
+.nv3 small{display:block;font-size:6.9pt;color:#6b746e}.ok{color:#17703c}.warn{color:#8a5f00}.bad{color:#a52a21}u.ok{background:#1f8a4c}u.warn{background:#c98500}u.bad{background:#c8372d}
+.hr3{display:flex;gap:10px;align-items:center}.hr3 .big{font-size:21pt;line-height:1}.hr3 .big small{font-size:10pt;color:#5b645e}.hr3 span{display:block;font-size:7.8pt;color:#5b645e;margin:2px 0 4px}
+.tags{display:flex;flex-wrap:wrap;gap:4px}.tags em{font-style:normal;font-size:7.2pt;font-weight:700;border-radius:9px;padding:1px 7px;background:#eceeec;color:#5b645e}.tags em.ok{background:#e3f3e9}.tags em.warn{background:#fdf1d6}.tags em.bad{background:#fbe3e1}
+.mt3{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin-top:7px}.mt3>div{background:#fff;border:1px solid #eaeeea;border-radius:6px;padding:4px 7px}.mt3 span,.mt3 small{display:block;font-size:6.8pt;color:#6b746e}.mt3 b{display:block;font-size:12pt;line-height:1.2}.mt3 .ok b{color:#17703c}
+.cv3{display:flex;gap:8px;align-items:flex-end;padding-top:12px}.cv3 .cw{flex:1;text-align:center;min-width:0}.cv3 .bars{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:76px;border-bottom:1px solid #dfe4e0}
+.cv3 .bars i{display:block;width:28%;max-width:16px;border-radius:3px 3px 0 0;position:relative}.cv3 .bars em{position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-style:normal;font-size:6.4pt;color:#5b645e}
+.cv3 span{display:block;font-size:7.2pt;font-weight:700;margin-top:2px}.cv3 small{display:block;font-size:6.3pt;color:#8a928c}
+.b1{background:#a9c4ef}.b2{background:#2a6fdb}.b3{background:#1f8a4c}.g1{background:#1f8a4c}.g2{background:#8fd0a8}.g3{background:#e5a33a}
+.lg3{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;font-size:6.9pt;color:#5b645e;margin-top:4px}.lg3.l{justify-content:flex-start;gap:6px 14px;font-size:7.6pt}.lg3 i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+.cov3{display:grid;grid-template-columns:180px minmax(0,1fr);gap:10px;align-items:center}.cv-a{background:#f7f9f7;border-radius:7px;padding:7px 10px}.cv-a span,.cv-a small{display:block;font-size:7.3pt;color:#6b746e}.cv-a b{display:block;font-size:20pt;line-height:1.15}
+.cvt{display:flex;justify-content:space-between;align-items:baseline;gap:8px}.cvt span{font-size:8.6pt;font-weight:700}.cvt span small{font-weight:400;color:#7b847e;font-size:7.2pt;margin-left:4px}.cvt b{font-size:17pt}
+.sg3{position:relative;display:flex;height:11px;background:#e7ebe8;border-radius:6px;overflow:visible;margin:4px 0 6px}.sg3 u{display:block;height:100%}.sg3 u:first-child{border-radius:6px 0 0 6px}.sg3 em{position:absolute;top:-3px;width:2px;height:17px;background:#111}
+ul.pt3{list-style:none;margin:8px 0 0;padding:0}ul.pt3>li{position:relative;padding-left:11px;margin:3px 0;font-size:8.5pt;line-height:1.55}ul.pt3>li:before{content:"";position:absolute;left:1px;top:7px;width:4px;height:4px;border-radius:50%;background:#1f8a4c}
+ul.pt3 li.kv,ul.pt3 li.cl{padding-left:0}ul.pt3 li.kv:before,ul.pt3 li.cl:before{display:none}ul.pt3 li.kv{display:flex;gap:6px;align-items:baseline}
+ul.pt3 .tg{flex:none;font-size:7pt;font-weight:700;color:#1f6e40;background:#eaf5ee;border-radius:5px;padding:1px 6px;white-space:nowrap}ul.pt3 li.cl .tg{display:inline-block;margin-bottom:3px}
+ul.pt3 .chips{display:flex;flex-wrap:wrap;gap:4px}ul.pt3 .chips span{font-size:7.6pt;background:#f4f6f4;border:1px solid #e3e8e4;border-radius:6px;padding:1px 6px}
+.s3 b.n{color:#17703c}.lgl .wd-ticks{list-style:none;margin:0;padding:0}.lgl .wd-ticks li{font-size:8.5pt;margin:3px 0}
+.pl3{margin:0;padding:0;list-style:none;counter-reset:p;display:grid;grid-template-columns:1fr 1fr;gap:5px 14px}.pl3 li{counter-increment:p;display:flex;gap:6px;font-size:8.5pt;line-height:1.55}
+.pl3 li:before{content:counter(p);flex:none;width:16px;height:16px;border-radius:50%;background:#1f8a4c;color:#fff;font-size:7.5pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.s3.adv{background:#fff8f7;border-color:#f3d2ce}.s3.adv .no{background:#c8372d}
+.ft3{font-size:7pt;color:#8a928c;font-style:italic;border-top:1px solid #e3e8e4;padding-top:4px}
+@media screen and (max-width:820px){.k3{grid-template-columns:1fr 1fr}.g3c,.g3c.two,.cov3,.pl3{grid-template-columns:1fr}.hd3{flex-wrap:wrap}}`;
+wdFile=function(d){return `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Báo cáo tuần ${d.wk} – Phòng HCNS</title><style>${WD_CSS}${WD_TICK_CSS}${WD2_CSS}${WD3_CSS}</style></head><body><div class="tool"><button onclick="window.print()">In / Lưu PDF</button></div><div class="page">${wdHtml(d)}</div></body></html>`};
 </script>
 </body>
 </html>
