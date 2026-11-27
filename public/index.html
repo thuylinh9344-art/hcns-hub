@@ -1149,10 +1149,11 @@ async function refreshRec(silent){
 }
 let _recCache=null;
 function recRows(){
-  const R=S.rec||{};if(_recCache&&_recCache.src===R)return _recCache.d;
+  const R=S.rec||{};if(_recCache&&_recCache.src===R&&_recCache.pv===S.pv&&_recCache.sys===S.sys&&_recCache.dc===S.dcShops)return _recCache.d;const ctx=recCtx();
   let raw=[];try{raw=JSON.parse(R.rowsJson||'[]')}catch(_){}
   const d=raw.map(a=>{const sub=n2d(a[3]),v1=n2d(a[5]),v2=n2d(a[6]),start=n2d(a[9]),quit=n2d(a[10]);const p=(R.pos||[])[a[1]]||'';const st=(R.sts||[])[a[4]]||'';const g=recGrp(p);
     const o=a[7]===-2?'x':a[7]>=0?(R.own||[])[a[7]]:'';const x={code:a[0],p,g,ar:(R.areas||[])[a[2]]||'',sub,st,v1,v2,o,src:a[8],start,quit,ac:n2d(a[11]),lc:a[12]>=0?((R.locs||[])[a[12]]||''):''};
+    if(sub){const o2=recAssign(x,ctx);if(o2&&o2!==x.o){x.oPv=x.o;x.o=o2;x.src=2}else if(o2&&o2===x.o)x.src=Math.max(x.src||0,2)}
     x.wd=v1?wdBetween(sub,v1):null;x.ontime=x.wd!=null?x.wd<=3:null;
     x.ttf=start?diffDays(sub,start):null;x.ttfOk=x.ttf!=null?x.ttf<=REC_TTF[g]:null;
     x.q90b=start&&start<=addDays(TODAY,-90);x.q90=x.q90b&&quit&&diffDays(start,quit)<=90;
@@ -1167,7 +1168,7 @@ function recRows(){
       if(x.stale&&!(TODAY>x.due)){x.stale='';x.due=''}
     }
     x.over=x.stale?diffDays(x.due,TODAY):0;return x});
-  _recCache={src:R,d};return d;
+  _recCache={src:R,pv:S.pv,sys:S.sys,dc:S.dcShops,d};return d;
 }
 const median=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);const m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2};
 const pctOf=(a,b)=>b?Math.round(a/b*1000)/10:null;
@@ -1229,7 +1230,7 @@ function vRec(){
   <div class="panel mt" style="border-color:${stale.length?'var(--bad)':'var(--line)'}"><h2 style="color:${stale.length?'var(--bad)':'inherit'}">Cảnh báo xử lý chậm <small>${stale.length} hồ sơ treo · ${types.map(t=>t+': '+stale.filter(x=>x.stale===t).length).join(' · ')}</small></h2>
     ${ages.length?`<div class="rec-so">${ages.map(([o,xs])=>`<button type="button" data-act="rec-so" data-id="${esc(o)}" aria-pressed="${S.recStaleO===o}"><b>${xs.length}</b><span><strong style="color:var(--fg)">${esc(shortName(o))}</strong> · trễ lâu nhất ${Math.max(...xs.map(x=>x.over))} ngày<br>${types.map(t=>{const n=xs.filter(x=>x.stale===t).length;return n?esc(t)+': '+n:''}).filter(Boolean).join(' · ')}</span></button>`).join('')}</div>${S.recStaleO?`<p class="note">Đang lọc: <b>${esc(staffName(S.recStaleO))}</b> · bấm lại thẻ để xem tất cả.</p>`:''}
     <div class="tbl-wrap" style="max-height:420px;overflow:auto"><table class="recbad"><thead><tr><th>Người phụ trách</th><th>Mã hồ sơ</th><th>Vị trí</th><th>Địa bàn</th><th>Trạng thái</th><th>Ngày nộp</th><th>Hạn xử lý</th><th>Cảnh báo</th></tr></thead><tbody>
-    ${stale.filter(x=>!S.recStaleO||x.o===S.recStaleO).slice(0,300).map(x=>`<tr><td><b>${esc(shortName(x.o))}</b>${x.src?'':'<div class="mini">gán theo vùng</div>'}</td><td class="num">${esc(x.code)}</td><td>${esc(x.p)}</td><td>${esc(x.ar)}</td><td>${esc(x.st)}</td><td class="num">${fmtD(x.sub)}</td><td class="num">${fmtD(x.due)}</td><td><span class="pill bad">${esc(x.stale)} · ${x.over} ngày</span></td></tr>`).join('')}
+    ${stale.filter(x=>!S.recStaleO||x.o===S.recStaleO).slice(0,300).map(x=>`<tr><td><b>${esc(shortName(x.o))}</b>${x.src===2?(x.shop?`<div class="mini">phân công · ${esc(dcNT(x.shop))}</div>`:'<div class="mini">phân công</div>'):x.src?'':'<div class="mini">gán theo vùng</div>'}</td><td class="num">${esc(x.code)}</td><td>${esc(x.p)}</td><td>${esc(x.ar)}</td><td>${esc(x.st)}</td><td class="num">${fmtD(x.sub)}</td><td class="num">${fmtD(x.due)}</td><td><span class="pill bad">${esc(x.stale)} · ${x.over} ngày</span></td></tr>`).join('')}
     </tbody></table></div>${stale.length>300?`<p class="note">Hiển thị 300/${stale.length} hồ sơ quá hạn lâu nhất.</p>`:''}
     <div class="row mt"><button class="btn" data-act="rec-copy">Sao chép tin nhắc</button></div>`:'<div class="empty">Không có hồ sơ treo. Tốt lắm!</div>'}
   </div>
@@ -3733,6 +3734,21 @@ function kpCapSum(es,caps){const by={};let free=0;es.forEach(e=>{if(isVoidLog(e)
 const DC_COST={stay:4500000,nostay:3000000};
 function dcCost(x){const st=String(x.m.stay||'').trim();const mo=+String(x.mo).replace(',','.')||0;if(!st)return null;return Math.round((st==='Có'?DC_COST.stay:DC_COST.nostay)*mo)}
 function dcCostSum(L){let sum=0,n=0,miss=0;L.forEach(x=>{const c=dcCost(x);if(c==null)miss++;else{sum+=c;n++}});return {sum,n,miss}}
+
+/* Người phụ trách hồ sơ theo PHÂN CÔNG TUYỂN DỤNG (Linh chốt 27/11/2026):
+   Nhà thuốc: nhà thiếu người được giao đích danh trong tháng (khớp tỉnh + địa bàn trên hồ sơ) → người tuyển của tỉnh;
+   Văn phòng → người tuyển khối văn phòng; CHT/QLKV → người tuyển CHT/QLKV toàn quốc. Không xác định được mới dùng người phỏng vấn / vùng cũ. */
+const recNk=t=>normName(t).replace(/^(phường|xã|thị trấn|tp\.?|thành phố|thị xã|huyện)\s+/,'').trim();
+function recCtx(){const tdn={},lab={};return {
+  tdn:m=>{if(!tdn[m]){const o={};try{tdnList(m).forEach(r=>{const w=r.own||r.prev;if(w)o[dcKey(r.x.code)]=w})}catch(_){}tdn[m]=o}return tdn[m]},
+  label:c=>{const k=dcKey(c);if(lab[k]==null){const xy=(typeof DC_XY!=='undefined'&&DC_XY[k])||null;const ds=(S.dcShops||{})[c]||(S.dcShops||{})['SHOP'+String(k).padStart(4,'0')]||{};lab[k]=normName([xy?xy[2]:'',ds.addr||'',ds.sheetAddr||''].join(' | '))}return lab[k]}}}
+function recShopsFor(ar,lc,ctx){const key=recNk(String(lc||'').split(/\s+-\s+/)[0]);if(!key||key.length<3)return [];let U=[];try{U=pvUniverse()}catch(_){}
+  const pk=pvKey(ar);const inProv=U.filter(x=>pvKey(x.prov)===pk);const pool=inProv.length?inProv:U;
+  return pool.filter(x=>ctx.label(x.code).includes(key)).map(x=>x.code)}
+function recAssign(x,ctx){if(x.o==='x')return '';const m=x.sub.slice(0,7);
+  if(x.g===0){const shops=recShopsFor(x.ar,x.lc,ctx);const tm=ctx.tdn(m);for(const c of shops){const w=tm[dcKey(c)];if(w){x.shop=c;return w}}if(shops.length===1)x.shop=shops[0];return (pvProvTD(m,x.ar)||{}).v||''}
+  if(x.g===1)return vpTDMain(m)||'';
+  return pvTQ(m,/cửa hàng trưởng|phụ trách cửa hàng/i.test(x.p)?'CHT':'QLKV')||''}
 </script>
 </body>
 </html>
